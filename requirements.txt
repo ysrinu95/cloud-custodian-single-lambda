@@ -1,8 +1,7 @@
 # Cloud Custodian and AWS dependencies
 c7n==0.9.36
 c7n-org==0.6.29
-boto3==1.34.51
-botocore==1.34.51
+# boto3 and botocore versions managed by c7n dependency (requires boto3==1.34.92)
 
 # Additional utilities
 pyyaml==6.0.1
