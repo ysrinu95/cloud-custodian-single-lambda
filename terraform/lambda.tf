@@ -21,6 +21,7 @@ resource "aws_lambda_layer_version" "custodian_layer" {
 data "archive_file" "lambda_function" {
   type        = "zip"
   output_path = "${path.module}/lambda-function.zip"
+  output_file_mode = "0666"
 
   source {
     content  = file("${path.module}/../src/lambda_${var.lambda_execution_mode}.py")
@@ -37,6 +38,14 @@ data "archive_file" "lambda_function" {
     content  = file("${path.module}/../policies/test-policy.yml")
     filename = "policies/test-policy.yml"
   }
+}
+
+resource "null_resource" "create_lambda_zip" {
+  triggers = {
+    always_run = timestamp()
+  }
+
+  depends_on = [data.archive_file.lambda_function]
 }
 
 resource "aws_lambda_function" "custodian" {
