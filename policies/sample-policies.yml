@@ -1,0 +1,101 @@
+policies:
+  # Stop EC2 instances without required tags
+  - name: ec2-require-tags
+    resource: ec2
+    description: |
+      Find EC2 instances that are missing required tags (Owner, Environment)
+      and stop them after 7 days
+    filters:
+      - "tag:Owner": absent
+      - type: value
+        key: State.Name
+        value: running
+    actions:
+      - type: mark-for-op
+        op: stop
+        days: 7
+      - type: notify
+        subject: "EC2 Instance Missing Required Tags"
+        to:
+          - resource-owner
+        transport:
+          type: sns
+          topic: arn:aws:sns:us-east-1:123456789012:custodian-notifications
+
+  # Remove unattached EBS volumes older than 30 days
+  - name: ebs-delete-unattached-volumes
+    resource: ebs
+    description: |
+      Delete EBS volumes that have been unattached for more than 30 days
+    filters:
+      - State: available
+      - type: value
+        key: CreateTime
+        op: greater-than
+        value_type: age
+        value: 30
+    actions:
+      - type: delete
+      - type: notify
+        subject: "Unattached EBS Volume Deleted"
+        to:
+          - resource-owner
+        transport:
+          type: sns
+          topic: arn:aws:sns:us-east-1:123456789012:custodian-notifications
+
+  # Find S3 buckets without encryption
+  - name: s3-enable-encryption
+    resource: s3
+    description: |
+      Find S3 buckets without default encryption and enable it
+    filters:
+      - type: bucket-encryption
+        state: false
+    actions:
+      - type: set-bucket-encryption
+        encryption: AES256
+      - type: notify
+        subject: "S3 Bucket Encryption Enabled"
+        to:
+          - resource-owner
+        transport:
+          type: sns
+          topic: arn:aws:sns:us-east-1:123456789012:custodian-notifications
+
+  # Clean up old Lambda function versions
+  - name: lambda-delete-old-versions
+    resource: lambda
+    description: |
+      Delete Lambda function versions older than 90 days (keep $LATEST)
+    filters:
+      - type: value
+        key: Version
+        op: ne
+        value: "$LATEST"
+      - type: value
+        key: LastModified
+        op: greater-than
+        value_type: age
+        value: 90
+    actions:
+      - type: delete
+
+  # Find RDS instances without backup
+  - name: rds-require-backup
+    resource: rds
+    description: |
+      Find RDS instances without automated backups enabled
+    filters:
+      - BackupRetentionPeriod: 0
+    actions:
+      - type: tag
+        key: BackupStatus
+        value: NoBackup
+      - type: notify
+        subject: "RDS Instance Without Backup Detected"
+        to:
+          - resource-owner
+        transport:
+          type: sns
+          topic: arn:aws:sns:us-east-1:123456789012:custodian-notifications

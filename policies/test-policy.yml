@@ -1,0 +1,9 @@
+policies:
+  # Simple test policy to list EC2 instances
+  - name: ec2-list-instances
+    resource: ec2
+    description: Simple test policy to list all EC2 instances
+    filters:
+      - type: value
+        key: State.Name
+        value: running

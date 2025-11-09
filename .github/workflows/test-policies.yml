@@ -1,0 +1,500 @@
+name: Test Cloud Custodian Policies
+
+on:
+  workflow_dispatch:
+    inputs:
+      policy_file:
+        description: 'Policy file to test (e.g., sample-policies.yml, test-policy.yml)'
+        required: true
+        type: string
+        default: 'test-policy.yml'
+      test_action:
+        description: 'Test action to perform'
+        required: true
+        type: choice
+        options:
+          - validate-only
+          - dry-run
+          - live-test
+        default: 'validate-only'
+      environment:
+        description: 'Environment for live testing'
+        required: false
+        type: choice
+        options:
+          - dev
+          - staging
+        default: 'dev'
+
+env:
+  AWS_REGION: us-east-1
+  PYTHON_VERSION: "3.11"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # ======================================================================
+  # Job 1: Validate Policy Syntax
+  # ======================================================================
+  validate-policy:
+    name: Validate Policy - ${{ inputs.policy_file }}
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install Cloud Custodian
+        run: |
+          pip install c7n c7n-org pyyaml boto3
+          echo "Cloud Custodian version:"
+          custodian version
+      
+      - name: Validate YAML syntax
+        run: |
+          echo "🔍 Validating YAML syntax..."
+          
+          POLICY_PATH="policies/${{ inputs.policy_file }}"
+          
+          if [ ! -f "$POLICY_PATH" ]; then
+            echo "::error::Policy file not found: $POLICY_PATH"
+            exit 1
+          fi
+          
+          # Validate YAML syntax
+          python -c "import yaml; yaml.safe_load(open('$POLICY_PATH'))"
+          echo "✅ YAML syntax is valid"
+      
+      - name: Validate Cloud Custodian policy
+        run: |
+          echo "🔍 Validating Cloud Custodian policy..."
+          
+          POLICY_PATH="policies/${{ inputs.policy_file }}"
+          
+          # Validate policy structure
+          custodian validate "$POLICY_PATH"
+          echo "✅ Policy validation successful!"
+      
+      - name: Analyze policy
+        run: |
+          echo "📊 Analyzing policy structure..."
+          
+          POLICY_PATH="policies/${{ inputs.policy_file }}"
+          
+          # Extract policy names
+          echo "Policies in file:"
+          python <<EOF
+          import yaml
+          with open('$POLICY_PATH') as f:
+              data = yaml.safe_load(f)
+              for policy in data.get('policies', []):
+                  print(f"  - {policy['name']}: {policy['resource']}")
+                  print(f"    Filters: {len(policy.get('filters', []))}")
+                  print(f"    Actions: {len(policy.get('actions', []))}")
+          EOF
+      
+      - name: Generate validation report
+        run: |
+          cat <<EOF > validation-report.md
+          ## ✅ Policy Validation Report
+          
+          **Policy File:** \`${{ inputs.policy_file }}\`
+          **Test Action:** \`${{ inputs.test_action }}\`
+          **Validation Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          **Triggered by:** ${{ github.actor }}
+          
+          ### Validation Results
+          
+          - ✅ YAML syntax: PASSED
+          - ✅ Cloud Custodian schema: PASSED
+          - ✅ Policy structure: VALID
+          
+          ### Policy Details
+          
+          $(python -c "
+          import yaml
+          with open('policies/${{ inputs.policy_file }}') as f:
+              data = yaml.safe_load(f)
+              for policy in data.get('policies', []):
+                  print(f\"- **{policy['name']}**\")
+                  print(f\"  - Resource: {policy['resource']}\")
+                  print(f\"  - Filters: {len(policy.get('filters', []))}\")
+                  print(f\"  - Actions: {len(policy.get('actions', []))}\")
+          ")
+          
+          EOF
+          
+          cat validation-report.md
+      
+      - name: Upload validation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-report-${{ inputs.policy_file }}
+          path: validation-report.md
+          retention-days: 30
+
+  # ======================================================================
+  # Job 2: Dry Run Policy (No Actions Executed)
+  # ======================================================================
+  dry-run-policy:
+    name: Dry Run - ${{ inputs.policy_file }}
+    runs-on: ubuntu-latest
+    needs: validate-policy
+    if: inputs.test_action == 'dry-run' || inputs.test_action == 'live-test'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install Cloud Custodian
+        run: |
+          pip install c7n c7n-org pyyaml boto3
+          custodian version
+      
+      - name: Run policy in dry-run mode
+        id: dryrun
+        run: |
+          echo "🧪 Running policy in dry-run mode (no actions executed)..."
+          
+          POLICY_PATH="policies/${{ inputs.policy_file }}"
+          OUTPUT_DIR="test-output/$(date +%Y%m%d-%H%M%S)"
+          
+          mkdir -p "$OUTPUT_DIR"
+          
+          # Run in dry-run mode
+          custodian run \
+            -s "$OUTPUT_DIR" \
+            --region ${{ env.AWS_REGION }} \
+            --dryrun \
+            "$POLICY_PATH" 2>&1 | tee dryrun-output.log
+          
+          echo "✅ Dry-run completed!"
+      
+      - name: Analyze dry-run results
+        run: |
+          echo "📊 Analyzing dry-run results..."
+          
+          OUTPUT_DIR="test-output"
+          
+          # Find the latest output directory
+          LATEST_DIR=$(ls -td "$OUTPUT_DIR"/* | head -1)
+          
+          echo "Results directory: $LATEST_DIR"
+          ls -la "$LATEST_DIR" || echo "No output directory found"
+          
+          # Check for resources.json in subdirectories
+          for policy_dir in "$LATEST_DIR"/*; do
+            if [ -d "$policy_dir" ]; then
+              POLICY_NAME=$(basename "$policy_dir")
+              echo ""
+              echo "Policy: $POLICY_NAME"
+              
+              if [ -f "$policy_dir/resources.json" ]; then
+                RESOURCE_COUNT=$(jq '. | length' "$policy_dir/resources.json")
+                echo "  Resources matched: $RESOURCE_COUNT"
+                
+                if [ "$RESOURCE_COUNT" -gt 0 ]; then
+                  echo "  Sample resources:"
+                  jq -r '.[] | .Name // .id // .Id // .InstanceId // .BucketName // "Unknown"' "$policy_dir/resources.json" | head -10
+                fi
+              else
+                echo "  No resources.json found"
+              fi
+            fi
+          done
+      
+      - name: Generate dry-run report
+        run: |
+          OUTPUT_DIR="test-output"
+          LATEST_DIR=$(ls -td "$OUTPUT_DIR"/* | head -1)
+          
+          cat <<EOF > dryrun-report.md
+          ## 🧪 Policy Dry-Run Report
+          
+          **Policy File:** \`${{ inputs.policy_file }}\`
+          **Execution Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          **AWS Region:** ${{ env.AWS_REGION }}
+          **Mode:** Dry-Run (No actions executed)
+          
+          ### Execution Summary
+          
+          EOF
+          
+          # Add resource counts per policy
+          for policy_dir in "$LATEST_DIR"/*; do
+            if [ -d "$policy_dir" ]; then
+              POLICY_NAME=$(basename "$policy_dir")
+              if [ -f "$policy_dir/resources.json" ]; then
+                RESOURCE_COUNT=$(jq '. | length' "$policy_dir/resources.json")
+                echo "- **$POLICY_NAME**: $RESOURCE_COUNT resources matched" >> dryrun-report.md
+              fi
+            fi
+          done
+          
+          cat <<EOF >> dryrun-report.md
+          
+          ### Important Notes
+          
+          - ⚠️ This was a **DRY-RUN** - no actions were executed
+          - Resources listed above would be affected in a live run
+          - Review the matched resources before live execution
+          
+          ### Next Steps
+          
+          1. Review matched resources
+          2. Adjust filters if needed
+          3. Test with live-test action (caution!)
+          4. Deploy to Lambda for scheduled execution
+          
+          EOF
+          
+          cat dryrun-report.md
+      
+      - name: Upload dry-run artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dryrun-results-${{ inputs.policy_file }}
+          path: |
+            test-output/
+            dryrun-output.log
+            dryrun-report.md
+          retention-days: 30
+
+  # ======================================================================
+  # Job 3: Live Test (Execute Actions - USE WITH CAUTION!)
+  # ======================================================================
+  live-test-policy:
+    name: Live Test - ${{ inputs.policy_file }}
+    runs-on: ubuntu-latest
+    needs: [validate-policy, dry-run-policy]
+    if: inputs.test_action == 'live-test'
+    environment:
+      name: ${{ inputs.environment }}-policy-test
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install Cloud Custodian
+        run: |
+          pip install c7n c7n-org pyyaml boto3
+          custodian version
+      
+      - name: Warning banner
+        run: |
+          echo "::warning::⚠️ LIVE TEST MODE - Actions will be EXECUTED!"
+          echo "::warning::This will make REAL changes to AWS resources!"
+          sleep 5
+      
+      - name: Run policy in live mode
+        id: live
+        run: |
+          echo "🚨 Running policy in LIVE mode..."
+          
+          POLICY_PATH="policies/${{ inputs.policy_file }}"
+          OUTPUT_DIR="live-output/$(date +%Y%m%d-%H%M%S)"
+          
+          mkdir -p "$OUTPUT_DIR"
+          
+          # Run in live mode (actions will be executed!)
+          custodian run \
+            -s "$OUTPUT_DIR" \
+            --region ${{ env.AWS_REGION }} \
+            "$POLICY_PATH" 2>&1 | tee live-output.log
+          
+          echo "✅ Live execution completed!"
+      
+      - name: Analyze live results
+        run: |
+          echo "📊 Analyzing live execution results..."
+          
+          OUTPUT_DIR="live-output"
+          LATEST_DIR=$(ls -td "$OUTPUT_DIR"/* | head -1)
+          
+          for policy_dir in "$LATEST_DIR"/*; do
+            if [ -d "$policy_dir" ]; then
+              POLICY_NAME=$(basename "$policy_dir")
+              echo ""
+              echo "Policy: $POLICY_NAME"
+              
+              if [ -f "$policy_dir/resources.json" ]; then
+                RESOURCE_COUNT=$(jq '. | length' "$policy_dir/resources.json")
+                echo "  Resources processed: $RESOURCE_COUNT"
+              fi
+              
+              if [ -f "$policy_dir/action.log" ]; then
+                echo "  Action log:"
+                cat "$policy_dir/action.log"
+              fi
+            fi
+          done
+      
+      - name: Generate live test report
+        run: |
+          OUTPUT_DIR="live-output"
+          LATEST_DIR=$(ls -td "$OUTPUT_DIR"/* | head -1)
+          
+          cat <<EOF > live-test-report.md
+          ## 🚨 Live Policy Execution Report
+          
+          **Policy File:** \`${{ inputs.policy_file }}\`
+          **Execution Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          **Environment:** ${{ inputs.environment }}
+          **AWS Region:** ${{ env.AWS_REGION }}
+          **Mode:** LIVE (Actions EXECUTED)
+          
+          ### ⚠️ WARNING
+          
+          This was a **LIVE EXECUTION** - actions were performed on real AWS resources!
+          
+          ### Execution Summary
+          
+          EOF
+          
+          for policy_dir in "$LATEST_DIR"/*; do
+            if [ -d "$policy_dir" ]; then
+              POLICY_NAME=$(basename "$policy_dir")
+              if [ -f "$policy_dir/resources.json" ]; then
+                RESOURCE_COUNT=$(jq '. | length' "$policy_dir/resources.json")
+                echo "- **$POLICY_NAME**: $RESOURCE_COUNT resources processed" >> live-test-report.md
+              fi
+            fi
+          done
+          
+          cat <<EOF >> live-test-report.md
+          
+          ### Actions Taken
+          
+          Review the action logs and CloudWatch Logs for detailed information about actions performed.
+          
+          ### Next Steps
+          
+          1. Verify changes in AWS Console
+          2. Check CloudWatch Logs for detailed execution
+          3. Review any errors or warnings
+          4. Adjust policy if needed
+          5. Deploy to production Lambda
+          
+          EOF
+          
+          cat live-test-report.md
+      
+      - name: Upload live test artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-test-results-${{ inputs.policy_file }}
+          path: |
+            live-output/
+            live-output.log
+            live-test-report.md
+          retention-days: 90
+
+      - name: Send notification
+        run: |
+          echo "::notice::✅ Live policy test completed for ${{ inputs.policy_file }}"
+          echo "::notice::Review artifacts and CloudWatch Logs for details"
+
+  # ======================================================================
+  # Job 4: Test Lambda Integration
+  # ======================================================================
+  test-lambda-integration:
+    name: Test Lambda Integration
+    runs-on: ubuntu-latest
+    needs: validate-policy
+    if: inputs.test_action == 'live-test'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Find Lambda function
+        id: lambda
+        run: |
+          # Try to find Lambda function by name pattern
+          FUNCTION_NAME=$(aws lambda list-functions \
+            --query "Functions[?contains(FunctionName, 'custodian')].FunctionName | [0]" \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+          
+          if [ -z "$FUNCTION_NAME" ] || [ "$FUNCTION_NAME" == "None" ]; then
+            echo "::warning::No Cloud Custodian Lambda function found"
+            echo "found=false" >> $GITHUB_OUTPUT
+          else
+            echo "found=true" >> $GITHUB_OUTPUT
+            echo "function_name=$FUNCTION_NAME" >> $GITHUB_OUTPUT
+            echo "✅ Found Lambda function: $FUNCTION_NAME"
+          fi
+      
+      - name: Test Lambda with policy
+        if: steps.lambda.outputs.found == 'true'
+        run: |
+          echo "🧪 Testing Lambda function with policy..."
+          
+          PAYLOAD=$(cat <<EOF
+          {
+            "policy_source": "file",
+            "policy_path": "/var/task/policies/${{ inputs.policy_file }}",
+            "dryrun": true,
+            "region": "${{ env.AWS_REGION }}"
+          }
+          EOF
+          )
+          
+          aws lambda invoke \
+            --function-name ${{ steps.lambda.outputs.function_name }} \
+            --payload "$PAYLOAD" \
+            --log-type Tail \
+            --region ${{ env.AWS_REGION }} \
+            lambda-response.json
+          
+          echo "Lambda response:"
+          cat lambda-response.json | jq .
+          
+          echo "✅ Lambda integration test completed!"
+      
+      - name: Check CloudWatch Logs
+        if: steps.lambda.outputs.found == 'true'
+        run: |
+          echo "📋 Checking Lambda CloudWatch Logs..."
+          
+          LOG_GROUP="/aws/lambda/${{ steps.lambda.outputs.function_name }}"
+          
+          aws logs tail "$LOG_GROUP" \
+            --since 5m \
+            --format short \
+            --region ${{ env.AWS_REGION }} || echo "No recent logs found"
