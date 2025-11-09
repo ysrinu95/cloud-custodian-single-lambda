@@ -368,9 +368,18 @@ jobs:
         run: |
           echo "🧪 Testing Lambda function..."
           
+          # Create a test payload file
+          cat > test-payload.json <<'EOF'
+          {
+            "policy_source": "file",
+            "policy_path": "/var/task/policies/test-policy.yml",
+            "dryrun": true
+          }
+          EOF
+          
           aws lambda invoke \
             --function-name ${{ steps.outputs.outputs.lambda_function_name }} \
-            --payload '{"policy_source":"file","policy_path":"/var/task/policies/test-policy.yml","dryrun":true}' \
+            --payload file://test-payload.json \
             --log-type Tail \
             --region ${{ env.AWS_REGION }} \
             response.json
