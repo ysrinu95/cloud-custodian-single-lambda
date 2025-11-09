@@ -203,6 +203,29 @@ jobs:
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
+      - name: Create Lambda function zip
+        run: |
+          # Create a temporary directory for Lambda package
+          mkdir -p lambda-package/policies
+          
+          # Copy Lambda handler (rename to lambda_function.py)
+          cp src/lambda_native.py lambda-package/lambda_function.py
+          
+          # Copy policies
+          cp policies/sample-policies.yml lambda-package/policies/
+          cp policies/test-policy.yml lambda-package/policies/
+          
+          # Create zip file
+          cd lambda-package
+          zip -r ../terraform/lambda-function.zip .
+          cd ..
+          
+          # Show zip contents and size
+          echo "Lambda function zip contents:"
+          unzip -l terraform/lambda-function.zip
+          ls -lh terraform/lambda-function.zip
+        shell: bash
+
       - name: Terraform Format Check
         working-directory: terraform
         run: terraform fmt -check -recursive
@@ -314,6 +337,29 @@ jobs:
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
           terraform_wrapper: false
+
+      - name: Create Lambda function zip
+        run: |
+          # Create a temporary directory for Lambda package
+          mkdir -p lambda-package/policies
+          
+          # Copy Lambda handler (rename to lambda_function.py)
+          cp src/lambda_native.py lambda-package/lambda_function.py
+          
+          # Copy policies
+          cp policies/sample-policies.yml lambda-package/policies/
+          cp policies/test-policy.yml lambda-package/policies/
+          
+          # Create zip file
+          cd lambda-package
+          zip -r ../terraform/lambda-function.zip .
+          cd ..
+          
+          # Show zip contents and size
+          echo "Lambda function zip contents:"
+          unzip -l terraform/lambda-function.zip
+          ls -lh terraform/lambda-function.zip
+        shell: bash
 
       - name: Terraform Init
         working-directory: terraform

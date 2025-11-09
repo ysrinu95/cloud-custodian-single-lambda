@@ -18,42 +18,38 @@ resource "aws_lambda_layer_version" "custodian_layer" {
 
 # Lambda Function
 
-data "archive_file" "lambda_function" {
-  type        = "zip"
-  output_path = "${path.module}/lambda-function.zip"
-  output_file_mode = "0666"
+# Note: Lambda function zip is created by GitHub Actions workflow
+# before Terraform runs to avoid issues with data.archive_file
 
-  source {
-    content  = file("${path.module}/../src/lambda_${var.lambda_execution_mode}.py")
-    filename = "lambda_function.py"
-  }
-
-  # Include policies directory
-  source {
-    content  = file("${path.module}/../policies/sample-policies.yml")
-    filename = "policies/sample-policies.yml"
-  }
-
-  source {
-    content  = file("${path.module}/../policies/test-policy.yml")
-    filename = "policies/test-policy.yml"
-  }
-}
-
-resource "null_resource" "create_lambda_zip" {
-  triggers = {
-    always_run = timestamp()
-  }
-
-  depends_on = [data.archive_file.lambda_function]
-}
+# Removed data.archive_file - zip created by workflow instead
+# data "archive_file" "lambda_function" {
+#   type        = "zip"
+#   output_path = "${path.module}/lambda-function.zip"
+#   output_file_mode = "0666"
+#
+#   source {
+#     content  = file("${path.module}/../src/lambda_${var.lambda_execution_mode}.py")
+#     filename = "lambda_function.py"
+#   }
+#
+#   # Include policies directory
+#   source {
+#     content  = file("${path.module}/../policies/sample-policies.yml")
+#     filename = "policies/sample-policies.yml"
+#   }
+#
+#   source {
+#     content  = file("${path.module}/../policies/test-policy.yml")
+#     filename = "policies/test-policy.yml"
+#   }
+# }
 
 resource "aws_lambda_function" "custodian" {
-  filename         = data.archive_file.lambda_function.output_path
+  filename         = "${path.module}/lambda-function.zip"
   function_name    = "${var.project_name}-executor-${var.environment}"
   role             = aws_iam_role.lambda_role.arn
   handler          = "lambda_function.lambda_handler"
-  source_code_hash = data.archive_file.lambda_function.output_base64sha256
+  source_code_hash = filebase64sha256("${path.module}/lambda-function.zip")
   runtime          = "python3.11"
   timeout          = var.lambda_timeout
   memory_size      = var.lambda_memory_size
