@@ -115,7 +115,7 @@ jobs:
           fi
 
       - name: Upload layer artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: cloud-custodian-layer
           path: layers/cloud-custodian-layer.zip
@@ -131,7 +131,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download layer artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: cloud-custodian-layer
           path: layers/
@@ -188,7 +188,7 @@ jobs:
             -out=tfplan
 
       - name: Upload Terraform plan
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: terraform-plan
           path: terraform/tfplan
@@ -207,13 +207,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download layer artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: cloud-custodian-layer
           path: layers/
 
       - name: Download Terraform plan
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: terraform-plan
           path: terraform/
