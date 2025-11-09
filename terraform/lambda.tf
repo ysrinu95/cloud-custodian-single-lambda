@@ -20,7 +20,7 @@ resource "aws_lambda_layer_version" "custodian_layer" {
 
 data "archive_file" "lambda_function" {
   type        = "zip"
-  output_path = "${path.module}/../dist/lambda-function.zip"
+  output_path = "${path.module}/lambda-function.zip"
 
   source {
     content  = file("${path.module}/../src/lambda_${var.lambda_execution_mode}.py")
