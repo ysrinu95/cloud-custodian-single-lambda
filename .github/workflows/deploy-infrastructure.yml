@@ -385,7 +385,7 @@ jobs:
           ### Quick Links
           
           - [Lambda Function](https://console.aws.amazon.com/lambda/home?region=${{ env.AWS_REGION }}#/functions/${{ steps.outputs.outputs.lambda_function_name }})
-          - [CloudWatch Logs](https://console.aws.amazon.com/cloudwatch/home?region=${{ env.AWS_REGION }}#logsV2:log-groups/log-group/${{ steps.outputs.outputs.log_group_name | replace('/', '$252F') }})
+          - [CloudWatch Logs](https://console.aws.amazon.com/cloudwatch/home?region=${{ env.AWS_REGION }}#logsV2:log-groups/log-group/${{ steps.outputs.outputs.log_group_name }})
           - [EventBridge Rules](https://console.aws.amazon.com/events/home?region=${{ env.AWS_REGION }}#/rules)
           
           ### Next Steps
