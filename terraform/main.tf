@@ -12,14 +12,12 @@ terraform {
     }
   }
 
-  # Uncomment and configure for remote state
-  # backend "s3" {
-  #   bucket         = "your-terraform-state-bucket"
-  #   key            = "cloud-custodian-lambda/terraform.tfstate"
-  #   region         = "us-east-1"
-  #   encrypt        = true
-  #   dynamodb_table = "terraform-state-lock"
-  # }
+  backend "s3" {
+    bucket  = "ysr95-cloud-custodian-tf-bkt"
+    key     = "cloud-custodian-lambda/terraform.tfstate"
+    region  = "us-east-1"
+    encrypt = true
+  }
 }
 
 provider "aws" {
