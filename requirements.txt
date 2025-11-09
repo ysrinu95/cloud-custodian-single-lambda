@@ -1,8 +1,4 @@
 # Cloud Custodian and AWS dependencies
 c7n==0.9.36
 c7n-org==0.6.29
-# boto3 and botocore versions managed by c7n dependency (requires boto3==1.34.92)
-
-# Additional utilities
-pyyaml==6.0.1
-python-dateutil==2.8.2
+# boto3, botocore, python-dateutil, and pyyaml versions managed by c7n dependencies
