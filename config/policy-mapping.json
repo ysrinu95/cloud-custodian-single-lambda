@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "description": "Policy mapping configuration for event-driven Cloud Custodian execution",
-  "s3_policy_bucket": "your-policies-bucket",
+  "s3_policy_bucket": "ysr95-custodian-policies",
   "s3_policy_prefix": "custodian-policies/",
   "mappings": [
     {
