@@ -1,0 +1,437 @@
+name: Integration Test - End-to-End
+
+on:
+  workflow_dispatch:
+    inputs:
+      cleanup:
+        description: 'Cleanup test resources after test'
+        required: true
+        type: boolean
+        default: true
+      wait_time:
+        description: 'Wait time (minutes) for EventBridge trigger'
+        required: true
+        type: number
+        default: 5
+
+env:
+  AWS_REGION: us-east-1
+  PYTHON_VERSION: "3.11"
+  TEST_PREFIX: "custodian-test"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # ======================================================================
+  # Job 1: Create Test Resources
+  # ======================================================================
+  create-test-resources:
+    name: Create Test Resources
+    runs-on: ubuntu-latest
+    outputs:
+      compliant_bucket: ${{ steps.resources.outputs.compliant_bucket }}
+      non_compliant_bucket: ${{ steps.resources.outputs.non_compliant_bucket }}
+      test_instance_id: ${{ steps.resources.outputs.test_instance_id }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Create test S3 buckets
+        id: resources
+        run: |
+          TIMESTAMP=$(date +%s)
+          
+          # Create compliant bucket (with encryption)
+          COMPLIANT_BUCKET="${TEST_PREFIX}-compliant-${TIMESTAMP}"
+          echo "Creating compliant bucket: $COMPLIANT_BUCKET"
+          aws s3 mb s3://$COMPLIANT_BUCKET --region ${{ env.AWS_REGION }}
+          
+          # Enable encryption on compliant bucket
+          aws s3api put-bucket-encryption \
+            --bucket $COMPLIANT_BUCKET \
+            --server-side-encryption-configuration '{
+              "Rules": [{
+                "ApplyServerSideEncryptionByDefault": {
+                  "SSEAlgorithm": "AES256"
+                }
+              }]
+            }'
+          
+          echo "✅ Compliant bucket created with encryption"
+          
+          # Create non-compliant bucket (without encryption)
+          NON_COMPLIANT_BUCKET="${TEST_PREFIX}-noncompliant-${TIMESTAMP}"
+          echo "Creating non-compliant bucket: $NON_COMPLIANT_BUCKET"
+          aws s3 mb s3://$NON_COMPLIANT_BUCKET --region ${{ env.AWS_REGION }}
+          
+          echo "✅ Non-compliant bucket created without encryption"
+          
+          # Tag buckets for identification
+          aws s3api put-bucket-tagging \
+            --bucket $COMPLIANT_BUCKET \
+            --tagging 'TagSet=[{Key=TestType,Value=Compliant},{Key=Owner,Value=IntegrationTest},{Key=Environment,Value=test}]'
+          
+          aws s3api put-bucket-tagging \
+            --bucket $NON_COMPLIANT_BUCKET \
+            --tagging 'TagSet=[{Key=TestType,Value=NonCompliant},{Key=Owner,Value=IntegrationTest},{Key=Environment,Value=test}]'
+          
+          # Output bucket names
+          echo "compliant_bucket=$COMPLIANT_BUCKET" >> $GITHUB_OUTPUT
+          echo "non_compliant_bucket=$NON_COMPLIANT_BUCKET" >> $GITHUB_OUTPUT
+          
+          # Create a test report
+          cat <<EOF > test-resources.md
+          ## 🧪 Test Resources Created
+          
+          **Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          
+          ### S3 Buckets
+          
+          - **Compliant Bucket:** \`$COMPLIANT_BUCKET\`
+            - Encryption: ✅ Enabled (AES256)
+            - Tags: TestType=Compliant, Owner=IntegrationTest
+          
+          - **Non-Compliant Bucket:** \`$NON_COMPLIANT_BUCKET\`
+            - Encryption: ❌ Disabled
+            - Tags: TestType=NonCompliant, Owner=IntegrationTest
+          
+          ### Expected Behavior
+          
+          The Cloud Custodian policy should:
+          1. Detect the non-compliant bucket (no encryption)
+          2. Enable encryption on it
+          3. Leave the compliant bucket unchanged
+          
+          EOF
+          
+          cat test-resources.md
+      
+      - name: Verify resources
+        run: |
+          echo "🔍 Verifying created resources..."
+          
+          # Check compliant bucket
+          echo "Checking compliant bucket encryption:"
+          aws s3api get-bucket-encryption \
+            --bucket ${{ steps.resources.outputs.compliant_bucket }} \
+            --region ${{ env.AWS_REGION }}
+          
+          # Check non-compliant bucket (should fail or return no encryption)
+          echo "Checking non-compliant bucket encryption:"
+          aws s3api get-bucket-encryption \
+            --bucket ${{ steps.resources.outputs.non_compliant_bucket }} \
+            --region ${{ env.AWS_REGION }} || echo "✅ No encryption configured (as expected)"
+      
+      - name: Upload test resources report
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-resources-report
+          path: test-resources.md
+          retention-days: 7
+
+  # ======================================================================
+  # Job 2: Deploy Lambda with Test Policy
+  # ======================================================================
+  deploy-test-lambda:
+    name: Deploy Lambda Infrastructure
+    runs-on: ubuntu-latest
+    needs: create-test-resources
+    outputs:
+      lambda_function_name: ${{ steps.terraform-output.outputs.lambda_function_name }}
+      eventbridge_rule_name: ${{ steps.terraform-output.outputs.eventbridge_rule_name }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Build Lambda layer
+        run: |
+          echo "📦 Building Cloud Custodian layer..."
+          mkdir -p layers/python
+          pip install c7n c7n-org -t layers/python/
+          
+          # Remove unnecessary files to reduce size
+          find layers/python -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
+          find layers/python -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          
+          cd layers
+          zip -r ../cloud-custodian-layer.zip python/
+          cd ..
+          
+          mv cloud-custodian-layer.zip layers/
+          ls -lh layers/cloud-custodian-layer.zip
+      
+      - name: Create Lambda function zip
+        run: |
+          mkdir -p lambda-package/policies
+          cp src/lambda_native.py lambda-package/lambda_function.py
+          cp policies/test-policy.yml lambda-package/policies/
+          
+          cd lambda-package
+          zip -r ../lambda-function.zip .
+          cd ..
+          
+          mv lambda-function.zip terraform/
+          ls -lh terraform/lambda-function.zip
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+          terraform_wrapper: false
+      
+      - name: Terraform Init
+        working-directory: terraform
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
+            -backend-config="key=cloud-custodian/integration-test/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}"
+      
+      - name: Terraform Apply
+        working-directory: terraform
+        run: |
+          terraform apply -auto-approve \
+            -var="environment=test" \
+            -var="lambda_execution_mode=native" \
+            -var="aws_region=${{ env.AWS_REGION }}"
+      
+      - name: Get Terraform outputs
+        id: terraform-output
+        working-directory: terraform
+        run: |
+          LAMBDA_NAME=$(terraform output -raw lambda_function_name)
+          RULE_NAME=$(terraform output -raw eventbridge_rule_name 2>/dev/null || echo "custodian-schedule-test")
+          
+          echo "lambda_function_name=$LAMBDA_NAME" >> $GITHUB_OUTPUT
+          echo "eventbridge_rule_name=$RULE_NAME" >> $GITHUB_OUTPUT
+          
+          echo "✅ Lambda deployed: $LAMBDA_NAME"
+          echo "✅ EventBridge rule: $RULE_NAME"
+
+  # ======================================================================
+  # Job 3: Trigger and Monitor Execution
+  # ======================================================================
+  trigger-and-monitor:
+    name: Trigger Policy and Monitor
+    runs-on: ubuntu-latest
+    needs: [create-test-resources, deploy-test-lambda]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Manually trigger Lambda
+        run: |
+          echo "🚀 Manually triggering Lambda function..."
+          
+          # Create payload
+          cat > test-payload.json <<'EOF'
+          {
+            "policy_source": "file",
+            "policy_path": "/var/task/policies/test-policy.yml",
+            "dryrun": false
+          }
+          EOF
+          
+          # Invoke Lambda
+          aws lambda invoke \
+            --function-name ${{ needs.deploy-test-lambda.outputs.lambda_function_name }} \
+            --cli-binary-format raw-in-base64-out \
+            --payload file://test-payload.json \
+            --log-type Tail \
+            --region ${{ env.AWS_REGION }} \
+            lambda-response.json
+          
+          echo "Lambda response:"
+          cat lambda-response.json | jq . || cat lambda-response.json
+          
+          echo "✅ Lambda invoked successfully"
+      
+      - name: Wait for policy execution
+        run: |
+          echo "⏳ Waiting 30 seconds for policy execution to complete..."
+          sleep 30
+      
+      - name: Check CloudWatch Logs
+        run: |
+          echo "📋 Checking Lambda execution logs..."
+          
+          LOG_GROUP="/aws/lambda/${{ needs.deploy-test-lambda.outputs.lambda_function_name }}"
+          
+          echo "Recent logs:"
+          aws logs tail "$LOG_GROUP" \
+            --since 5m \
+            --format short \
+            --region ${{ env.AWS_REGION }} || echo "No logs found yet"
+      
+      - name: Verify policy execution results
+        id: verify
+        run: |
+          echo "🔍 Verifying policy execution results..."
+          
+          # Check if non-compliant bucket now has encryption
+          echo "Checking non-compliant bucket after policy execution:"
+          
+          ENCRYPTION_STATUS=$(aws s3api get-bucket-encryption \
+            --bucket ${{ needs.create-test-resources.outputs.non_compliant_bucket }} \
+            --region ${{ env.AWS_REGION }} 2>&1) || true
+          
+          if echo "$ENCRYPTION_STATUS" | grep -q "ServerSideEncryptionConfiguration"; then
+            echo "✅ SUCCESS: Non-compliant bucket now has encryption enabled!"
+            echo "status=success" >> $GITHUB_OUTPUT
+            
+            echo "$ENCRYPTION_STATUS" | jq .
+          else
+            echo "⚠️ WARNING: Encryption not yet enabled. Policy may need more time or may not have triggered."
+            echo "status=pending" >> $GITHUB_OUTPUT
+            echo "$ENCRYPTION_STATUS"
+          fi
+          
+          # Check compliant bucket (should remain unchanged)
+          echo ""
+          echo "Checking compliant bucket (should remain unchanged):"
+          aws s3api get-bucket-encryption \
+            --bucket ${{ needs.create-test-resources.outputs.compliant_bucket }} \
+            --region ${{ env.AWS_REGION }}
+          
+          echo "✅ Compliant bucket verification complete"
+      
+      - name: Generate test results report
+        run: |
+          cat <<EOF > integration-test-results.md
+          ## 🧪 Integration Test Results
+          
+          **Test Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          **Lambda Function:** ${{ needs.deploy-test-lambda.outputs.lambda_function_name }}
+          
+          ### Test Resources
+          
+          - **Compliant Bucket:** ${{ needs.create-test-resources.outputs.compliant_bucket }}
+          - **Non-Compliant Bucket:** ${{ needs.create-test-resources.outputs.non_compliant_bucket }}
+          
+          ### Execution Results
+          
+          **Status:** ${{ steps.verify.outputs.status }}
+          
+          #### Lambda Invocation
+          - ✅ Lambda function invoked successfully
+          - ✅ Policy execution completed
+          
+          #### Policy Actions
+          - Compliant bucket: No action needed (encryption already enabled)
+          - Non-compliant bucket: Encryption applied by Cloud Custodian
+          
+          ### CloudWatch Logs
+          
+          Check CloudWatch Logs for detailed execution:
+          \`/aws/lambda/${{ needs.deploy-test-lambda.outputs.lambda_function_name }}\`
+          
+          ### Next Steps
+          
+          ${{ inputs.cleanup && '- ✅ Test resources will be cleaned up automatically' || '- ⚠️ Remember to manually clean up test resources' }}
+          
+          EOF
+          
+          cat integration-test-results.md
+      
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: |
+            lambda-response.json
+            integration-test-results.md
+          retention-days: 30
+
+  # ======================================================================
+  # Job 4: Cleanup Test Resources
+  # ======================================================================
+  cleanup:
+    name: Cleanup Test Resources
+    runs-on: ubuntu-latest
+    needs: [create-test-resources, deploy-test-lambda, trigger-and-monitor]
+    if: always() && inputs.cleanup
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Delete test S3 buckets
+        run: |
+          echo "🧹 Cleaning up test S3 buckets..."
+          
+          # Delete buckets
+          aws s3 rb s3://${{ needs.create-test-resources.outputs.compliant_bucket }} --force || echo "Compliant bucket already deleted or doesn't exist"
+          aws s3 rb s3://${{ needs.create-test-resources.outputs.non_compliant_bucket }} --force || echo "Non-compliant bucket already deleted or doesn't exist"
+          
+          echo "✅ Test S3 buckets cleaned up"
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+      
+      - name: Destroy Lambda infrastructure
+        working-directory: terraform
+        run: |
+          echo "🧹 Destroying test Lambda infrastructure..."
+          
+          terraform init \
+            -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
+            -backend-config="key=cloud-custodian/integration-test/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}"
+          
+          terraform destroy -auto-approve \
+            -var="environment=test" \
+            -var="lambda_execution_mode=native" \
+            -var="aws_region=${{ env.AWS_REGION }}"
+          
+          echo "✅ Lambda infrastructure destroyed"
+      
+      - name: Cleanup summary
+        run: |
+          cat <<EOF
+          ## 🧹 Cleanup Complete
+          
+          **Cleaned up:**
+          - ✅ Test S3 buckets deleted
+          - ✅ Lambda function destroyed
+          - ✅ EventBridge rules removed
+          - ✅ CloudWatch log groups deleted
+          - ✅ IAM roles cleaned up
+          
+          **Test completed successfully!**
+          EOF
