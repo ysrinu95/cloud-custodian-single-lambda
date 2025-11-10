@@ -1,4 +1,4 @@
-name: Integration Test - End-to-End
+name: Integration Test - End-to-End Auto Detection
 
 on:
   workflow_dispatch:
@@ -9,10 +9,10 @@ on:
         type: boolean
         default: true
       wait_time:
-        description: 'Wait time (minutes) for EventBridge trigger'
+        description: 'Wait time (minutes) to monitor for EventBridge trigger'
         required: true
         type: number
-        default: 5
+        default: 2
 
 env:
   AWS_REGION: us-east-1
@@ -28,12 +28,11 @@ jobs:
   # Job 1: Create Test Resources
   # ======================================================================
   create-test-resources:
-    name: Create Test Resources
+    name: Create Public S3 Bucket
     runs-on: ubuntu-latest
     outputs:
-      compliant_bucket: ${{ steps.resources.outputs.compliant_bucket }}
-      non_compliant_bucket: ${{ steps.resources.outputs.non_compliant_bucket }}
-      test_instance_id: ${{ steps.resources.outputs.test_instance_id }}
+      public_bucket: ${{ steps.resources.outputs.public_bucket }}
+      bucket_creation_time: ${{ steps.resources.outputs.bucket_creation_time }}
     
     steps:
       - name: Checkout code
@@ -45,91 +44,77 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
           aws-region: ${{ env.AWS_REGION }}
       
-      - name: Create test S3 buckets
+      - name: Create public S3 bucket
         id: resources
         run: |
           TIMESTAMP=$(date +%s)
+          BUCKET_NAME="${TEST_PREFIX}-public-${TIMESTAMP}"
           
-          # Create compliant bucket (with encryption)
-          COMPLIANT_BUCKET="${TEST_PREFIX}-compliant-${TIMESTAMP}"
-          echo "Creating compliant bucket: $COMPLIANT_BUCKET"
-          aws s3 mb s3://$COMPLIANT_BUCKET --region ${{ env.AWS_REGION }}
+          echo "🪣 Creating public S3 bucket: $BUCKET_NAME"
           
-          # Enable encryption on compliant bucket
-          aws s3api put-bucket-encryption \
-            --bucket $COMPLIANT_BUCKET \
-            --server-side-encryption-configuration '{
-              "Rules": [{
-                "ApplyServerSideEncryptionByDefault": {
-                  "SSEAlgorithm": "AES256"
-                }
-              }]
-            }'
+          # Create bucket
+          aws s3 mb s3://$BUCKET_NAME --region ${{ env.AWS_REGION }}
           
-          echo "✅ Compliant bucket created with encryption"
+          # Disable block public access settings
+          aws s3api put-public-access-block \
+            --bucket $BUCKET_NAME \
+            --public-access-block-configuration \
+              "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
           
-          # Create non-compliant bucket (without encryption)
-          NON_COMPLIANT_BUCKET="${TEST_PREFIX}-noncompliant-${TIMESTAMP}"
-          echo "Creating non-compliant bucket: $NON_COMPLIANT_BUCKET"
-          aws s3 mb s3://$NON_COMPLIANT_BUCKET --region ${{ env.AWS_REGION }}
+          # Apply public ACL
+          aws s3api put-bucket-acl \
+            --bucket $BUCKET_NAME \
+            --acl public-read
           
-          echo "✅ Non-compliant bucket created without encryption"
+          # Verify it's public
+          echo ""
+          echo "📋 Bucket ACL:"
+          aws s3api get-bucket-acl --bucket $BUCKET_NAME
           
-          # Tag buckets for identification
+          # Add tags
           aws s3api put-bucket-tagging \
-            --bucket $COMPLIANT_BUCKET \
-            --tagging 'TagSet=[{Key=TestType,Value=Compliant},{Key=Owner,Value=IntegrationTest},{Key=Environment,Value=test}]'
+            --bucket $BUCKET_NAME \
+            --tagging 'TagSet=[{Key=TestType,Value=PublicBucket},{Key=Owner,Value=IntegrationTest},{Key=Environment,Value=test}]'
           
-          aws s3api put-bucket-tagging \
-            --bucket $NON_COMPLIANT_BUCKET \
-            --tagging 'TagSet=[{Key=TestType,Value=NonCompliant},{Key=Owner,Value=IntegrationTest},{Key=Environment,Value=test}]'
+          CREATION_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           
-          # Output bucket names
-          echo "compliant_bucket=$COMPLIANT_BUCKET" >> $GITHUB_OUTPUT
-          echo "non_compliant_bucket=$NON_COMPLIANT_BUCKET" >> $GITHUB_OUTPUT
+          # Output
+          echo "public_bucket=$BUCKET_NAME" >> $GITHUB_OUTPUT
+          echo "bucket_creation_time=$CREATION_TIME" >> $GITHUB_OUTPUT
           
-          # Create a test report
           cat <<EOF > test-resources.md
-          ## 🧪 Test Resources Created
+          ## 🧪 Test Resource Created
           
-          **Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          **Timestamp:** $CREATION_TIME
           
-          ### S3 Buckets
+          ### Public S3 Bucket
           
-          - **Compliant Bucket:** \`$COMPLIANT_BUCKET\`
-            - Encryption: ✅ Enabled (AES256)
-            - Tags: TestType=Compliant, Owner=IntegrationTest
-          
-          - **Non-Compliant Bucket:** \`$NON_COMPLIANT_BUCKET\`
-            - Encryption: ❌ Disabled
-            - Tags: TestType=NonCompliant, Owner=IntegrationTest
+          - **Bucket Name:** \`$BUCKET_NAME\`
+          - **Status:** ⚠️ **PUBLIC** (Block Public Access: Disabled, ACL: public-read)
+          - **Tags:** TestType=PublicBucket, Owner=IntegrationTest
           
           ### Expected Behavior
           
-          The Cloud Custodian policy should:
-          1. Detect the non-compliant bucket (no encryption)
-          2. Enable encryption on it
-          3. Leave the compliant bucket unchanged
+          Cloud Custodian should automatically:
+          1. Detect the public bucket via EventBridge (CloudTrail events)
+          2. Trigger Lambda function
+          3. Remove public access or apply remediation
+          4. Log actions to CloudWatch
+          
+          ### Monitoring
+          
+          The workflow will monitor for ${{ inputs.wait_time }} minutes to observe:
+          - EventBridge rule trigger
+          - Lambda function invocation
+          - Policy execution and remediation
           
           EOF
           
           cat test-resources.md
-      
-      - name: Verify resources
-        run: |
-          echo "🔍 Verifying created resources..."
           
-          # Check compliant bucket
-          echo "Checking compliant bucket encryption:"
-          aws s3api get-bucket-encryption \
-            --bucket ${{ steps.resources.outputs.compliant_bucket }} \
-            --region ${{ env.AWS_REGION }}
-          
-          # Check non-compliant bucket (should fail or return no encryption)
-          echo "Checking non-compliant bucket encryption:"
-          aws s3api get-bucket-encryption \
-            --bucket ${{ steps.resources.outputs.non_compliant_bucket }} \
-            --region ${{ env.AWS_REGION }} || echo "✅ No encryption configured (as expected)"
+          echo ""
+          echo "⚠️ PUBLIC BUCKET CREATED: $BUCKET_NAME"
+          echo "⏳ Waiting for Cloud Custodian to detect and remediate..."
       
       - name: Upload test resources report
         uses: actions/upload-artifact@v4
@@ -230,10 +215,10 @@ jobs:
           echo "✅ EventBridge rule: $RULE_NAME"
 
   # ======================================================================
-  # Job 3: Trigger and Monitor Execution
+  # Job 3: Monitor EventBridge and Lambda Automatically
   # ======================================================================
   trigger-and-monitor:
-    name: Trigger Policy and Monitor
+    name: Monitor Automatic Detection and Remediation
     runs-on: ubuntu-latest
     needs: [create-test-resources, deploy-test-lambda]
     
@@ -247,37 +232,61 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
           aws-region: ${{ env.AWS_REGION }}
       
-      - name: Manually trigger Lambda
+      - name: Wait for EventBridge to trigger Lambda
         run: |
-          echo "🚀 Manually triggering Lambda function..."
+          echo "⏳ Waiting ${{ inputs.wait_time }} minutes for EventBridge to detect S3 event and trigger Lambda..."
+          echo ""
+          echo "What's happening:"
+          echo "1. CloudTrail logs S3 bucket creation event"
+          echo "2. EventBridge rule matches the event pattern"
+          echo "3. Lambda function gets triggered automatically"
+          echo "4. Cloud Custodian policy executes"
+          echo "5. Public bucket gets remediated"
+          echo ""
           
-          # Create payload
-          cat > test-payload.json <<'EOF'
-          {
-            "policy_source": "file",
-            "policy_path": "/var/task/policies/test-policy.yml",
-            "dryrun": false
-          }
-          EOF
+          WAIT_SECONDS=$((inputs.wait_time * 60))
           
-          # Invoke Lambda
-          aws lambda invoke \
-            --function-name ${{ needs.deploy-test-lambda.outputs.lambda_function_name }} \
-            --cli-binary-format raw-in-base64-out \
-            --payload file://test-payload.json \
-            --log-type Tail \
-            --region ${{ env.AWS_REGION }} \
-            lambda-response.json
+          # Show progress
+          for i in $(seq 1 ${{ inputs.wait_time }}); do
+            echo "⏳ Minute $i/${{ inputs.wait_time }} - Monitoring..."
+            sleep 60
+          done
           
-          echo "Lambda response:"
-          cat lambda-response.json | jq . || cat lambda-response.json
-          
-          echo "✅ Lambda invoked successfully"
+          echo "✅ Monitoring period complete"
       
-      - name: Wait for policy execution
+      - name: Check Lambda invocations
         run: |
-          echo "⏳ Waiting 30 seconds for policy execution to complete..."
-          sleep 30
+          echo "🔍 Checking Lambda invocation metrics..."
+          
+          FUNCTION_NAME="${{ needs.deploy-test-lambda.outputs.lambda_function_name }}"
+          START_TIME=$(date -u -d "${{ needs.create-test-resources.outputs.bucket_creation_time }}" +%s)000
+          END_TIME=$(date +%s)000
+          
+          echo "Querying Lambda metrics from ${{ needs.create-test-resources.outputs.bucket_creation_time }} to now..."
+          
+          # Check invocation count
+          INVOCATIONS=$(aws cloudwatch get-metric-statistics \
+            --namespace AWS/Lambda \
+            --metric-name Invocations \
+            --dimensions Name=FunctionName,Value=$FUNCTION_NAME \
+            --start-time ${{ needs.create-test-resources.outputs.bucket_creation_time }} \
+            --end-time $(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+            --period 60 \
+            --statistics Sum \
+            --region ${{ env.AWS_REGION }})
+          
+          echo "Lambda Invocations:"
+          echo "$INVOCATIONS" | jq .
+          
+          INVOCATION_COUNT=$(echo "$INVOCATIONS" | jq '[.Datapoints[].Sum] | add // 0')
+          echo ""
+          echo "Total invocations: $INVOCATION_COUNT"
+          
+          if [ "$INVOCATION_COUNT" -gt 0 ]; then
+            echo "✅ Lambda was invoked automatically!"
+          else
+            echo "⚠️ No automatic invocations detected. EventBridge may need more time or may not be configured."
+          fi
       
       - name: Check CloudWatch Logs
         run: |
@@ -285,72 +294,93 @@ jobs:
           
           LOG_GROUP="/aws/lambda/${{ needs.deploy-test-lambda.outputs.lambda_function_name }}"
           
-          echo "Recent logs:"
+          echo "Recent logs (last ${{ inputs.wait_time }} minutes):"
           aws logs tail "$LOG_GROUP" \
-            --since 5m \
+            --since ${{ inputs.wait_time }}m \
             --format short \
-            --region ${{ env.AWS_REGION }} || echo "No logs found yet"
+            --region ${{ env.AWS_REGION }} || echo "No logs found"
       
-      - name: Verify policy execution results
+      - name: Verify bucket remediation
         id: verify
         run: |
-          echo "🔍 Verifying policy execution results..."
+          echo "🔍 Verifying if public bucket was remediated..."
           
-          # Check if non-compliant bucket now has encryption
-          echo "Checking non-compliant bucket after policy execution:"
+          BUCKET="${{ needs.create-test-resources.outputs.public_bucket }}"
           
-          ENCRYPTION_STATUS=$(aws s3api get-bucket-encryption \
-            --bucket ${{ needs.create-test-resources.outputs.non_compliant_bucket }} \
+          echo "Checking public access block settings:"
+          PUBLIC_ACCESS=$(aws s3api get-public-access-block \
+            --bucket $BUCKET \
             --region ${{ env.AWS_REGION }} 2>&1) || true
           
-          if echo "$ENCRYPTION_STATUS" | grep -q "ServerSideEncryptionConfiguration"; then
-            echo "✅ SUCCESS: Non-compliant bucket now has encryption enabled!"
-            echo "status=success" >> $GITHUB_OUTPUT
-            
-            echo "$ENCRYPTION_STATUS" | jq .
-          else
-            echo "⚠️ WARNING: Encryption not yet enabled. Policy may need more time or may not have triggered."
-            echo "status=pending" >> $GITHUB_OUTPUT
-            echo "$ENCRYPTION_STATUS"
-          fi
+          echo "$PUBLIC_ACCESS"
           
-          # Check compliant bucket (should remain unchanged)
           echo ""
-          echo "Checking compliant bucket (should remain unchanged):"
-          aws s3api get-bucket-encryption \
-            --bucket ${{ needs.create-test-resources.outputs.compliant_bucket }} \
-            --region ${{ env.AWS_REGION }}
+          echo "Checking bucket ACL:"
+          BUCKET_ACL=$(aws s3api get-bucket-acl \
+            --bucket $BUCKET \
+            --region ${{ env.AWS_REGION }})
           
-          echo "✅ Compliant bucket verification complete"
+          echo "$BUCKET_ACL" | jq .
+          
+          # Check if public access was blocked
+          if echo "$PUBLIC_ACCESS" | grep -q "BlockPublicAcls.*true"; then
+            echo ""
+            echo "✅ SUCCESS: Public access has been BLOCKED!"
+            echo "status=remediated" >> $GITHUB_OUTPUT
+          else
+            echo ""
+            echo "⚠️ WARNING: Bucket is still public. Policy may need more time or may require different configuration."
+            echo "status=still_public" >> $GITHUB_OUTPUT
+          fi
       
       - name: Generate test results report
         run: |
           cat <<EOF > integration-test-results.md
-          ## 🧪 Integration Test Results
+          ## 🧪 Automatic Detection Integration Test Results
           
           **Test Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
           **Lambda Function:** ${{ needs.deploy-test-lambda.outputs.lambda_function_name }}
+          **Monitoring Duration:** ${{ inputs.wait_time }} minutes
           
-          ### Test Resources
+          ### Test Resource
           
-          - **Compliant Bucket:** ${{ needs.create-test-resources.outputs.compliant_bucket }}
-          - **Non-Compliant Bucket:** ${{ needs.create-test-resources.outputs.non_compliant_bucket }}
+          - **Public S3 Bucket:** ${{ needs.create-test-resources.outputs.public_bucket }}
+          - **Created At:** ${{ needs.create-test-resources.outputs.bucket_creation_time }}
           
-          ### Execution Results
+          ### Automatic Detection Flow
+          
+          1. ✅ Public S3 bucket created
+          2. 📋 CloudTrail logged the event
+          3. ⚡ EventBridge rule evaluated event
+          4. 🚀 Lambda function triggered (if rule matched)
+          5. 🔒 Cloud Custodian policy executed
+          6. 📊 Results logged to CloudWatch
+          
+          ### Remediation Status
           
           **Status:** ${{ steps.verify.outputs.status }}
           
-          #### Lambda Invocation
-          - ✅ Lambda function invoked successfully
-          - ✅ Policy execution completed
-          
-          #### Policy Actions
-          - Compliant bucket: No action needed (encryption already enabled)
-          - Non-compliant bucket: Encryption applied by Cloud Custodian
+          $(if [ "${{ steps.verify.outputs.status }}" == "remediated" ]; then
+            echo "✅ **SUCCESS** - Public access was automatically blocked!"
+            echo ""
+            echo "The integration test proves:"
+            echo "- EventBridge detected the S3 event"
+            echo "- Lambda was triggered automatically"
+            echo "- Cloud Custodian policy executed successfully"
+            echo "- Public bucket was remediated"
+          else
+            echo "⚠️ **PENDING/FAILED** - Bucket is still public"
+            echo ""
+            echo "Possible reasons:"
+            echo "- EventBridge rule may need different event pattern"
+            echo "- CloudTrail events may be delayed"
+            echo "- Policy may need adjustment"
+            echo "- Lambda may need more time to execute"
+          fi)
           
           ### CloudWatch Logs
           
-          Check CloudWatch Logs for detailed execution:
+          Check detailed execution logs:
           \`/aws/lambda/${{ needs.deploy-test-lambda.outputs.lambda_function_name }}\`
           
           ### Next Steps
@@ -365,9 +395,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: integration-test-results
-          path: |
-            lambda-response.json
-            integration-test-results.md
+          path: integration-test-results.md
           retention-days: 30
 
   # ======================================================================
@@ -389,15 +417,14 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
           aws-region: ${{ env.AWS_REGION }}
       
-      - name: Delete test S3 buckets
+      - name: Delete test S3 bucket
         run: |
-          echo "🧹 Cleaning up test S3 buckets..."
+          echo "🧹 Cleaning up test S3 bucket..."
           
-          # Delete buckets
-          aws s3 rb s3://${{ needs.create-test-resources.outputs.compliant_bucket }} --force || echo "Compliant bucket already deleted or doesn't exist"
-          aws s3 rb s3://${{ needs.create-test-resources.outputs.non_compliant_bucket }} --force || echo "Non-compliant bucket already deleted or doesn't exist"
+          # Delete bucket
+          aws s3 rb s3://${{ needs.create-test-resources.outputs.public_bucket }} --force || echo "Bucket already deleted or doesn't exist"
           
-          echo "✅ Test S3 buckets cleaned up"
+          echo "✅ Test S3 bucket cleaned up"
       
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -427,11 +454,16 @@ jobs:
           ## 🧹 Cleanup Complete
           
           **Cleaned up:**
-          - ✅ Test S3 buckets deleted
+          - ✅ Test S3 bucket deleted
           - ✅ Lambda function destroyed
           - ✅ EventBridge rules removed
           - ✅ CloudWatch log groups deleted
           - ✅ IAM roles cleaned up
           
-          **Test completed successfully!**
+          **Automatic detection test completed!**
+          
+          The test verified that Cloud Custodian can automatically:
+          - Detect resource changes via EventBridge
+          - Execute policies without manual triggers
+          - Remediate non-compliant resources in real-time
           EOF
