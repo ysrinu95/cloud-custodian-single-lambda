@@ -60,11 +60,11 @@ resource "aws_lambda_function" "custodian" {
 
   environment {
     variables = {
-      POLICY_PATH   = var.policy_path
-      POLICY_BUCKET = var.policy_bucket
-      POLICY_KEY    = var.policy_key
-      LOG_GROUP     = aws_cloudwatch_log_group.lambda_logs.name
-      ENVIRONMENT   = var.environment
+      POLICY_MAPPING_BUCKET = var.policy_bucket
+      POLICY_MAPPING_KEY    = var.policy_mapping_key
+      LOG_GROUP             = aws_cloudwatch_log_group.lambda_logs.name
+      ENVIRONMENT           = var.environment
+      DRYRUN                = "false"
     }
   }
 

@@ -6,8 +6,14 @@ A complete solution for running Cloud Custodian policies in AWS Lambda triggered
 
 ```
 ┌─────────────────┐
+│  CloudTrail     │
+│  S3 API Calls   │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
 │  EventBridge    │
-│  Schedule Rule  │
+│  Event Rule     │
 └────────┬────────┘
          │ Trigger
          ▼
@@ -30,7 +36,7 @@ A complete solution for running Cloud Custodian policies in AWS Lambda triggered
   - **Native Mode**: Uses Cloud Custodian as a Python library (recommended)
   - **CLI Mode**: Executes `custodian` CLI commands via subprocess
   
-- **EventBridge Integration**: Scheduled or event-driven policy execution
+- **EventBridge Integration**: Event-driven policy execution triggered by S3 CloudTrail events
 - **Terraform Infrastructure**: Complete IaC for Lambda, layers, IAM, and EventBridge
 - **GitHub Actions CI/CD**: Automated building and deployment
 - **Lambda Layers**: Optimized Cloud Custodian dependencies
@@ -39,10 +45,41 @@ A complete solution for running Cloud Custodian policies in AWS Lambda triggered
 ## 📋 Prerequisites
 
 - AWS Account with appropriate permissions
+- **CloudTrail enabled** with S3 data events logging
 - Terraform >= 1.0
 - Python 3.11+
 - AWS CLI configured
 - Git and GitHub account (for CI/CD)
+
+## ⚠️ Important: CloudTrail Setup
+
+For the EventBridge rule to trigger on S3 events, you **must** have CloudTrail enabled with S3 data events logging:
+
+1. **Enable CloudTrail** (if not already enabled):
+   ```bash
+   aws cloudtrail create-trail \
+     --name cloud-custodian-trail \
+     --s3-bucket-name your-cloudtrail-bucket
+   ```
+
+2. **Start logging**:
+   ```bash
+   aws cloudtrail start-logging --name cloud-custodian-trail
+   ```
+
+3. **Verify CloudTrail is working**:
+   ```bash
+   aws cloudtrail get-trail-status --name cloud-custodian-trail
+   ```
+
+**Note**: CloudTrail events typically take 5-15 minutes to appear in EventBridge. The EventBridge rule will trigger on these S3 API calls:
+- `CreateBucket`
+- `PutBucketAcl`
+- `PutBucketPolicy`
+- `PutBucketPublicAccessBlock`
+- `DeleteBucketPublicAccessBlock`
+- `PutBucketCors`
+- `PutBucketWebsite`
 
 ## 🚀 Quick Start
 
@@ -78,7 +115,6 @@ Edit `terraform.tfvars`:
 aws_region             = "us-east-1"
 environment            = "dev"
 lambda_execution_mode  = "native"  # or "cli"
-schedule_expression    = "rate(1 hour)"
 ```
 
 ### 4. Deploy Infrastructure
@@ -182,23 +218,32 @@ The Lambda function supports three policy sources:
 }
 ```
 
-### EventBridge Schedule Expressions
+### EventBridge Trigger Configuration
 
-Configure the schedule in `terraform.tfvars`:
+The EventBridge rule is configured to trigger on S3 bucket creation and configuration changes detected via CloudTrail. The following S3 API calls will trigger the Lambda function:
 
-```hcl
-# Run every hour
-schedule_expression = "rate(1 hour)"
+- **CreateBucket**: When a new S3 bucket is created
+- **PutBucketAcl**: When bucket ACL is modified
+- **PutBucketPolicy**: When bucket policy is added/changed
+- **PutBucketPublicAccessBlock**: When public access block settings are modified
+- **DeleteBucketPublicAccessBlock**: When public access block is removed
+- **PutBucketCors**: When CORS configuration is added/changed
+- **PutBucketWebsite**: When bucket is configured for static website hosting
 
-# Run daily at 9 AM UTC
-schedule_expression = "cron(0 9 * * ? *)"
+The Lambda function receives detailed event information including:
+- Bucket name
+- Event name (API call)
+- AWS region
+- Source IP address
+- User agent
+- Event timestamp
 
-# Run every 15 minutes
-schedule_expression = "rate(15 minutes)"
-
-# Run Monday-Friday at 6 PM UTC
-schedule_expression = "cron(0 18 ? * MON-FRI *)"
-```
+**Example Event Flow:**
+1. User creates a public S3 bucket
+2. CloudTrail logs the `CreateBucket` API call
+3. EventBridge detects the CloudTrail event (5-15 min delay)
+4. Lambda function is triggered with event details
+5. Cloud Custodian policies execute to check/remediate the bucket
 
 ## 🔐 IAM Permissions
 
@@ -307,7 +352,19 @@ Monitor Lambda metrics in AWS Console:
 
 Check EventBridge rule status:
 ```bash
-aws events describe-rule --name cloud-custodian-schedule-dev
+aws events describe-rule --name cloud-custodian-s3-events-dev
+```
+
+List recent rule invocations:
+```bash
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/Events \
+  --metric-name Invocations \
+  --dimensions Name=RuleName,Value=cloud-custodian-s3-events-dev \
+  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+  --period 300 \
+  --statistics Sum
 ```
 
 ## 🔄 Updates and Maintenance
@@ -362,13 +419,31 @@ Check `terraform/iam.tf` and ensure Lambda has required permissions.
 
 ### EventBridge Not Triggering
 
+Check CloudTrail status:
+```bash
+# Verify CloudTrail is enabled and logging
+aws cloudtrail get-trail-status --name cloud-custodian-trail
+
+# Check recent S3 events in CloudTrail
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=ResourceType,AttributeValue=AWS::S3::Bucket \
+  --max-results 10
+```
+
+Check EventBridge rule:
 ```bash
 # Check rule status
-aws events describe-rule --name cloud-custodian-schedule-dev
+aws events describe-rule --name cloud-custodian-s3-events-dev
 
 # Check Lambda permissions
 aws lambda get-policy --function-name cloud-custodian-executor-dev
 ```
+
+**Common Issues:**
+- CloudTrail not enabled or not logging S3 data events
+- CloudTrail events take 5-15 minutes to appear
+- EventBridge rule pattern doesn't match the events
+- Lambda function doesn't have permission to be invoked by EventBridge
 
 ## 🎓 Example Policies
 

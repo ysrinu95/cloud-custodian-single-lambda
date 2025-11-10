@@ -1,0 +1,69 @@
+{
+  "version": "1.0",
+  "description": "Policy mapping configuration for event-driven Cloud Custodian execution",
+  "s3_policy_bucket": "your-policies-bucket",
+  "s3_policy_prefix": "custodian-policies/",
+  "mappings": [
+    {
+      "event_type": "CreateBucket",
+      "description": "S3 bucket creation",
+      "policy_file": "s3-bucket-security.yml",
+      "policy_name": "s3-bucket-public-access-check",
+      "enabled": true,
+      "priority": 1
+    },
+    {
+      "event_type": "PutBucketAcl",
+      "description": "S3 bucket ACL modification",
+      "policy_file": "s3-bucket-security.yml",
+      "policy_name": "s3-bucket-acl-check",
+      "enabled": true,
+      "priority": 1
+    },
+    {
+      "event_type": "PutBucketPolicy",
+      "description": "S3 bucket policy modification",
+      "policy_file": "s3-bucket-security.yml",
+      "policy_name": "s3-bucket-policy-check",
+      "enabled": true,
+      "priority": 1
+    },
+    {
+      "event_type": "DeleteBucketPublicAccessBlock",
+      "description": "S3 public access block removal",
+      "policy_file": "s3-bucket-security.yml",
+      "policy_name": "s3-bucket-public-block-removed",
+      "enabled": true,
+      "priority": 1
+    },
+    {
+      "event_type": "PutBucketPublicAccessBlock",
+      "description": "S3 public access block modification",
+      "policy_file": "s3-bucket-security.yml",
+      "policy_name": "s3-bucket-public-block-check",
+      "enabled": true,
+      "priority": 2
+    },
+    {
+      "event_type": "PutBucketCors",
+      "description": "S3 CORS configuration",
+      "policy_file": "s3-bucket-security.yml",
+      "policy_name": "s3-bucket-cors-check",
+      "enabled": true,
+      "priority": 2
+    },
+    {
+      "event_type": "PutBucketWebsite",
+      "description": "S3 static website configuration",
+      "policy_file": "s3-bucket-security.yml",
+      "policy_name": "s3-bucket-website-check",
+      "enabled": true,
+      "priority": 2
+    }
+  ],
+  "default_policy": {
+    "policy_file": "s3-bucket-security.yml",
+    "policy_name": "s3-bucket-default-check",
+    "enabled": true
+  }
+}

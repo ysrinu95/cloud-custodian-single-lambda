@@ -1,16 +1,32 @@
-# EventBridge Rule for scheduled execution
+# EventBridge Rule for S3 bucket events via CloudTrail
 
-resource "aws_cloudwatch_event_rule" "custodian_schedule" {
+resource "aws_cloudwatch_event_rule" "custodian_s3_events" {
   count = var.enable_eventbridge_rule ? 1 : 0
 
-  name                = "${var.project_name}-schedule-${var.environment}"
-  description         = "Trigger Cloud Custodian Lambda function on schedule"
-  schedule_expression = var.schedule_expression
+  name        = "${var.project_name}-s3-events-${var.environment}"
+  description = "Trigger Cloud Custodian Lambda on S3 bucket creation or configuration changes"
+
+  event_pattern = jsonencode({
+    source      = ["aws.s3"]
+    detail-type = ["AWS API Call via CloudTrail"]
+    detail = {
+      eventSource = ["s3.amazonaws.com"]
+      eventName = [
+        "CreateBucket",
+        "PutBucketAcl",
+        "PutBucketPolicy",
+        "PutBucketPublicAccessBlock",
+        "DeleteBucketPublicAccessBlock",
+        "PutBucketCors",
+        "PutBucketWebsite"
+      ]
+    }
+  })
 
   tags = merge(
     var.tags,
     {
-      Name = "${var.project_name}-schedule-${var.environment}"
+      Name = "${var.project_name}-s3-events-${var.environment}"
     }
   )
 }
@@ -18,20 +34,39 @@ resource "aws_cloudwatch_event_rule" "custodian_schedule" {
 resource "aws_cloudwatch_event_target" "lambda_target" {
   count = var.enable_eventbridge_rule ? 1 : 0
 
-  rule      = aws_cloudwatch_event_rule.custodian_schedule[0].name
+  rule      = aws_cloudwatch_event_rule.custodian_s3_events[0].name
   target_id = "CloudCustodianLambda"
   arn       = aws_lambda_function.custodian.arn
 
-  # Optional: Pass custom input to Lambda
-  input = jsonencode({
-    policy_source = var.policy_bucket != "" ? "s3" : "file"
-    bucket        = var.policy_bucket
-    key           = var.policy_key
-    policy_path   = var.policy_path
-    region        = var.aws_region
-    dryrun        = false
-    verbose       = true
-  })
+  # Pass S3 event details to Lambda
+  input_transformer {
+    input_paths = {
+      bucket     = "$.detail.requestParameters.bucketName"
+      eventName  = "$.detail.eventName"
+      awsRegion  = "$.detail.awsRegion"
+      sourceIP   = "$.detail.sourceIPAddress"
+      userAgent  = "$.detail.userAgent"
+      eventTime  = "$.detail.eventTime"
+    }
+    
+    input_template = jsonencode({
+      policy_source = var.policy_bucket != "" ? "s3" : "file"
+      bucket        = var.policy_bucket
+      key           = var.policy_key
+      policy_path   = var.policy_path
+      region        = var.aws_region
+      dryrun        = false
+      verbose       = true
+      trigger_event = {
+        bucket_name = "<bucket>"
+        event_name  = "<eventName>"
+        aws_region  = "<awsRegion>"
+        source_ip   = "<sourceIP>"
+        user_agent  = "<userAgent>"
+        event_time  = "<eventTime>"
+      }
+    })
+  }
 }
 
 # Lambda permission for EventBridge to invoke function
@@ -43,7 +78,7 @@ resource "aws_lambda_permission" "allow_eventbridge" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.custodian.function_name
   principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.custodian_schedule[0].arn
+  source_arn    = aws_cloudwatch_event_rule.custodian_s3_events[0].arn
 }
 
 # Optional: Additional EventBridge rules for specific triggers

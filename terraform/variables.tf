@@ -39,22 +39,22 @@ variable "lambda_memory_size" {
   default     = 512
 }
 
-variable "schedule_expression" {
-  description = "EventBridge schedule expression (e.g., 'rate(1 hour)', 'cron(0 9 * * ? *)')"
-  type        = string
-  default     = "rate(1 hour)"
-}
-
 variable "policy_bucket" {
-  description = "S3 bucket containing Cloud Custodian policies (optional)"
+  description = "S3 bucket containing Cloud Custodian policy files and policy mapping configuration"
   type        = string
   default     = ""
 }
 
-variable "policy_key" {
-  description = "S3 key for Cloud Custodian policy file (optional)"
+variable "policy_mapping_key" {
+  description = "S3 key for policy mapping JSON file"
   type        = string
-  default     = ""
+  default     = "config/policy-mapping.json"
+}
+
+variable "policy_mapping_key" {
+  description = "S3 key for policy mapping JSON file"
+  type        = string
+  default     = "config/policy-mapping.json"
 }
 
 variable "policy_path" {
@@ -70,7 +70,7 @@ variable "custodian_layer_arn" {
 }
 
 variable "enable_eventbridge_rule" {
-  description = "Enable EventBridge rule for scheduled execution"
+  description = "Enable EventBridge rule for S3 CloudTrail events"
   type        = bool
   default     = true
 }
