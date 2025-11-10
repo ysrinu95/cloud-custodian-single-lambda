@@ -7,3 +7,18 @@ policies:
       - type: value
         key: State.Name
         value: running
+
+  # Test S3 buckets without proper policies
+  - name: s3-check-bucket-policy
+    resource: s3
+    description: Find S3 buckets without bucket policies or with public access
+    filters:
+      - or:
+          - type: has-statement
+            statements:
+              - Effect: Allow
+                Principal: "*"
+          - type: bucket-encryption
+            state: false
+          - type: global-grants
+            allow_website: false
