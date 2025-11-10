@@ -216,7 +216,11 @@ jobs:
           # Copy Lambda handler (rename to lambda_function.py)
           cp src/lambda_native.py lambda-package/lambda_function.py
           
-          # Copy policies
+          # Copy validator and policy_executor modules
+          cp src/validator.py lambda-package/validator.py
+          cp src/policy_executor.py lambda-package/policy_executor.py
+          
+          # Copy policies (for backward compatibility, though we'll use S3)
           cp policies/sample-policies.yml lambda-package/policies/
           cp policies/test-policy.yml lambda-package/policies/
           
