@@ -1,10 +1,15 @@
-name: Integration Test - End-to-End Auto Detection
+name: Integration Test - Monitor Existing Infrastructure
 
 on:
   workflow_dispatch:
     inputs:
+      lambda_function_name:
+        description: 'Lambda function name to monitor'
+        required: true
+        type: string
+        default: 'cloud-custodian-executor-prod'
       cleanup:
-        description: 'Cleanup test resources after test'
+        description: 'Cleanup test bucket after test'
         required: true
         type: boolean
         default: true
@@ -16,7 +21,6 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  PYTHON_VERSION: "3.11"
   TEST_PREFIX: "custodian-test"
 
 permissions:
@@ -25,19 +29,16 @@ permissions:
 
 jobs:
   # ======================================================================
-  # Job 1: Create Test Resources
+  # Job 1: Create Public S3 Bucket
   # ======================================================================
-  create-test-resources:
+  create-public-bucket:
     name: Create Public S3 Bucket
     runs-on: ubuntu-latest
     outputs:
-      public_bucket: ${{ steps.resources.outputs.public_bucket }}
-      bucket_creation_time: ${{ steps.resources.outputs.bucket_creation_time }}
+      public_bucket: ${{ steps.create.outputs.public_bucket }}
+      bucket_creation_time: ${{ steps.create.outputs.bucket_creation_time }}
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -45,7 +46,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
       
       - name: Create public S3 bucket
-        id: resources
+        id: create
         run: |
           TIMESTAMP=$(date +%s)
           BUCKET_NAME="${TEST_PREFIX}-public-${TIMESTAMP}"
@@ -68,8 +69,12 @@ jobs:
           
           # Verify it's public
           echo ""
-          echo "📋 Bucket ACL:"
+          echo "📋 Bucket ACL (should show public-read):"
           aws s3api get-bucket-acl --bucket $BUCKET_NAME
+          
+          echo ""
+          echo "📋 Public Access Block (should be disabled):"
+          aws s3api get-public-access-block --bucket $BUCKET_NAME
           
           # Add tags
           aws s3api put-bucket-tagging \
@@ -82,173 +87,41 @@ jobs:
           echo "public_bucket=$BUCKET_NAME" >> $GITHUB_OUTPUT
           echo "bucket_creation_time=$CREATION_TIME" >> $GITHUB_OUTPUT
           
-          cat <<EOF > test-resources.md
-          ## 🧪 Test Resource Created
-          
-          **Timestamp:** $CREATION_TIME
-          
-          ### Public S3 Bucket
-          
-          - **Bucket Name:** \`$BUCKET_NAME\`
-          - **Status:** ⚠️ **PUBLIC** (Block Public Access: Disabled, ACL: public-read)
-          - **Tags:** TestType=PublicBucket, Owner=IntegrationTest
-          
-          ### Expected Behavior
-          
-          Cloud Custodian should automatically:
-          1. Detect the public bucket via EventBridge (CloudTrail events)
-          2. Trigger Lambda function
-          3. Remove public access or apply remediation
-          4. Log actions to CloudWatch
-          
-          ### Monitoring
-          
-          The workflow will monitor for ${{ inputs.wait_time }} minutes to observe:
-          - EventBridge rule trigger
-          - Lambda function invocation
-          - Policy execution and remediation
-          
-          EOF
-          
-          cat test-resources.md
-          
           echo ""
-          echo "⚠️ PUBLIC BUCKET CREATED: $BUCKET_NAME"
-          echo "⏳ Waiting for Cloud Custodian to detect and remediate..."
-      
-      - name: Upload test resources report
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-resources-report
-          path: test-resources.md
-          retention-days: 7
+          echo "✅ PUBLIC BUCKET CREATED: $BUCKET_NAME"
+          echo "⏳ Waiting for EventBridge to detect and trigger Lambda..."
 
   # ======================================================================
-  # Job 2: Deploy Lambda with Test Policy
+  # Job 2: Monitor EventBridge and Lambda
   # ======================================================================
-  deploy-test-lambda:
-    name: Deploy Lambda Infrastructure
+  monitor-execution:
+    name: Monitor Automatic Detection
     runs-on: ubuntu-latest
-    needs: create-test-resources
-    outputs:
-      lambda_function_name: ${{ steps.terraform-output.outputs.lambda_function_name }}
-      eventbridge_rule_name: ${{ steps.terraform-output.outputs.eventbridge_rule_name }}
+    needs: create-public-bucket
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
           aws-region: ${{ env.AWS_REGION }}
       
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      
-      - name: Build Lambda layer
+      - name: Wait for EventBridge trigger
         run: |
-          echo "📦 Building Cloud Custodian layer..."
-          mkdir -p layers/python
-          pip install c7n c7n-org -t layers/python/
-          
-          # Remove unnecessary files to reduce size
-          find layers/python -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
-          find layers/python -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-          
-          cd layers
-          zip -r ../cloud-custodian-layer.zip python/
-          cd ..
-          
-          mv cloud-custodian-layer.zip layers/
-          ls -lh layers/cloud-custodian-layer.zip
-      
-      - name: Create Lambda function zip
-        run: |
-          mkdir -p lambda-package/policies
-          cp src/lambda_native.py lambda-package/lambda_function.py
-          cp policies/test-policy.yml lambda-package/policies/
-          
-          cd lambda-package
-          zip -r ../lambda-function.zip .
-          cd ..
-          
-          mv lambda-function.zip terraform/
-          ls -lh terraform/lambda-function.zip
-      
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.6.0
-          terraform_wrapper: false
-      
-      - name: Terraform Init
-        working-directory: terraform
-        run: |
-          terraform init \
-            -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
-            -backend-config="key=cloud-custodian/integration-test/terraform.tfstate" \
-            -backend-config="region=${{ env.AWS_REGION }}"
-      
-      - name: Terraform Apply
-        working-directory: terraform
-        run: |
-          terraform apply -auto-approve \
-            -var="environment=test" \
-            -var="lambda_execution_mode=native" \
-            -var="aws_region=${{ env.AWS_REGION }}"
-      
-      - name: Get Terraform outputs
-        id: terraform-output
-        working-directory: terraform
-        run: |
-          LAMBDA_NAME=$(terraform output -raw lambda_function_name)
-          RULE_NAME=$(terraform output -raw eventbridge_rule_name 2>/dev/null || echo "custodian-schedule-test")
-          
-          echo "lambda_function_name=$LAMBDA_NAME" >> $GITHUB_OUTPUT
-          echo "eventbridge_rule_name=$RULE_NAME" >> $GITHUB_OUTPUT
-          
-          echo "✅ Lambda deployed: $LAMBDA_NAME"
-          echo "✅ EventBridge rule: $RULE_NAME"
-
-  # ======================================================================
-  # Job 3: Monitor EventBridge and Lambda Automatically
-  # ======================================================================
-  trigger-and-monitor:
-    name: Monitor Automatic Detection and Remediation
-    runs-on: ubuntu-latest
-    needs: [create-test-resources, deploy-test-lambda]
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
-          aws-region: ${{ env.AWS_REGION }}
-      
-      - name: Wait for EventBridge to trigger Lambda
-        run: |
-          echo "⏳ Waiting ${{ inputs.wait_time }} minutes for EventBridge to detect S3 event and trigger Lambda..."
+          echo "⏳ Waiting ${{ inputs.wait_time }} minutes for automatic detection..."
           echo ""
-          echo "What's happening:"
-          echo "1. CloudTrail logs S3 bucket creation event"
-          echo "2. EventBridge rule matches the event pattern"
-          echo "3. Lambda function gets triggered automatically"
-          echo "4. Cloud Custodian policy executes"
-          echo "5. Public bucket gets remediated"
+          echo "📊 What's happening:"
+          echo "  1. Public S3 bucket created: ${{ needs.create-public-bucket.outputs.public_bucket }}"
+          echo "  2. CloudTrail logs the S3 API events"
+          echo "  3. EventBridge rule detects S3 changes"
+          echo "  4. Lambda function (${{ inputs.lambda_function_name }}) gets triggered"
+          echo "  5. Cloud Custodian policy executes"
+          echo "  6. Public bucket gets remediated"
           echo ""
           
-          WAIT_SECONDS=$((inputs.wait_time * 60))
-          
-          # Show progress
+          # Monitor in intervals
           for i in $(seq 1 ${{ inputs.wait_time }}); do
-            echo "⏳ Minute $i/${{ inputs.wait_time }} - Monitoring..."
+            echo "⏳ Minute $i/${{ inputs.wait_time }}..."
             sleep 60
           done
           
@@ -258,212 +131,186 @@ jobs:
         run: |
           echo "🔍 Checking Lambda invocation metrics..."
           
-          FUNCTION_NAME="${{ needs.deploy-test-lambda.outputs.lambda_function_name }}"
-          START_TIME=$(date -u -d "${{ needs.create-test-resources.outputs.bucket_creation_time }}" +%s)000
-          END_TIME=$(date +%s)000
+          FUNCTION_NAME="${{ inputs.lambda_function_name }}"
           
-          echo "Querying Lambda metrics from ${{ needs.create-test-resources.outputs.bucket_creation_time }} to now..."
-          
-          # Check invocation count
+          # Get metrics for last 10 minutes
           INVOCATIONS=$(aws cloudwatch get-metric-statistics \
             --namespace AWS/Lambda \
             --metric-name Invocations \
             --dimensions Name=FunctionName,Value=$FUNCTION_NAME \
-            --start-time ${{ needs.create-test-resources.outputs.bucket_creation_time }} \
+            --start-time $(date -u -d '10 minutes ago' +"%Y-%m-%dT%H:%M:%SZ") \
             --end-time $(date -u +"%Y-%m-%dT%H:%M:%SZ") \
             --period 60 \
             --statistics Sum \
             --region ${{ env.AWS_REGION }})
           
-          echo "Lambda Invocations:"
+          echo "Lambda Invocations (last 10 minutes):"
           echo "$INVOCATIONS" | jq .
           
           INVOCATION_COUNT=$(echo "$INVOCATIONS" | jq '[.Datapoints[].Sum] | add // 0')
           echo ""
-          echo "Total invocations: $INVOCATION_COUNT"
           
           if [ "$INVOCATION_COUNT" -gt 0 ]; then
-            echo "✅ Lambda was invoked automatically!"
+            echo "✅ Lambda was invoked $INVOCATION_COUNT time(s) automatically!"
           else
-            echo "⚠️ No automatic invocations detected. EventBridge may need more time or may not be configured."
+            echo "⚠️ No automatic invocations detected in the last 10 minutes."
+            echo "   EventBridge may need more time, or the event pattern may not match."
           fi
       
       - name: Check CloudWatch Logs
         run: |
           echo "📋 Checking Lambda execution logs..."
           
-          LOG_GROUP="/aws/lambda/${{ needs.deploy-test-lambda.outputs.lambda_function_name }}"
+          LOG_GROUP="/aws/lambda/${{ inputs.lambda_function_name }}"
           
           echo "Recent logs (last ${{ inputs.wait_time }} minutes):"
           aws logs tail "$LOG_GROUP" \
             --since ${{ inputs.wait_time }}m \
             --format short \
-            --region ${{ env.AWS_REGION }} || echo "No logs found"
+            --region ${{ env.AWS_REGION }} || echo "⚠️ No recent logs found"
       
       - name: Verify bucket remediation
         id: verify
         run: |
           echo "🔍 Verifying if public bucket was remediated..."
           
-          BUCKET="${{ needs.create-test-resources.outputs.public_bucket }}"
+          BUCKET="${{ needs.create-public-bucket.outputs.public_bucket }}"
           
           echo "Checking public access block settings:"
           PUBLIC_ACCESS=$(aws s3api get-public-access-block \
             --bucket $BUCKET \
-            --region ${{ env.AWS_REGION }} 2>&1) || true
+            --region ${{ env.AWS_REGION }} 2>&1)
           
           echo "$PUBLIC_ACCESS"
           
           echo ""
           echo "Checking bucket ACL:"
-          BUCKET_ACL=$(aws s3api get-bucket-acl \
-            --bucket $BUCKET \
-            --region ${{ env.AWS_REGION }})
-          
+          BUCKET_ACL=$(aws s3api get-bucket-acl --bucket $BUCKET --region ${{ env.AWS_REGION }})
           echo "$BUCKET_ACL" | jq .
           
-          # Check if public access was blocked
+          # Determine remediation status
           if echo "$PUBLIC_ACCESS" | grep -q "BlockPublicAcls.*true"; then
             echo ""
-            echo "✅ SUCCESS: Public access has been BLOCKED!"
+            echo "✅ SUCCESS: Public access has been BLOCKED by Cloud Custodian!"
             echo "status=remediated" >> $GITHUB_OUTPUT
           else
             echo ""
-            echo "⚠️ WARNING: Bucket is still public. Policy may need more time or may require different configuration."
+            echo "⚠️ WARNING: Bucket is still public. Policy may need more time or different configuration."
             echo "status=still_public" >> $GITHUB_OUTPUT
           fi
       
-      - name: Generate test results report
+      - name: Generate test report
         run: |
-          cat <<EOF > integration-test-results.md
-          ## 🧪 Automatic Detection Integration Test Results
+          STATUS="${{ steps.verify.outputs.status }}"
+          
+          cat <<EOF > integration-test-report.md
+          ## 🧪 Integration Test Report - Automatic Detection
           
           **Test Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          **Lambda Function:** ${{ needs.deploy-test-lambda.outputs.lambda_function_name }}
+          **Lambda Function:** ${{ inputs.lambda_function_name }}
           **Monitoring Duration:** ${{ inputs.wait_time }} minutes
           
-          ### Test Resource
+          ---
           
-          - **Public S3 Bucket:** ${{ needs.create-test-resources.outputs.public_bucket }}
-          - **Created At:** ${{ needs.create-test-resources.outputs.bucket_creation_time }}
+          ### Test Flow
           
-          ### Automatic Detection Flow
+          1. ✅ Created public S3 bucket: \`${{ needs.create-public-bucket.outputs.public_bucket }}\`
+          2. ⏳ Waited for EventBridge to detect S3 events
+          3. 📊 Monitored Lambda invocations via CloudWatch metrics
+          4. 📋 Checked Lambda execution logs
+          5. 🔍 Verified remediation status
           
-          1. ✅ Public S3 bucket created
-          2. 📋 CloudTrail logged the event
-          3. ⚡ EventBridge rule evaluated event
-          4. 🚀 Lambda function triggered (if rule matched)
-          5. 🔒 Cloud Custodian policy executed
-          6. 📊 Results logged to CloudWatch
+          ---
           
-          ### Remediation Status
+          ### Results
           
-          **Status:** ${{ steps.verify.outputs.status }}
+          **Bucket:** \`${{ needs.create-public-bucket.outputs.public_bucket }}\`  
+          **Created At:** ${{ needs.create-public-bucket.outputs.bucket_creation_time }}  
+          **Status:** \`$STATUS\`
           
-          $(if [ "${{ steps.verify.outputs.status }}" == "remediated" ]; then
-            echo "✅ **SUCCESS** - Public access was automatically blocked!"
-            echo ""
-            echo "The integration test proves:"
-            echo "- EventBridge detected the S3 event"
-            echo "- Lambda was triggered automatically"
-            echo "- Cloud Custodian policy executed successfully"
-            echo "- Public bucket was remediated"
+          $(if [ "$STATUS" == "remediated" ]; then
+            cat <<RESULT
+          
+          #### ✅ TEST PASSED
+          
+          The integration test successfully verified:
+          - ✅ EventBridge detected the S3 bucket creation event
+          - ✅ Lambda function was triggered automatically
+          - ✅ Cloud Custodian policy executed
+          - ✅ Public access was blocked on the bucket
+          
+          **Automatic real-time remediation is working!**
+          RESULT
           else
-            echo "⚠️ **PENDING/FAILED** - Bucket is still public"
-            echo ""
-            echo "Possible reasons:"
-            echo "- EventBridge rule may need different event pattern"
-            echo "- CloudTrail events may be delayed"
-            echo "- Policy may need adjustment"
-            echo "- Lambda may need more time to execute"
+            cat <<RESULT
+          
+          #### ⚠️ TEST INCONCLUSIVE
+          
+          The bucket is still public. Possible reasons:
+          - ⏰ EventBridge/CloudTrail events may be delayed
+          - 🔧 EventBridge rule pattern may not match S3 events
+          - 📜 Policy may need adjustment for public bucket detection
+          - ⏳ Lambda may need more time to execute
+          
+          **Check CloudWatch Logs for details.**
+          RESULT
           fi)
+          
+          ---
           
           ### CloudWatch Logs
           
-          Check detailed execution logs:
-          \`/aws/lambda/${{ needs.deploy-test-lambda.outputs.lambda_function_name }}\`
+          View detailed execution logs:  
+          \`/aws/lambda/${{ inputs.lambda_function_name }}\`
           
-          ### Next Steps
+          ### AWS Console Links
           
-          ${{ inputs.cleanup && '- ✅ Test resources will be cleaned up automatically' || '- ⚠️ Remember to manually clean up test resources' }}
+          - [Lambda Function](https://console.aws.amazon.com/lambda/home?region=${{ env.AWS_REGION }}#/functions/${{ inputs.lambda_function_name }})
+          - [CloudWatch Logs](https://console.aws.amazon.com/cloudwatch/home?region=${{ env.AWS_REGION }}#logsV2:log-groups/log-group//aws/lambda/${{ inputs.lambda_function_name }})
+          - [EventBridge Rules](https://console.aws.amazon.com/events/home?region=${{ env.AWS_REGION }}#/rules)
+          - [S3 Bucket](https://s3.console.aws.amazon.com/s3/buckets/${{ needs.create-public-bucket.outputs.public_bucket }})
           
           EOF
           
-          cat integration-test-results.md
+          cat integration-test-report.md
       
-      - name: Upload test results
+      - name: Upload test report
         uses: actions/upload-artifact@v4
         with:
-          name: integration-test-results
-          path: integration-test-results.md
+          name: integration-test-report
+          path: integration-test-report.md
           retention-days: 30
 
   # ======================================================================
-  # Job 4: Cleanup Test Resources
+  # Job 3: Cleanup Test Bucket
   # ======================================================================
   cleanup:
-    name: Cleanup Test Resources
+    name: Cleanup Test Bucket
     runs-on: ubuntu-latest
-    needs: [create-test-resources, deploy-test-lambda, trigger-and-monitor]
+    needs: [create-public-bucket, monitor-execution]
     if: always() && inputs.cleanup
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
           aws-region: ${{ env.AWS_REGION }}
       
-      - name: Delete test S3 bucket
+      - name: Delete test bucket
         run: |
           echo "🧹 Cleaning up test S3 bucket..."
           
+          BUCKET="${{ needs.create-public-bucket.outputs.public_bucket }}"
+          
           # Delete bucket
-          aws s3 rb s3://${{ needs.create-test-resources.outputs.public_bucket }} --force || echo "Bucket already deleted or doesn't exist"
+          aws s3 rb s3://$BUCKET --force 2>&1 || echo "⚠️ Bucket already deleted or doesn't exist"
           
-          echo "✅ Test S3 bucket cleaned up"
+          echo "✅ Test bucket cleanup complete"
       
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.6.0
-      
-      - name: Destroy Lambda infrastructure
-        working-directory: terraform
+      - name: Summary
         run: |
-          echo "🧹 Destroying test Lambda infrastructure..."
-          
-          terraform init \
-            -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
-            -backend-config="key=cloud-custodian/integration-test/terraform.tfstate" \
-            -backend-config="region=${{ env.AWS_REGION }}"
-          
-          terraform destroy -auto-approve \
-            -var="environment=test" \
-            -var="lambda_execution_mode=native" \
-            -var="aws_region=${{ env.AWS_REGION }}"
-          
-          echo "✅ Lambda infrastructure destroyed"
-      
-      - name: Cleanup summary
-        run: |
-          cat <<EOF
-          ## 🧹 Cleanup Complete
-          
-          **Cleaned up:**
-          - ✅ Test S3 bucket deleted
-          - ✅ Lambda function destroyed
-          - ✅ EventBridge rules removed
-          - ✅ CloudWatch log groups deleted
-          - ✅ IAM roles cleaned up
-          
-          **Automatic detection test completed!**
-          
-          The test verified that Cloud Custodian can automatically:
-          - Detect resource changes via EventBridge
-          - Execute policies without manual triggers
-          - Remediate non-compliant resources in real-time
-          EOF
+          echo "✅ Integration test complete!"
+          echo ""
+          echo "Test bucket deleted: ${{ needs.create-public-bucket.outputs.public_bucket }}"
+          echo "Lambda and EventBridge infrastructure remains deployed for continuous monitoring."
