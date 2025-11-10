@@ -277,6 +277,7 @@ jobs:
             -var="environment=${{ steps.env.outputs.environment }}" \
             -var="lambda_execution_mode=${{ steps.env.outputs.execution_mode }}" \
             -var="aws_region=${{ env.AWS_REGION }}" \
+            -var="policy_bucket=ysr95-custodian-policies" \
             -out=tfplan \
             -no-color 2>&1 | tee plan-output.txt
 
