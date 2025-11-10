@@ -19,7 +19,7 @@ enable_eventbridge_rule = true
 # This bucket stores:
 # 1. Policy mapping configuration (policy-mapping.json)
 # 2. Cloud Custodian policy files (s3-bucket-security.yml, etc.)
-policy_bucket          = "your-custodian-policies-bucket"  # CHANGE THIS to your bucket name
+policy_bucket          = "ysr95-custodian-policies"  # CHANGE THIS to your bucket name
 policy_mapping_key     = "config/policy-mapping.json"
 
 # Optional: Path to policy file in Lambda package (for backward compatibility)
