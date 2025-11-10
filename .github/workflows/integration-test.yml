@@ -53,8 +53,11 @@ jobs:
           
           echo "🪣 Creating public S3 bucket: $BUCKET_NAME"
           
-          # Create bucket
-          aws s3 mb s3://$BUCKET_NAME --region ${{ env.AWS_REGION }}
+          # Create bucket with ACLs enabled
+          aws s3api create-bucket \
+            --bucket $BUCKET_NAME \
+            --region ${{ env.AWS_REGION }} \
+            --object-ownership BucketOwnerPreferred
           
           # Disable block public access settings
           aws s3api put-public-access-block \
@@ -62,15 +65,24 @@ jobs:
             --public-access-block-configuration \
               "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
           
-          # Apply public ACL
-          aws s3api put-bucket-acl \
+          # Apply public bucket policy (more reliable than ACLs)
+          aws s3api put-bucket-policy \
             --bucket $BUCKET_NAME \
-            --acl public-read
+            --policy "{
+              \"Version\": \"2012-10-17\",
+              \"Statement\": [{
+                \"Sid\": \"PublicReadGetObject\",
+                \"Effect\": \"Allow\",
+                \"Principal\": \"*\",
+                \"Action\": \"s3:GetObject\",
+                \"Resource\": \"arn:aws:s3:::$BUCKET_NAME/*\"
+              }]
+            }"
           
           # Verify it's public
           echo ""
-          echo "📋 Bucket ACL (should show public-read):"
-          aws s3api get-bucket-acl --bucket $BUCKET_NAME
+          echo "📋 Bucket Policy:"
+          aws s3api get-bucket-policy --bucket $BUCKET_NAME
           
           echo ""
           echo "📋 Public Access Block (should be disabled):"
@@ -184,18 +196,22 @@ jobs:
           echo "$PUBLIC_ACCESS"
           
           echo ""
-          echo "Checking bucket ACL:"
-          BUCKET_ACL=$(aws s3api get-bucket-acl --bucket $BUCKET --region ${{ env.AWS_REGION }})
-          echo "$BUCKET_ACL" | jq .
+          echo "Checking bucket policy:"
+          BUCKET_POLICY=$(aws s3api get-bucket-policy --bucket $BUCKET --region ${{ env.AWS_REGION }} 2>&1) || echo "No bucket policy or access denied"
+          echo "$BUCKET_POLICY"
           
           # Determine remediation status
           if echo "$PUBLIC_ACCESS" | grep -q "BlockPublicAcls.*true"; then
             echo ""
             echo "✅ SUCCESS: Public access has been BLOCKED by Cloud Custodian!"
             echo "status=remediated" >> $GITHUB_OUTPUT
+          elif echo "$BUCKET_POLICY" | grep -q "NoSuchBucketPolicy"; then
+            echo ""
+            echo "✅ SUCCESS: Public bucket policy has been REMOVED by Cloud Custodian!"
+            echo "status=remediated" >> $GITHUB_OUTPUT
           else
             echo ""
-            echo "⚠️ WARNING: Bucket is still public. Policy may need more time or different configuration."
+            echo "⚠️ WARNING: Bucket may still be public. Policy may need more time or different configuration."
             echo "status=still_public" >> $GITHUB_OUTPUT
           fi
       
