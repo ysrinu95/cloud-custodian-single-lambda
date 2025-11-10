@@ -66,7 +66,27 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     - DRYRUN: Set to 'true' to run in dry-run mode (optional)
     """
     logger.info(f"Lambda invocation started")
-    logger.info(f"Event: {json.dumps(event, default=str)}")
+    logger.info(f"Event received: {json.dumps(event, default=str)}")
+    
+    # Check if this is a test invocation
+    if not event or 'detail-type' not in event:
+        logger.warning("Received test or invalid event format")
+        return {
+            'statusCode': 200,
+            'body': json.dumps({
+                'message': 'Lambda function is healthy and ready to process EventBridge events',
+                'note': 'This Lambda is designed to be triggered by EventBridge S3 CloudTrail events',
+                'expected_event_format': {
+                    'detail-type': 'AWS API Call via CloudTrail',
+                    'source': 'aws.s3',
+                    'detail': {
+                        'eventName': 'CreateBucket|PutBucketAcl|...',
+                        'eventSource': 's3.amazonaws.com',
+                        'requestParameters': {'bucketName': 'bucket-name'}
+                    }
+                }
+            })
+        }
     
     try:
         # Get configuration from environment variables
