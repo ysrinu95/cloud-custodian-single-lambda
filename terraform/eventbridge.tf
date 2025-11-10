@@ -38,35 +38,8 @@ resource "aws_cloudwatch_event_target" "lambda_target" {
   target_id = "CloudCustodianLambda"
   arn       = aws_lambda_function.custodian.arn
 
-  # Pass S3 event details to Lambda
-  input_transformer {
-    input_paths = {
-      bucket     = "$.detail.requestParameters.bucketName"
-      eventName  = "$.detail.eventName"
-      awsRegion  = "$.detail.awsRegion"
-      sourceIP   = "$.detail.sourceIPAddress"
-      userAgent  = "$.detail.userAgent"
-      eventTime  = "$.detail.eventTime"
-    }
-    
-    input_template = jsonencode({
-      policy_source = var.policy_bucket != "" ? "s3" : "file"
-      bucket        = var.policy_bucket
-      key           = var.policy_key
-      policy_path   = var.policy_path
-      region        = var.aws_region
-      dryrun        = false
-      verbose       = true
-      trigger_event = {
-        bucket_name = "<bucket>"
-        event_name  = "<eventName>"
-        aws_region  = "<awsRegion>"
-        source_ip   = "<sourceIP>"
-        user_agent  = "<userAgent>"
-        event_time  = "<eventTime>"
-      }
-    })
-  }
+  # Lambda will receive the full EventBridge event
+  # The validator module will extract event details and determine which policy to execute
 }
 
 # Lambda permission for EventBridge to invoke function
