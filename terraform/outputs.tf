@@ -20,7 +20,7 @@ output "lambda_layer_arn" {
 
 output "eventbridge_rule_name" {
   description = "Name of the EventBridge rule"
-  value       = var.enable_eventbridge_rule ? aws_cloudwatch_event_rule.custodian_s3_events[0].name : null
+  value       = var.enable_eventbridge_rule ? aws_cloudwatch_event_rule.custodian_multi_resource_events[0].name : null
 }
 
 output "log_group_name" {

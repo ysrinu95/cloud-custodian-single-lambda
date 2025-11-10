@@ -1,24 +1,55 @@
-# EventBridge Rule for S3 bucket events via CloudTrail
+# EventBridge Rule for Multi-Resource CloudTrail events
+# Captures S3, EC2, and IAM API calls for Cloud Custodian policy execution
 
-resource "aws_cloudwatch_event_rule" "custodian_s3_events" {
+resource "aws_cloudwatch_event_rule" "custodian_multi_resource_events" {
   count = var.enable_eventbridge_rule ? 1 : 0
 
-  name        = "${var.project_name}-s3-events-${var.environment}"
-  description = "Trigger Cloud Custodian Lambda on S3 bucket creation or configuration changes"
+  name        = "${var.project_name}-multi-resource-events-${var.environment}"
+  description = "Trigger Cloud Custodian Lambda on S3, EC2, and IAM CloudTrail events"
 
   event_pattern = jsonencode({
-    source      = ["aws.s3"]
+    source      = ["aws.s3", "aws.ec2", "aws.iam"]
     detail-type = ["AWS API Call via CloudTrail"]
     detail = {
-      eventSource = ["s3.amazonaws.com"]
+      eventSource = ["s3.amazonaws.com", "ec2.amazonaws.com", "iam.amazonaws.com"]
       eventName = [
+        # S3 Events
         "CreateBucket",
         "PutBucketAcl",
         "PutBucketPolicy",
         "PutBucketPublicAccessBlock",
         "DeleteBucketPublicAccessBlock",
         "PutBucketCors",
-        "PutBucketWebsite"
+        "PutBucketWebsite",
+        "DeleteBucketEncryption",
+        "PutBucketLogging",
+        
+        # EC2 Events
+        "RunInstances",
+        "StartInstances",
+        "StopInstances",
+        "TerminateInstances",
+        "CreateSecurityGroup",
+        "AuthorizeSecurityGroupIngress",
+        "AuthorizeSecurityGroupEgress",
+        "RevokeSecurityGroupIngress",
+        "CreateVolume",
+        "AttachVolume",
+        "ModifyInstanceAttribute",
+        
+        # IAM Events
+        "CreateUser",
+        "CreateRole",
+        "CreateAccessKey",
+        "CreatePolicy",
+        "AttachUserPolicy",
+        "AttachRolePolicy",
+        "PutUserPolicy",
+        "PutRolePolicy",
+        "DeleteUserPolicy",
+        "DeleteRolePolicy",
+        "UpdateAccessKey",
+        "CreateLoginProfile"
       ]
     }
   })
@@ -26,7 +57,7 @@ resource "aws_cloudwatch_event_rule" "custodian_s3_events" {
   tags = merge(
     var.tags,
     {
-      Name = "${var.project_name}-s3-events-${var.environment}"
+      Name = "${var.project_name}-multi-resource-events-${var.environment}"
     }
   )
 }
@@ -34,7 +65,7 @@ resource "aws_cloudwatch_event_rule" "custodian_s3_events" {
 resource "aws_cloudwatch_event_target" "lambda_target" {
   count = var.enable_eventbridge_rule ? 1 : 0
 
-  rule      = aws_cloudwatch_event_rule.custodian_s3_events[0].name
+  rule      = aws_cloudwatch_event_rule.custodian_multi_resource_events[0].name
   target_id = "CloudCustodianLambda"
   arn       = aws_lambda_function.custodian.arn
 
@@ -51,7 +82,7 @@ resource "aws_lambda_permission" "allow_eventbridge" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.custodian.function_name
   principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.custodian_s3_events[0].arn
+  source_arn    = aws_cloudwatch_event_rule.custodian_multi_resource_events[0].arn
 }
 
 # Optional: Additional EventBridge rules for specific triggers
