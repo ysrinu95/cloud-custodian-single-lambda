@@ -51,12 +51,6 @@ variable "policy_mapping_key" {
   default     = "config/policy-mapping.json"
 }
 
-variable "policy_mapping_key" {
-  description = "S3 key for policy mapping JSON file"
-  type        = string
-  default     = "config/policy-mapping.json"
-}
-
 variable "policy_path" {
   description = "Path to policy file in Lambda package"
   type        = string
