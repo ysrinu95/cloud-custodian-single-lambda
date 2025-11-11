@@ -1,69 +1,1506 @@
 {
   "version": "1.0",
-  "description": "Policy mapping configuration for event-driven Cloud Custodian execution",
-  "s3_policy_bucket": "ysr95-custodian-policies",
-  "s3_policy_prefix": "custodian-policies/",
-  "mappings": [
-    {
-      "event_type": "CreateBucket",
-      "description": "S3 bucket creation",
-      "policy_file": "s3-bucket-security.yml",
-      "policy_name": "s3-bucket-public-access-check",
-      "enabled": true,
-      "priority": 1
+  "description": "Cloud Custodian Policy Event Mapping",
+  "generated_at": "auto-generated",
+  "statistics": {
+    "total_policies": 142,
+    "event_driven_policies": 98,
+    "unique_events": 78
+  },
+  "event_mapping": {
+    "ConsoleLogin": [
+      {
+        "policy_name": "aws-account-root-user-login-detected",
+        "resource": "account",
+        "source_file": "aws-account-root-user-login-detected.yml"
+      },
+      {
+        "policy_name": "cloudtrail-security-events",
+        "resource": "aws.account",
+        "source_file": "cloudtrail-security-events.yml"
+      }
+    ],
+    "RunInstances": [
+      {
+        "policy_name": "ec2-public-instances-stepfunction-remediation",
+        "resource": "aws.ec2",
+        "source_file": "ec2-public-instances-stepfunction-remediation.yml"
+      },
+      {
+        "policy_name": "ec2-public-ip-vpc-deployed",
+        "resource": "aws.ec2",
+        "source_file": "ec2-public-ip-vpc-deployed.yml"
+      },
+      {
+        "policy_name": "aws-ec2-stop-public-instances",
+        "resource": "aws.ec2",
+        "source_file": "aws-ec2-stop-public-instances.yml"
+      },
+      {
+        "policy_name": "ec2-public-instance-stepfunction-realtime",
+        "resource": "aws.ec2",
+        "source_file": "ec2-public-instance-stepfunction-realtime.yml"
+      },
+      {
+        "policy_name": "aws-ec2-auto-tag-user",
+        "resource": "aws.ec2",
+        "source_file": "aws-ec2-auto-tag-user.yml"
+      },
+      {
+        "policy_name": "ec2-untagged-instances-realtime",
+        "resource": "aws.ec2",
+        "source_file": "ec2-untagged-instances-realtime.yml"
+      }
+    ],
+    "AuthorizeSecurityGroupIngress": [
+      {
+        "policy_name": "aws-security-group-unsafe-ports",
+        "resource": "aws.security-group",
+        "source_file": "aws-security-group-unsafe-ports.yml"
+      },
+      {
+        "policy_name": "cloudtrail-security-events",
+        "resource": "aws.account",
+        "source_file": "cloudtrail-security-events.yml"
+      }
+    ],
+    "AuthorizeSecurityGroupEgress": [
+      {
+        "policy_name": "aws-security-group-unsafe-ports",
+        "resource": "aws.security-group",
+        "source_file": "aws-security-group-unsafe-ports.yml"
+      }
+    ],
+    "RevokeSecurityGroupEgress": [
+      {
+        "policy_name": "aws-security-group-unsafe-ports",
+        "resource": "aws.security-group",
+        "source_file": "aws-security-group-unsafe-ports.yml"
+      }
+    ],
+    "RevokeSecurityGroupIngress": [
+      {
+        "policy_name": "aws-security-group-unsafe-ports",
+        "resource": "aws.security-group",
+        "source_file": "aws-security-group-unsafe-ports.yml"
+      }
+    ],
+    "CreateFinding": [
+      {
+        "policy_name": "guardduty-high-severity-findings",
+        "resource": "aws.guardduty-finding",
+        "source_file": "guardduty-high-severity-findings.yml"
+      },
+      {
+        "policy_name": "guardduty-high-severity-findings",
+        "resource": "aws.guardduty-finding",
+        "source_file": "guardduty-high-severity-findings.yml"
+      },
+      {
+        "policy_name": "iam-access-analyzer-external-access",
+        "resource": "aws.access-analyzer-finding",
+        "source_file": "iam-access-analyzer-external-access.yml"
+      }
+    ],
+    "CreatePolicy": [
+      {
+        "policy_name": "aws-iam-policy-allow-all-created",
+        "resource": "aws.iam-policy",
+        "source_file": "aws-iam-policy-allow-all-created.yml"
+      },
+      {
+        "policy_name": "aws-iam-policy-auto-tag-user",
+        "resource": "aws.iam-policy",
+        "source_file": "aws-iam-policy-auto-tag-user.yml"
+      }
+    ],
+    "CreatePolicyVersion": [
+      {
+        "policy_name": "aws-iam-policy-allow-all-created",
+        "resource": "aws.iam-policy",
+        "source_file": "aws-iam-policy-allow-all-created.yml"
+      }
+    ],
+    "AttachRolePolicy": [
+      {
+        "policy_name": "aws-iam-role-admin-access-attached",
+        "resource": "aws.iam-role",
+        "source_file": "aws-iam-role-admin-access-attached.yml"
+      }
+    ],
+    "PutRolePolicy": [
+      {
+        "policy_name": "aws-iam-role-admin-access-attached",
+        "resource": "aws.iam-role",
+        "source_file": "aws-iam-role-admin-access-attached.yml"
+      }
+    ],
+    "AttachUserPolicy": [
+      {
+        "policy_name": "aws-iam-user-admin-access-attached",
+        "resource": "aws.iam-user",
+        "source_file": "aws-iam-user-admin-access-attached.yml"
+      },
+      {
+        "policy_name": "cloudtrail-security-events",
+        "resource": "aws.account",
+        "source_file": "cloudtrail-security-events.yml"
+      }
+    ],
+    "PutUserPolicy": [
+      {
+        "policy_name": "aws-iam-user-admin-access-attached",
+        "resource": "aws.iam-user",
+        "source_file": "aws-iam-user-admin-access-attached.yml"
+      },
+      {
+        "policy_name": "cloudtrail-security-events",
+        "resource": "aws.account",
+        "source_file": "cloudtrail-security-events.yml"
+      }
+    ],
+    "AttachGroupPolicy": [
+      {
+        "policy_name": "aws-iam-group-admin-access-attached",
+        "resource": "aws.iam-group",
+        "source_file": "aws-iam-group-admin-access-attached.yml"
+      }
+    ],
+    "PutGroupPolicy": [
+      {
+        "policy_name": "aws-iam-group-admin-access-attached",
+        "resource": "aws.iam-group",
+        "source_file": "aws-iam-group-admin-access-attached.yml"
+      }
+    ],
+    "CreateUser": [
+      {
+        "policy_name": "aws-iam-new-user-created",
+        "resource": "aws.iam-user",
+        "source_file": "aws-iam-new-user-created.yml"
+      },
+      {
+        "policy_name": "aws-iam-user-auto-tag-user",
+        "resource": "aws.iam-user",
+        "source_file": "aws-iam-user-auto-tag-user.yml"
+      }
+    ],
+    "CreateFunction": [
+      {
+        "policy_name": "aws-lambda-outdated-runtime-creation",
+        "resource": "aws.lambda",
+        "source_file": "aws-lambda-outdated-runtime-creation.yml"
+      },
+      {
+        "policy_name": "aws-lambda-auto-tag-user",
+        "resource": "aws.lambda",
+        "source_file": "aws-lambda-auto-tag-user.yml"
+      }
+    ],
+    "CreateLoadBalancer": [
+      {
+        "policy_name": "aws-elb-create-internet-facing-load-balancer",
+        "resource": "aws.app-elb",
+        "source_file": "aws-elb-create-internet-facing-load-balancer.yml"
+      },
+      {
+        "policy_name": "aws-alb-auto-tag-user",
+        "resource": "aws.app-elb",
+        "source_file": "aws-alb-auto-tag-user.yml"
+      }
+    ],
+    "CreateDBInstance": [
+      {
+        "policy_name": "aws-rds-stop-public-db-instances",
+        "resource": "aws.rds",
+        "source_file": "aws-rds-stop-public-db-instances.yml"
+      },
+      {
+        "policy_name": "aws-rds-instance-auto-tag-user",
+        "resource": "aws.rds",
+        "source_file": "aws-rds-instance-auto-tag-user.yml"
+      },
+      {
+        "policy_name": "rds-public-access-remediation-realtime",
+        "resource": "aws.rds",
+        "source_file": "rds-public-access-remediation-realtime.yml"
+      }
+    ],
+    "PutEvaluations": [
+      {
+        "policy_name": "config-compliance-violations",
+        "resource": "aws.config-rule",
+        "source_file": "config-compliance-violations.yml"
+      }
+    ],
+    "BatchImportFindings": [
+      {
+        "policy_name": "securityhub-critical-findings",
+        "resource": "aws.securityhub-finding",
+        "source_file": "securityhub-critical-findings.yml"
+      }
+    ],
+    "ClassificationResult": [
+      {
+        "policy_name": "macie-sensitive-data-findings",
+        "resource": "aws.s3",
+        "source_file": "macie-sensitive-data-findings.yml"
+      }
+    ],
+    "GetObject": [
+      {
+        "policy_name": "s3-access-logs-suspicious-activity",
+        "resource": "aws.s3",
+        "source_file": "s3-access-logs-suspicious-activity.yml"
+      }
+    ],
+    "DeleteObject": [
+      {
+        "policy_name": "s3-access-logs-suspicious-activity",
+        "resource": "aws.s3",
+        "source_file": "s3-access-logs-suspicious-activity.yml"
+      }
+    ],
+    "PutBucketPolicy": [
+      {
+        "policy_name": "s3-access-logs-suspicious-activity",
+        "resource": "aws.s3",
+        "source_file": "s3-access-logs-suspicious-activity.yml"
+      }
+    ],
+    "DeleteUserPolicy": [
+      {
+        "policy_name": "cloudtrail-security-events",
+        "resource": "aws.account",
+        "source_file": "cloudtrail-security-events.yml"
+      }
+    ],
+    "CreateAccessKey": [
+      {
+        "policy_name": "cloudtrail-security-events",
+        "resource": "aws.account",
+        "source_file": "cloudtrail-security-events.yml"
+      }
+    ],
+    "DeleteAccountPasswordPolicy": [
+      {
+        "policy_name": "cloudtrail-security-events",
+        "resource": "aws.account",
+        "source_file": "cloudtrail-security-events.yml"
+      }
+    ],
+    "DeleteDetector": [
+      {
+        "policy_name": "cloudtrail-security-events",
+        "resource": "aws.account",
+        "source_file": "cloudtrail-security-events.yml"
+      }
+    ],
+    "StopLogging": [
+      {
+        "policy_name": "cloudtrail-security-events",
+        "resource": "aws.account",
+        "source_file": "cloudtrail-security-events.yml"
+      }
+    ],
+    "DeleteTrail": [
+      {
+        "policy_name": "cloudtrail-security-events",
+        "resource": "aws.account",
+        "source_file": "cloudtrail-security-events.yml"
+      }
+    ],
+    "DeleteConfigRule": [
+      {
+        "policy_name": "cloudtrail-security-events",
+        "resource": "aws.account",
+        "source_file": "cloudtrail-security-events.yml"
+      }
+    ],
+    "StopConfigurationRecorder": [
+      {
+        "policy_name": "cloudtrail-security-events",
+        "resource": "aws.account",
+        "source_file": "cloudtrail-security-events.yml"
+      }
+    ],
+    "CreateNetworkAclEntry": [
+      {
+        "policy_name": "cloudtrail-security-events",
+        "resource": "aws.account",
+        "source_file": "cloudtrail-security-events.yml"
+      }
+    ],
+    "AssociateAddress": [
+      {
+        "policy_name": "ec2-public-instance-stepfunction-realtime",
+        "resource": "aws.ec2",
+        "source_file": "ec2-public-instance-stepfunction-realtime.yml"
+      }
+    ],
+    "ModifyInstanceAttribute": [
+      {
+        "policy_name": "ec2-public-instance-stepfunction-realtime",
+        "resource": "aws.ec2",
+        "source_file": "ec2-public-instance-stepfunction-realtime.yml"
+      }
+    ],
+    "RequestCertificate": [
+      {
+        "policy_name": "aws-acm-auto-tag-user",
+        "resource": "aws.acm-certificate",
+        "source_file": "aws-acm-auto-tag-user.yml"
+      }
+    ],
+    "CreateImage": [
+      {
+        "policy_name": "aws-ami-auto-tag-user",
+        "resource": "aws.ami",
+        "source_file": "aws-ami-auto-tag-user.yml"
+      }
+    ],
+    "CreateAutoScalingGroup": [
+      {
+        "policy_name": "aws-asg-auto-tag-user",
+        "resource": "aws.asg",
+        "source_file": "aws-asg-auto-tag-user.yml"
+      }
+    ],
+    "CreateRestApi": [
+      {
+        "policy_name": "aws-api-auto-tag-user",
+        "resource": "aws.rest-api",
+        "source_file": "aws-api-auto-tag-user.yml"
+      }
+    ],
+    "CreateStack": [
+      {
+        "policy_name": "aws-cfn-auto-tag-user",
+        "resource": "aws.cfn",
+        "source_file": "aws-cfn-auto-tag-user.yml"
+      }
+    ],
+    "CreateTrail": [
+      {
+        "policy_name": "aws-cloudtrail-auto-tag-user",
+        "resource": "aws.cloudtrail",
+        "source_file": "aws-cloudtrail-auto-tag-user.yml"
+      }
+    ],
+    "CreateDistribution": [
+      {
+        "policy_name": "aws-cloudfront-auto-tag-user",
+        "resource": "aws.distribution",
+        "source_file": "aws-cloudfront-auto-tag-user.yml"
+      }
+    ],
+    "CreateGlobalTable": [
+      {
+        "policy_name": "aws-dynamodb-auto-tag-user",
+        "resource": "aws.dynamodb-table",
+        "source_file": "aws-dynamodb-auto-tag-user.yml"
+      }
+    ],
+    "CreateTable": [
+      {
+        "policy_name": "aws-dynamodb-auto-tag-user",
+        "resource": "aws.dynamodb-table",
+        "source_file": "aws-dynamodb-auto-tag-user.yml"
+      }
+    ],
+    "CreateRepository": [
+      {
+        "policy_name": "aws-ecr-auto-tag-user",
+        "resource": "aws.ecr",
+        "source_file": "aws-ecr-auto-tag-user.yml"
+      }
+    ],
+    "CreateCluster": [
+      {
+        "policy_name": "aws-ecs-cluster-auto-tag-user",
+        "resource": "aws.ecs",
+        "source_file": "aws-ecs-cluster-auto-tag-user.yml"
+      }
+    ],
+    "CreateService": [
+      {
+        "policy_name": "aws-ecs-service-auto-tag-user",
+        "resource": "aws.ecs-service",
+        "source_file": "aws-ecs-service-auto-tag-user.yml"
+      }
+    ],
+    "RegisterTaskDefinition": [
+      {
+        "policy_name": "aws-ecs-task-definition-auto-tag-user",
+        "resource": "aws.ecs-task-definition",
+        "source_file": "aws-ecs-task-definition-auto-tag-user.yml"
+      }
+    ],
+    "CreateFileSystem": [
+      {
+        "policy_name": "aws-efs-auto-tag-user",
+        "resource": "aws.efs",
+        "source_file": "aws-efs-auto-tag-user.yml"
+      }
+    ],
+    "AllocateAddress": [
+      {
+        "policy_name": "aws-elastic-ip-auto-tag-user",
+        "resource": "aws.elastic-ip",
+        "source_file": "aws-elastic-ip-auto-tag-user.yml"
+      }
+    ],
+    "CreateNetworkInterface": [
+      {
+        "policy_name": "aws-eni-auto-tag-user",
+        "resource": "aws.eni",
+        "source_file": "aws-eni-auto-tag-user.yml"
+      }
+    ],
+    "CreateVolume": [
+      {
+        "policy_name": "aws-ebs-volume-auto-tag-user",
+        "resource": "aws.ebs",
+        "source_file": "aws-ebs-volume-auto-tag-user.yml"
+      }
+    ],
+    "CreateSnapshot": [
+      {
+        "policy_name": "aws-ebs-snapshot-auto-tag-user",
+        "resource": "aws.ebs-snapshot",
+        "source_file": "aws-ebs-snapshot-auto-tag-user.yml"
+      },
+      {
+        "policy_name": "aws-elasticache-snapshot-auto-tag-user",
+        "resource": "aws.cache-snapshot",
+        "source_file": "aws-elasticache-snapshot-auto-tag-user.yml"
+      }
+    ],
+    "CreateCacheCluster": [
+      {
+        "policy_name": "aws-elasticache-cluster-auto-tag-user",
+        "resource": "aws.cache-cluster",
+        "source_file": "aws-elasticache-cluster-auto-tag-user.yml"
+      }
+    ],
+    "CreateElasticsearchDomain": [
+      {
+        "policy_name": "aws-elasticsearch-auto-tag-user",
+        "resource": "aws.elasticsearch",
+        "source_file": "aws-elasticsearch-auto-tag-user.yml"
+      }
+    ],
+    "CreateInternetGateway": [
+      {
+        "policy_name": "aws-igw-auto-tag-user",
+        "resource": "aws.internet-gateway",
+        "source_file": "aws-igw-auto-tag-user.yml"
+      }
+    ],
+    "CreateRole": [
+      {
+        "policy_name": "aws-iam-role-auto-tag-user",
+        "resource": "aws.iam-role",
+        "source_file": "aws-iam-role-auto-tag-user.yml"
+      }
+    ],
+    "CreateKeyPair": [
+      {
+        "policy_name": "aws-key-pair-auto-tag-user",
+        "resource": "aws.key-pair",
+        "source_file": "aws-key-pair-auto-tag-user.yml"
+      }
+    ],
+    "CreateKey": [
+      {
+        "policy_name": "aws-kms-key-auto-tag-user",
+        "resource": "aws.kms-key",
+        "source_file": "aws-kms-key-auto-tag-user.yml"
+      }
+    ],
+    "CreateFunction20150331": [
+      {
+        "policy_name": "aws-lambda-auto-tag-user",
+        "resource": "aws.lambda",
+        "source_file": "aws-lambda-auto-tag-user.yml"
+      }
+    ],
+    "CreateLogGroup": [
+      {
+        "policy_name": "aws-cloudwatch-log-group-auto-tag-user",
+        "resource": "aws.log-group",
+        "source_file": "aws-cloudwatch-log-group-auto-tag-user.yml"
+      }
+    ],
+    "CreateNatGateway": [
+      {
+        "policy_name": "aws-nat-gateway-auto-tag-user",
+        "resource": "aws.nat-gateway",
+        "source_file": "aws-nat-gateway-auto-tag-user.yml"
+      },
+      {
+        "policy_name": "aws-nacl-auto-tag-user",
+        "resource": "aws.network-acl",
+        "source_file": "aws-nacl-auto-tag-user.yml"
+      }
+    ],
+    "CreateVpcPeeringConnection": [
+      {
+        "policy_name": "aws-peering-connection-auto-tag-user",
+        "resource": "aws.peering-connection",
+        "source_file": "aws-peering-connection-auto-tag-user.yml"
+      }
+    ],
+    "CreateDBSnapshot": [
+      {
+        "policy_name": "aws-rds-snapshot-auto-tag-user",
+        "resource": "aws.rds-snapshot",
+        "source_file": "aws-rds-snapshot-auto-tag-user.yml"
+      }
+    ],
+    "CreateDBParameterGroup": [
+      {
+        "policy_name": "aws-rds-parameter-group-auto-tag-user",
+        "resource": "aws.rds-param-group",
+        "source_file": "aws-rds-parameter-group-auto-tag-user.yml"
+      }
+    ],
+    "CreateDBSubnetGroup": [
+      {
+        "policy_name": "aws-rds-subnet-group-auto-tag-user",
+        "resource": "aws.rds-subnet-group",
+        "source_file": "aws-rds-subnet-group-auto-tag-user.yml"
+      }
+    ],
+    "CreateRouteTable": [
+      {
+        "policy_name": "aws-route-table-auto-tag-user",
+        "resource": "aws.route-table",
+        "source_file": "aws-route-table-auto-tag-user.yml"
+      }
+    ],
+    "PutParameter": [
+      {
+        "policy_name": "aws-ssm-parameter-group-auto-tag-user",
+        "resource": "aws.ssm-parameter",
+        "source_file": "aws-ssm-parameter-group-auto-tag-user.yml"
+      }
+    ],
+    "CreateSecret": [
+      {
+        "policy_name": "aws-secrets-manager-group-auto-tag-user",
+        "resource": "aws.secrets-manager",
+        "source_file": "aws-secrets-manager-group-auto-tag-user.yml"
+      }
+    ],
+    "CreateSecurityGroup": [
+      {
+        "policy_name": "aws-security-group-group-auto-tag-user",
+        "resource": "aws.security-group",
+        "source_file": "aws-security-group-group-auto-tag-user.yml"
+      }
+    ],
+    "CreateBucket": [
+      {
+        "policy_name": "aws-s3-auto-tag-user",
+        "resource": "aws.s3",
+        "source_file": "aws-s3-auto-tag-user.yml"
+      },
+      {
+        "policy_name": "s3-public-bucket-remediation-realtime",
+        "resource": "aws.s3",
+        "source_file": "s3-public-bucket-remediation-realtime.yml"
+      }
+    ],
+    "CreateTopic": [
+      {
+        "policy_name": "aws-sns-auto-tag-user",
+        "resource": "aws.sns",
+        "source_file": "aws-sns-auto-tag-user.yml"
+      }
+    ],
+    "CreateQueue": [
+      {
+        "policy_name": "aws-sqs-auto-tag-user",
+        "resource": "aws.sqs",
+        "source_file": "aws-sqs-auto-tag-user.yml"
+      }
+    ],
+    "CreateSubnet": [
+      {
+        "policy_name": "aws-subnet-auto-tag-user",
+        "resource": "aws.subnet",
+        "source_file": "aws-subnet-auto-tag-user.yml"
+      }
+    ],
+    "CreateTransitGateway": [
+      {
+        "policy_name": "aws-tgw-auto-tag-user",
+        "resource": "aws.transit-gateway",
+        "source_file": "aws-tgw-auto-tag-user.yml"
+      }
+    ],
+    "CreateVpc": [
+      {
+        "policy_name": "aws-vpc-auto-tag-user",
+        "resource": "aws.vpc",
+        "source_file": "aws-vpc-auto-tag-user.yml"
+      }
+    ],
+    "CreateHostedZone": [
+      {
+        "policy_name": "aws-route53-auto-tag-user",
+        "resource": "aws.hostedzone",
+        "source_file": "aws-route53-auto-tag-user.yml"
+      }
+    ]
+  },
+  "policies": {
+    "aws-account-root-user-login-detected": {
+      "resource": "account",
+      "source_file": "aws-account-root-user-login-detected.yml",
+      "mode_type": "cloudtrail",
+      "description": "Notifies of any AWS root user console logins\n"
     },
-    {
-      "event_type": "PutBucketAcl",
-      "description": "S3 bucket ACL modification",
-      "policy_file": "s3-bucket-security.yml",
-      "policy_name": "s3-bucket-acl-check",
-      "enabled": true,
-      "priority": 1
+    "aws-phd-health-event-issue": {
+      "resource": "aws.health-event",
+      "source_file": "aws-phd-health-event-issue.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of Personal Health Dashboard issue events\n"
     },
-    {
-      "event_type": "PutBucketPolicy",
-      "description": "S3 bucket policy modification",
-      "policy_file": "s3-bucket-security.yml",
-      "policy_name": "s3-bucket-policy-check",
-      "enabled": true,
-      "priority": 1
+    "aws-phd-health-event-scheduled-change": {
+      "resource": "aws.health-event",
+      "source_file": "aws-phd-health-event-scheduled-change.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of Personal Health Dashboard scheduled change events\n"
     },
-    {
-      "event_type": "DeleteBucketPublicAccessBlock",
-      "description": "S3 public access block removal",
-      "policy_file": "s3-bucket-security.yml",
-      "policy_name": "s3-bucket-public-block-removed",
-      "enabled": true,
-      "priority": 1
+    "aws-phd-health-event-account-notification": {
+      "resource": "aws.health-event",
+      "source_file": "aws-phd-health-event-account-notification.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of Personal Health Dashboard account notification events\n"
     },
-    {
-      "event_type": "PutBucketPublicAccessBlock",
-      "description": "S3 public access block modification",
-      "policy_file": "s3-bucket-security.yml",
-      "policy_name": "s3-bucket-public-block-check",
-      "enabled": true,
-      "priority": 2
+    "aws-cloudwatch-stale-log-groups": {
+      "resource": "aws.log-group",
+      "source_file": "aws-cloudwatch-stale-log-groups.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of CloudWatch log groups found to be unused\n"
     },
-    {
-      "event_type": "PutBucketCors",
-      "description": "S3 CORS configuration",
-      "policy_file": "s3-bucket-security.yml",
-      "policy_name": "s3-bucket-cors-check",
-      "enabled": true,
-      "priority": 2
+    "aws-cloudwatch-c7n-log-group-retention": {
+      "resource": "aws.log-group",
+      "source_file": "aws-cloudwatch-c7n-log-group-retention.yml",
+      "mode_type": "periodic",
+      "description": "Notifies and sets the log group retention for c7n log groups\n"
     },
-    {
-      "event_type": "PutBucketWebsite",
-      "description": "S3 static website configuration",
-      "policy_file": "s3-bucket-security.yml",
-      "policy_name": "s3-bucket-website-check",
-      "enabled": true,
-      "priority": 2
+    "aws-cloudwatch-log-group-retention": {
+      "resource": "aws.log-group",
+      "source_file": "aws-cloudwatch-log-group-retention.yml",
+      "mode_type": "periodic",
+      "description": "Notifies and sets the retention for log groups set to never expire\n"
+    },
+    "ec2-public-instances-stepfunction-remediation": {
+      "resource": "aws.ec2",
+      "source_file": "ec2-public-instances-stepfunction-remediation.yml",
+      "mode_type": "cloudtrail",
+      "description": "Detect public EC2 instances and invoke Step Function for automated remediation workflow.\nThis policy triggers a Step Function that handles notification, tagging, and remediation\nof publicly accessible EC2 instances.\n"
+    },
+    "ec2-public-instances-periodic-check": {
+      "resource": "aws.ec2",
+      "source_file": "ec2-public-instances-periodic-check.yml",
+      "mode_type": "periodic",
+      "description": "Periodic check for public EC2 instances using Step Function remediation.\nRuns every 6 hours to catch instances that may have been missed by real-time monitoring.\n"
+    },
+    "ec2-public-ip-vpc-deployed": {
+      "resource": "aws.ec2",
+      "source_file": "ec2-public-ip-vpc-deployed.yml",
+      "mode_type": "cloudtrail",
+      "description": "Event-driven policy deployed inside VPC for enhanced security.\nAutomatically terminates EC2 instances launched with public IP addresses.\nThis policy demonstrates Cloud Custodian Lambda deployment within a VPC.\n"
+    },
+    "ec2-untagged-instances-vpc-periodic": {
+      "resource": "aws.ec2",
+      "source_file": "ec2-untagged-instances-vpc-periodic.yml",
+      "mode_type": "periodic",
+      "description": "Periodic policy running inside VPC.\nScans all EC2 instances daily for missing required tags.\nDemonstrates scheduled VPC-deployed Lambda function.\n"
+    },
+    "aws-ec2-public-ips": {
+      "resource": "aws.ec2",
+      "source_file": "aws-ec2-public-ips.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of instances found with a public IP address\n"
+    },
+    "aws-ec2-stop-public-instances": {
+      "resource": "aws.ec2",
+      "source_file": "aws-ec2-stop-public-instances.yml",
+      "mode_type": "cloudtrail",
+      "description": "Notifies of and stops EC2 instances launched in a public subnet\n"
+    },
+    "aws-security-group-unsafe-ports": {
+      "resource": "aws.security-group",
+      "source_file": "aws-security-group-unsafe-ports.yml",
+      "mode_type": "cloudtrail",
+      "description": "Notifies of and remediates security group creation with unrestricted access over unsafe ports\n"
+    },
+    "aws-ecs-long-running-airflow-tasks": {
+      "resource": "aws.ecs-task",
+      "source_file": "aws-ecs-long-running-airflow-tasks.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of and stops Airflow ECS tasks that have been running for more than 18 hours\n"
+    },
+    "aws-ecs-service-deployment-failures": {
+      "resource": "aws.ecs-service",
+      "source_file": "aws-ecs-service-deployment-failures.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of and stops ECS service deployments with more than 10 failed attempts\n"
+    },
+    "aws-ecs-long-running-data-schema-tasks": {
+      "resource": "aws.ecs-task",
+      "source_file": "aws-ecs-long-running-data-schema-tasks.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of and stops Data Schema ECS tasks that have been running for more than 1 hour\n"
+    },
+    "guardduty-high-severity-findings": {
+      "resource": "aws.guardduty-finding",
+      "source_file": "guardduty-high-severity-findings.yml",
+      "mode_type": "cloudtrail",
+      "description": "Respond to AWS GuardDuty high and critical severity findings in real-time.\nThis policy triggers on GuardDuty findings and takes automated remediation actions.\n"
+    },
+    "aws-guarduty-account-new-finding": {
+      "resource": "account",
+      "source_file": "aws-guarduty-account-new-finding.yml",
+      "mode_type": "guard-duty",
+      "description": "Notifies of new account findings in GuardDuty\n"
+    },
+    "aws-guarduty-iam-user-new-finding": {
+      "resource": "iam-user",
+      "source_file": "aws-guarduty-iam-user-new-finding.yml",
+      "mode_type": "guard-duty",
+      "description": "Notifies of new IAM user findings in GuardDuty\n"
+    },
+    "aws-guarduty-ec2-new-finding": {
+      "resource": "ec2",
+      "source_file": "aws-guarduty-ec2-new-finding.yml",
+      "mode_type": "guard-duty",
+      "description": "Notifies of new EC2 findings in GuardDuty\n"
+    },
+    "aws-iam-user-inactive-access-keys": {
+      "resource": "aws.iam-user",
+      "source_file": "aws-iam-user-inactive-access-keys.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of and disables IAM access keys found to be unused\n"
+    },
+    "aws-iam-policy-allow-all-report": {
+      "resource": "aws.iam-policy",
+      "source_file": "aws-iam-policy-allow-all-report.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of IAM policies which allow all permissions\n"
+    },
+    "aws-iam-role-admin-access-report": {
+      "resource": "aws.iam-role",
+      "source_file": "aws-iam-role-admin-access-report.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of IAM roles with administrator permissions\n"
+    },
+    "aws-iam-user-admin-access-report": {
+      "resource": "aws.iam-user",
+      "source_file": "aws-iam-user-admin-access-report.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of IAM users with administrator permissions\n"
+    },
+    "aws-iam-group-admin-access-report": {
+      "resource": "aws.iam-group",
+      "source_file": "aws-iam-group-admin-access-report.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of IAM groups with administrator permissions\n"
+    },
+    "aws-iam-policy-allow-all-created": {
+      "resource": "aws.iam-policy",
+      "source_file": "aws-iam-policy-allow-all-created.yml",
+      "mode_type": "cloudtrail",
+      "description": "Notifies of IAM policy created which allows all permissions\n"
+    },
+    "aws-iam-role-admin-access-attached": {
+      "resource": "aws.iam-role",
+      "source_file": "aws-iam-role-admin-access-attached.yml",
+      "mode_type": "cloudtrail",
+      "description": "Notifies of administrator policy being attached to IAM role\n"
+    },
+    "aws-iam-user-admin-access-attached": {
+      "resource": "aws.iam-user",
+      "source_file": "aws-iam-user-admin-access-attached.yml",
+      "mode_type": "cloudtrail",
+      "description": "Notifies of administrator policy being attached to IAM user\n"
+    },
+    "aws-iam-group-admin-access-attached": {
+      "resource": "aws.iam-group",
+      "source_file": "aws-iam-group-admin-access-attached.yml",
+      "mode_type": "cloudtrail",
+      "description": "Notifies of administrator policy being attached to IAM group\n"
+    },
+    "aws-iam-unused-roles-report": {
+      "resource": "aws.iam-role",
+      "source_file": "aws-iam-unused-roles-report.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of IAM roles found to be unused\n"
+    },
+    "aws-iam-unused-policies-report": {
+      "resource": "aws.iam-policy",
+      "source_file": "aws-iam-unused-policies-report.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of IAM policies found to be unused\n"
+    },
+    "aws-iam-new-user-created": {
+      "resource": "aws.iam-user",
+      "source_file": "aws-iam-new-user-created.yml",
+      "mode_type": "cloudtrail",
+      "description": "Notifies of new IAM user creation\n"
+    },
+    "aws-lambda-deprecated-runtimes": {
+      "resource": "aws.lambda",
+      "source_file": "aws-lambda-deprecated-runtimes.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of Lambda functions using deprecated runtimes\n"
+    },
+    "aws-lambda-outdated-runtimes": {
+      "resource": "aws.lambda",
+      "source_file": "aws-lambda-outdated-runtimes.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of Lambda functions using oudated runtimes that will be deprecated soon\n"
+    },
+    "aws-lambda-outdated-runtime-creation": {
+      "resource": "aws.lambda",
+      "source_file": "aws-lambda-outdated-runtime-creation.yml",
+      "mode_type": "cloudtrail",
+      "description": "Notify when a Lambda function is created with an outdated runtime.\n"
+    },
+    "aws-lambda-unused-functions": {
+      "resource": "aws.lambda",
+      "source_file": "aws-lambda-unused-functions.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of Lambda functions appear to be unused.\n"
+    },
+    "aws-elb-outdated-tls-protocols": {
+      "resource": "app-elb",
+      "source_file": "aws-elb-outdated-tls-protocols.yml",
+      "mode_type": "periodic",
+      "description": "Notifies on usage of outdated TLS protocols\n"
+    },
+    "aws-elb-http-listeners-without-https": {
+      "resource": "app-elb",
+      "source_file": "aws-elb-http-listeners-without-https.yml",
+      "mode_type": "periodic",
+      "description": "Notifies on LB HTTP listeners in use that do not redirect to HTTPS\n"
+    },
+    "aws-elb-create-internet-facing-load-balancer": {
+      "resource": "aws.app-elb",
+      "source_file": "aws-elb-create-internet-facing-load-balancer.yml",
+      "mode_type": "cloudtrail",
+      "description": "Notifies on creation of an internet-facing load balancer\n"
+    },
+    "aws-rds-stop-public-db-instances": {
+      "resource": "aws.rds",
+      "source_file": "aws-rds-stop-public-db-instances.yml",
+      "mode_type": "cloudtrail",
+      "description": "Notifies of and stops RDS DB instances launched as publicly accessible\n"
+    },
+    "aws-rds-engine-version-upgrade-available": {
+      "resource": "aws.rds",
+      "source_file": "aws-rds-engine-version-upgrade-available.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of RDS instances with engine upgrades available\n"
+    },
+    "aws-rds-snapshot-old": {
+      "resource": "rds-snapshot",
+      "source_file": "aws-rds-snapshot-old.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of and deletes old RDS instance manual snapshots\n"
+    },
+    "aws-rds-cluster-snapshot-old": {
+      "resource": "rds-cluster-snapshot",
+      "source_file": "aws-rds-cluster-snapshot-old.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of and deletes old RDS cluster manual snapshots\n"
+    },
+    "aws-s3-no-encryption": {
+      "resource": "aws.s3",
+      "source_file": "aws-s3-no-encryption.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of S3 buckets without encyrption enabled\n"
+    },
+    "aws-s3-public-access": {
+      "resource": "aws.s3",
+      "source_file": "aws-s3-public-access.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of S3 buckets that do not have public access fully restricted\n"
+    },
+    "aws-rds-schedule-stop": {
+      "resource": "aws.rds",
+      "source_file": "aws-rds-schedule-stop.yml",
+      "mode_type": "periodic",
+      "description": "Stops RDS instances based on the c7n-schedule tag\n"
+    },
+    "aws-rds-schedule-start": {
+      "resource": "aws.rds",
+      "source_file": "aws-rds-schedule-start.yml",
+      "mode_type": "periodic",
+      "description": "Starts RDS instances based on the c7n-schedule tag\n"
+    },
+    "aws-rds-cluster-schedule-stop": {
+      "resource": "aws.rds-cluster",
+      "source_file": "aws-rds-cluster-schedule-stop.yml",
+      "mode_type": "periodic",
+      "description": "Stops RDS clusters based on the c7n-schedule tag\n"
+    },
+    "aws-rds-cluster-schedule-start": {
+      "resource": "aws.rds",
+      "source_file": "aws-rds-cluster-schedule-start.yml",
+      "mode_type": "periodic",
+      "description": "Starts RDS clusters based on the c7n-schedule tag\n"
+    },
+    "aws-ec2-schedule-stop": {
+      "resource": "aws.ec2",
+      "source_file": "aws-ec2-schedule-stop.yml",
+      "mode_type": "periodic",
+      "description": "Stops EC2 instances based on the c7n-schedule tag\n"
+    },
+    "aws-ec2-schedule-start": {
+      "resource": "aws.ec2",
+      "source_file": "aws-ec2-schedule-start.yml",
+      "mode_type": "periodic",
+      "description": "Starts EC2 instances based on the c7n-schedule tag\n"
+    },
+    "aws-asg-schedule-stop": {
+      "resource": "aws.asg",
+      "source_file": "aws-asg-schedule-stop.yml",
+      "mode_type": "periodic",
+      "description": "Suspends ASG based on the c7n-schedule tag\n"
+    },
+    "aws-asg-schedule-start": {
+      "resource": "aws.asg",
+      "source_file": "aws-asg-schedule-start.yml",
+      "mode_type": "periodic",
+      "description": "Resumes ASG based on the c7n-schedule tag\n"
+    },
+    "config-compliance-violations": {
+      "resource": "aws.config-rule",
+      "source_file": "config-compliance-violations.yml",
+      "mode_type": "cloudtrail",
+      "description": "Respond to AWS Config rule compliance violations in real-time.\nThis policy triggers when resources become non-compliant with Config rules.\n"
+    },
+    "securityhub-critical-findings": {
+      "resource": "aws.securityhub-finding",
+      "source_file": "securityhub-critical-findings.yml",
+      "mode_type": "cloudtrail",
+      "description": "Respond to AWS Security Hub critical and high severity findings from CSPM controls.\nThis includes AWS Foundational Security Best Practices and CIS benchmarks.\n"
+    },
+    "macie-sensitive-data-findings": {
+      "resource": "aws.s3",
+      "source_file": "macie-sensitive-data-findings.yml",
+      "mode_type": "cloudtrail",
+      "description": "Respond to AWS Macie sensitive data discovery findings in S3 buckets.\nThis policy triggers when Macie detects PII, credentials, or sensitive data.\n"
+    },
+    "iam-access-analyzer-external-access": {
+      "resource": "aws.access-analyzer-finding",
+      "source_file": "iam-access-analyzer-external-access.yml",
+      "mode_type": "cloudtrail",
+      "description": "Respond to IAM Access Analyzer findings indicating external access to resources.\nThis policy triggers when resources are shared with external principals.\n"
+    },
+    "s3-access-logs-suspicious-activity": {
+      "resource": "aws.s3",
+      "source_file": "s3-access-logs-suspicious-activity.yml",
+      "mode_type": "cloudtrail",
+      "description": "Monitor S3 access logs for suspicious activity patterns.\nThis policy analyzes S3 access logs and triggers on anomalous access patterns.\n"
+    },
+    "cloudtrail-security-events": {
+      "resource": "aws.account",
+      "source_file": "cloudtrail-security-events.yml",
+      "mode_type": "cloudtrail",
+      "description": "Monitor AWS CloudTrail for high-risk security events and configuration changes.\nThis policy triggers on critical API calls that may indicate security issues.\n"
+    },
+    "ec2-public-instance-stepfunction-realtime": {
+      "resource": "aws.ec2",
+      "source_file": "ec2-public-instance-stepfunction-realtime.yml",
+      "mode_type": "cloudtrail",
+      "description": "Real-time detection of EC2 instances launched with public IP addresses.\nImmediately triggers Step Function workflow for automated risk assessment \nand remediation based on risk level (HIGH/MEDIUM/LOW).\n"
+    },
+    "ec2-public-instance-stepfunction-periodic": {
+      "resource": "aws.ec2",
+      "source_file": "ec2-public-instance-stepfunction-periodic.yml",
+      "mode_type": "periodic",
+      "description": "Periodic scan for existing EC2 instances with public IP addresses.\nRuns hourly to catch instances that may have been missed by real-time detection\nor had their networking configuration changed after launch.\n"
+    },
+    "security-findings-daily-summary": {
+      "resource": "aws.account",
+      "source_file": "security-findings-daily-summary.yml",
+      "mode_type": "periodic",
+      "description": "Daily summary of all security findings from various AWS security services.\nThis provides a consolidated view of the security posture.\n"
+    },
+    "aws-security-hub-critical-findings": {
+      "resource": "aws.securityhub-finding",
+      "source_file": "aws-security-hub-critical-findings.yml",
+      "mode_type": "periodic",
+      "description": "Notifies of new critical findings in Security Hub\n"
+    },
+    "aws-acm-auto-tag-user": {
+      "resource": "aws.acm-certificate",
+      "source_file": "aws-acm-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags ACM resources with creator info\n"
+    },
+    "aws-ami-auto-tag-user": {
+      "resource": "aws.ami",
+      "source_file": "aws-ami-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags AMI resources with creator info\n"
+    },
+    "aws-asg-auto-tag-user": {
+      "resource": "aws.asg",
+      "source_file": "aws-asg-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags ASG resources with creator info\n"
+    },
+    "aws-api-auto-tag-user": {
+      "resource": "aws.rest-api",
+      "source_file": "aws-api-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags API Gateway REST API resources with creator info\n"
+    },
+    "aws-cfn-auto-tag-user": {
+      "resource": "aws.cfn",
+      "source_file": "aws-cfn-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags Cloud Formation resources with creator info\n"
+    },
+    "aws-cloudtrail-auto-tag-user": {
+      "resource": "aws.cloudtrail",
+      "source_file": "aws-cloudtrail-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags CloudTrail resources with creator info\n"
+    },
+    "aws-cloudfront-auto-tag-user": {
+      "resource": "aws.distribution",
+      "source_file": "aws-cloudfront-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags CloudFront resources with creator info\n"
+    },
+    "aws-dynamodb-auto-tag-user": {
+      "resource": "aws.dynamodb-table",
+      "source_file": "aws-dynamodb-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags DynamoDB resources with creator info\n"
+    },
+    "aws-ec2-auto-tag-user": {
+      "resource": "aws.ec2",
+      "source_file": "aws-ec2-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags EC2 resources with creator info\n"
+    },
+    "aws-ecr-auto-tag-user": {
+      "resource": "aws.ecr",
+      "source_file": "aws-ecr-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags ECR resources with creator info\n"
+    },
+    "aws-ecs-cluster-auto-tag-user": {
+      "resource": "aws.ecs",
+      "source_file": "aws-ecs-cluster-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags ECS cluster resources with creator info\n"
+    },
+    "aws-ecs-service-auto-tag-user": {
+      "resource": "aws.ecs-service",
+      "source_file": "aws-ecs-service-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags ECS service resources with creator info\n"
+    },
+    "aws-ecs-task-definition-auto-tag-user": {
+      "resource": "aws.ecs-task-definition",
+      "source_file": "aws-ecs-task-definition-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags ECS service resources with creator info\n"
+    },
+    "aws-efs-auto-tag-user": {
+      "resource": "aws.efs",
+      "source_file": "aws-efs-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags EFS resources with creator info\n"
+    },
+    "aws-elastic-ip-auto-tag-user": {
+      "resource": "aws.elastic-ip",
+      "source_file": "aws-elastic-ip-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags Elastic IP with creator info\n"
+    },
+    "aws-eni-auto-tag-user": {
+      "resource": "aws.eni",
+      "source_file": "aws-eni-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags Elastic Network Interface with creator info\n"
+    },
+    "aws-ebs-volume-auto-tag-user": {
+      "resource": "aws.ebs",
+      "source_file": "aws-ebs-volume-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags EBS volume with creator info\n"
+    },
+    "aws-ebs-snapshot-auto-tag-user": {
+      "resource": "aws.ebs-snapshot",
+      "source_file": "aws-ebs-snapshot-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags EBS snapshot with creator info\n"
+    },
+    "aws-elasticache-cluster-auto-tag-user": {
+      "resource": "aws.cache-cluster",
+      "source_file": "aws-elasticache-cluster-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags Elasticache cluster resources with creator info\n"
+    },
+    "aws-elasticache-snapshot-auto-tag-user": {
+      "resource": "aws.cache-snapshot",
+      "source_file": "aws-elasticache-snapshot-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags Elasticache snapshot resources with creator info\n"
+    },
+    "aws-elasticsearch-auto-tag-user": {
+      "resource": "aws.elasticsearch",
+      "source_file": "aws-elasticsearch-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags ElasticSearch resources with creator info\n"
+    },
+    "aws-alb-auto-tag-user": {
+      "resource": "aws.app-elb",
+      "source_file": "aws-alb-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags ALB resources with creator info\n"
+    },
+    "aws-igw-auto-tag-user": {
+      "resource": "aws.internet-gateway",
+      "source_file": "aws-igw-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags Internet Gateway resources with creator info\n"
+    },
+    "aws-iam-role-auto-tag-user": {
+      "resource": "aws.iam-role",
+      "source_file": "aws-iam-role-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags IAM role resources with creator info\n"
+    },
+    "aws-iam-policy-auto-tag-user": {
+      "resource": "aws.iam-policy",
+      "source_file": "aws-iam-policy-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags IAM policy resources with creator info\n"
+    },
+    "aws-iam-user-auto-tag-user": {
+      "resource": "aws.iam-user",
+      "source_file": "aws-iam-user-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags IAM user resources with creator info\n"
+    },
+    "aws-key-pair-auto-tag-user": {
+      "resource": "aws.key-pair",
+      "source_file": "aws-key-pair-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags key pair resources with creator info\n"
+    },
+    "aws-kms-key-auto-tag-user": {
+      "resource": "aws.kms-key",
+      "source_file": "aws-kms-key-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags KMS key resources with creator info\n"
+    },
+    "aws-lambda-auto-tag-user": {
+      "resource": "aws.lambda",
+      "source_file": "aws-lambda-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags Lambda resources with creator info\n"
+    },
+    "aws-cloudwatch-log-group-auto-tag-user": {
+      "resource": "aws.log-group",
+      "source_file": "aws-cloudwatch-log-group-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags CloudWatch log group resources with creator info\n"
+    },
+    "aws-nat-gateway-auto-tag-user": {
+      "resource": "aws.nat-gateway",
+      "source_file": "aws-nat-gateway-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags NAT Gateway resources with creator info\n"
+    },
+    "aws-nacl-auto-tag-user": {
+      "resource": "aws.network-acl",
+      "source_file": "aws-nacl-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags Network ACL resources with creator info\n"
+    },
+    "aws-peering-connection-auto-tag-user": {
+      "resource": "aws.peering-connection",
+      "source_file": "aws-peering-connection-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags VPC peering connection resources with creator info\n"
+    },
+    "aws-rds-instance-auto-tag-user": {
+      "resource": "aws.rds",
+      "source_file": "aws-rds-instance-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags RDS instance resources with creator info\n"
+    },
+    "aws-rds-snapshot-auto-tag-user": {
+      "resource": "aws.rds-snapshot",
+      "source_file": "aws-rds-snapshot-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags RDS snapshot resources with creator info\n"
+    },
+    "aws-rds-parameter-group-auto-tag-user": {
+      "resource": "aws.rds-param-group",
+      "source_file": "aws-rds-parameter-group-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags RDS parameter group resources with creator info\n"
+    },
+    "aws-rds-subnet-group-auto-tag-user": {
+      "resource": "aws.rds-subnet-group",
+      "source_file": "aws-rds-subnet-group-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags RDS subnet group resources with creator info\n"
+    },
+    "aws-route-table-auto-tag-user": {
+      "resource": "aws.route-table",
+      "source_file": "aws-route-table-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags VPC route-table resources with creator info\n"
+    },
+    "aws-ssm-parameter-group-auto-tag-user": {
+      "resource": "aws.ssm-parameter",
+      "source_file": "aws-ssm-parameter-group-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags SSM parameter resources with creator info\n"
+    },
+    "aws-secrets-manager-group-auto-tag-user": {
+      "resource": "aws.secrets-manager",
+      "source_file": "aws-secrets-manager-group-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags Secrets Manager resources with creator info\n"
+    },
+    "aws-security-group-group-auto-tag-user": {
+      "resource": "aws.security-group",
+      "source_file": "aws-security-group-group-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags Security Group resources with creator info\n"
+    },
+    "aws-s3-auto-tag-user": {
+      "resource": "aws.s3",
+      "source_file": "aws-s3-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags S3 resources with creator info\n"
+    },
+    "aws-sns-auto-tag-user": {
+      "resource": "aws.sns",
+      "source_file": "aws-sns-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags SNS resources with creator info\n"
+    },
+    "aws-sqs-auto-tag-user": {
+      "resource": "aws.sqs",
+      "source_file": "aws-sqs-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags SQS resources with creator info\n"
+    },
+    "aws-subnet-auto-tag-user": {
+      "resource": "aws.subnet",
+      "source_file": "aws-subnet-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags VPC subnet resources with creator info\n"
+    },
+    "aws-tgw-auto-tag-user": {
+      "resource": "aws.transit-gateway",
+      "source_file": "aws-tgw-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags Transit Gateway resources with creator info\n"
+    },
+    "aws-vpc-auto-tag-user": {
+      "resource": "aws.vpc",
+      "source_file": "aws-vpc-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags VPC resources with creator info\n"
+    },
+    "aws-route53-auto-tag-user": {
+      "resource": "aws.hostedzone",
+      "source_file": "aws-route53-auto-tag-user.yml",
+      "mode_type": "cloudtrail",
+      "description": "Auto-tags Route53 HostedZone resources with creator info\n"
+    },
+    "ec2-untagged-instances": {
+      "resource": "aws.ec2",
+      "source_file": "ec2-untagged-instances.yml",
+      "mode_type": null,
+      "description": "Find EC2 instances that are missing required tags.\nThis is a common compliance requirement for cost allocation and governance.\n"
+    },
+    "ebs-oversized-volumes": {
+      "resource": "aws.ebs",
+      "source_file": "ebs-oversized-volumes.yml",
+      "mode_type": null,
+      "description": "Find EBS volumes larger than 100GB that are available (unattached).\nThese might be candidates for cost optimization.\n"
+    },
+    "s3-unencrypted-buckets": {
+      "resource": "aws.s3",
+      "source_file": "s3-unencrypted-buckets.yml",
+      "mode_type": null,
+      "description": "Find S3 buckets that don't have default encryption enabled.\nThis is a security best practice to protect data at rest.\n"
+    },
+    "security-groups-ssh-unrestricted": {
+      "resource": "aws.security-group",
+      "source_file": "security-groups-ssh-unrestricted.yml",
+      "mode_type": null,
+      "description": "Find security groups that allow SSH (port 22) access from anywhere (0.0.0.0/0).\nThis is a security risk and should be restricted.\n"
+    },
+    "elastic-ips-unused": {
+      "resource": "aws.elastic-ip",
+      "source_file": "elastic-ips-unused.yml",
+      "mode_type": null,
+      "description": "Find Elastic IP addresses that are allocated but not associated\nwith any instance. These incur charges without providing value.\n"
+    },
+    "rds-backup-disabled": {
+      "resource": "aws.rds",
+      "source_file": "rds-backup-disabled.yml",
+      "mode_type": null,
+      "description": "Find RDS instances that don't have automated backups enabled.\nThis is important for data protection and compliance.\n"
+    },
+    "lambda-public-access": {
+      "resource": "aws.lambda",
+      "source_file": "lambda-public-access.yml",
+      "mode_type": null,
+      "description": "Find Lambda functions that have resource-based policies\nallowing public access. This could be a security risk.\n"
+    },
+    "ec2-stopped-instances-old": {
+      "resource": "aws.ec2",
+      "source_file": "ec2-stopped-instances-old.yml",
+      "mode_type": null,
+      "description": "Find EC2 instances that have been stopped for more than 30 days.\nThese might be candidates for termination to save costs.\n"
+    },
+    "iam-users-old-access-keys": {
+      "resource": "aws.iam-user",
+      "source_file": "iam-users-old-access-keys.yml",
+      "mode_type": null,
+      "description": "Find IAM users with access keys that haven't been rotated\nin more than 90 days. This is a security best practice.\n"
+    },
+    "ec2-low-utilization": {
+      "resource": "aws.ec2",
+      "source_file": "ec2-low-utilization.yml",
+      "mode_type": null,
+      "description": "Find EC2 instances with low CPU utilization over the past 14 days.\nThese might be candidates for downsizing or termination.\n"
+    },
+    "ebs-unattached-volumes": {
+      "resource": "aws.ebs",
+      "source_file": "ebs-unattached-volumes.yml",
+      "mode_type": null,
+      "description": "Find EBS volumes that are not attached to any instance.\nThese incur storage costs.\n"
+    },
+    "ebs-old-snapshots": {
+      "resource": "aws.ebs-snapshot",
+      "source_file": "ebs-old-snapshots.yml",
+      "mode_type": null,
+      "description": "Find EBS snapshots older than 90 days that might be\nsafe to delete for cost savings.\n"
+    },
+    "rds-oversized-instances": {
+      "resource": "aws.rds",
+      "source_file": "rds-oversized-instances.yml",
+      "mode_type": null,
+      "description": "Find RDS instances that might be oversized based on\nCPU and connection metrics.\n"
+    },
+    "elb-no-targets": {
+      "resource": "aws.elb",
+      "source_file": "elb-no-targets.yml",
+      "mode_type": null,
+      "description": "Find Classic Load Balancers with no registered instances.\nThese incur costs without providing value.\n"
+    },
+    "elbv2-no-targets": {
+      "resource": "aws.app-elb",
+      "source_file": "elbv2-no-targets.yml",
+      "mode_type": null,
+      "description": "Find Application/Network Load Balancers with no targets\nor very low request count.\n"
+    },
+    "reserved-instances-unused": {
+      "resource": "aws.ec2-reserved",
+      "source_file": "reserved-instances-unused.yml",
+      "mode_type": null,
+      "description": "Find Reserved Instances that are not being fully utilized.\nThese represent wasted pre-paid capacity.\n"
+    },
+    "cloudwatch-large-log-groups": {
+      "resource": "aws.log-group",
+      "source_file": "cloudwatch-large-log-groups.yml",
+      "mode_type": null,
+      "description": "Find CloudWatch log groups that are very large and might\nbenefit from log retention policy optimization.\n"
+    },
+    "lambda-unused-functions": {
+      "resource": "aws.lambda",
+      "source_file": "lambda-unused-functions.yml",
+      "mode_type": null,
+      "description": "Find Lambda functions that haven't been invoked recently.\nWhile Lambda has no cost when not running, these might be cleanup candidates.\n"
+    },
+    "ec2-untagged-instances-realtime": {
+      "resource": "aws.ec2",
+      "source_file": "ec2-untagged-instances-realtime.yml",
+      "mode_type": "cloudtrail",
+      "description": "Monitor EC2 instances in real-time and automatically tag untagged instances.\nTriggers on EC2 instance launch events.\n"
+    },
+    "s3-public-bucket-remediation-realtime": {
+      "resource": "aws.s3",
+      "source_file": "s3-public-bucket-remediation-realtime.yml",
+      "mode_type": "cloudtrail",
+      "description": "Monitor S3 buckets in real-time and automatically secure public buckets.\nTriggers when S3 buckets are created or modified.\n"
+    },
+    "security-group-ssh-remediation-realtime": {
+      "resource": "aws.security-group",
+      "source_file": "security-group-ssh-remediation-realtime.yml",
+      "mode_type": "periodic",
+      "description": "Monitor security groups in real-time and remove unrestricted SSH access.\nTriggers when security group rules are modified.\n"
+    },
+    "iam-policy-monitoring-realtime": {
+      "resource": "aws.iam-policy",
+      "source_file": "iam-policy-monitoring-realtime.yml",
+      "mode_type": "periodic",
+      "description": "Monitor IAM policies in real-time for overly permissive policies.\nTriggers when IAM policies are created or modified.\n"
+    },
+    "ebs-unencrypted-volumes-scheduled": {
+      "resource": "aws.ebs",
+      "source_file": "ebs-unencrypted-volumes-scheduled.yml",
+      "mode_type": "periodic",
+      "description": "Scheduled check for unencrypted EBS volumes.\nRuns every hour to ensure continuous compliance.\n"
+    },
+    "rds-public-access-remediation-realtime": {
+      "resource": "aws.rds",
+      "source_file": "rds-public-access-remediation-realtime.yml",
+      "mode_type": "cloudtrail",
+      "description": "Monitor RDS instances in real-time and flag publicly accessible databases.\nTriggers when RDS instances are created or modified.\n"
+    },
+    "s3-public-buckets": {
+      "resource": "aws.s3",
+      "source_file": "s3-public-buckets.yml",
+      "mode_type": null,
+      "description": "Find S3 buckets that are publicly accessible.\nThis is a critical security issue that needs immediate attention.\n"
+    },
+    "security-groups-wide-open": {
+      "resource": "aws.security-group",
+      "source_file": "security-groups-wide-open.yml",
+      "mode_type": null,
+      "description": "Find security groups with rules that allow all traffic (0.0.0.0/0)\non sensitive ports. This is a security risk.\n"
+    },
+    "iam-admin-access-check": {
+      "resource": "aws.iam-user",
+      "source_file": "iam-admin-access-check.yml",
+      "mode_type": null,
+      "description": "Find IAM users and roles with admin-level permissions.\nThese should be regularly reviewed for security.\n"
+    },
+    "nat-gateways-unused": {
+      "resource": "aws.nat-gateway",
+      "source_file": "nat-gateways-unused.yml",
+      "mode_type": null,
+      "description": "Find NAT Gateways that might not be actively used.\nThese are expensive and should be reviewed for cost optimization.\n"
+    },
+    "cloudtrail-not-enabled": {
+      "resource": "aws.cloudtrail",
+      "source_file": "cloudtrail-not-enabled.yml",
+      "mode_type": null,
+      "description": "Find CloudTrail trails that are not logging or not configured properly.\nThis is required for compliance and security monitoring.\n"
     }
-  ],
-  "default_policy": {
-    "policy_file": "s3-bucket-security.yml",
-    "policy_name": "s3-bucket-default-check",
-    "enabled": true
   }
 }
