@@ -258,14 +258,16 @@ class PolicyExecutor:
             # Extract raw CloudTrail event data for policy context
             raw_event = event_info.get('raw_event', {})
             
-            # Create policy collection with event context
-            options = {
-                'region': self.region,
-                'log_group': f'/aws/lambda/cloud-custodian',
-                'output_dir': '/tmp/custodian-output',
-                'cache': '/tmp/custodian-cache',
-                'dryrun': dryrun,
-            }
+            # Create policy collection with event context using Config class
+            from c7n.config import Config
+            
+            options = Config.empty(
+                region=self.region,
+                log_group=f'/aws/lambda/cloud-custodian',
+                output_dir='/tmp/custodian-output',
+                cache='/tmp/custodian-cache',
+                dryrun=dryrun,
+            )
             
             # Load policies
             collection = PolicyCollection.from_data(policy_config, options)
