@@ -1,0 +1,43 @@
+policies:
+- name: aws-guarduty-ec2-new-finding
+  resource: ec2
+  description: 'Notifies of new EC2 findings in GuardDuty'
+  filters: []
+  actions:
+  - template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+    type: notify
+    violation_desc: 'New GuardDuty finding received - EC2
+
+      '
+    action_desc: 'Please investigate.
+
+      More details can be found in the Audit account: https://us-west-2.console.aws.amazon.com/guardduty/
+
+      '
+vars:
+  tags:
+    contact: ysrinu95@gmail.com
+    environment: production
+    repo: ysrinu95/cloud-custodian
+  email-notify:
+    template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+  audit-only-condition:
+  - type: value
+    key: account_id
+    op: in
+    value:
+    - '605289256863'

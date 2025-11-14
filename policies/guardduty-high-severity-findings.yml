@@ -1,0 +1,41 @@
+policies:
+- name: guardduty-high-severity-findings
+  resource: aws.guardduty-finding
+  description: Respond to AWS GuardDuty high and critical severity findings in real-time.
+    This policy triggers on GuardDuty findings and takes automated remediation actions.
+  filters:
+  - type: value
+    key: severity
+    op: gte
+    value: 7.0
+  - or:
+    - type: value
+      key: type
+      op: in
+      value:
+      - UnauthorizedAccess:EC2/SSHBruteForce
+      - UnauthorizedAccess:EC2/RDPBruteForce
+      - CryptoCurrency:EC2/BitcoinTool.B!DNS
+      - Backdoor:EC2/C&CActivity.B!DNS
+      - Trojan:EC2/DNSDataExfiltration
+      - UnauthorizedAccess:IAMUser/MaliciousIPCaller.Custom
+  actions:
+  - type: post-finding
+    compliance_status: FAILED
+    severity_label: HIGH
+    types:
+    - Software and Configuration Checks/AWS Security Best Practices
+  - type: notify
+    template: aws-basic_email
+    priority_header: '1'
+    violation_desc: GuardDuty High Severity Finding Detected
+    action_desc: 'A high or critical severity GuardDuty finding has been detected.
+
+      Immediate investigation and remediation required.
+
+      '
+    to:
+    - security-team@optum.com
+    transport:
+      type: sqs
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue

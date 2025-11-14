@@ -1,0 +1,24 @@
+policies:
+- name: ebs-unencrypted-volumes-scheduled
+  resource: aws.ebs
+  description: Scheduled check for unencrypted EBS volumes. Runs every hour to ensure
+    continuous compliance.
+  filters:
+  - Encrypted: false
+  - State: available
+  actions:
+  - type: tag
+    key: ComplianceStatus
+    value: NonCompliant-Unencrypted
+  - type: tag
+    key: AutoRemediation
+    value: Required
+  - type: notify
+    template: default
+    priority_header: '2'
+    subject: EBS Compliance Alert - Unencrypted Volumes Found - {{ account }}
+    to:
+    - security-team
+    transport:
+      type: sns
+      topic: arn:aws:sns:{region}:{account_id}:cloud-custodian-notifications

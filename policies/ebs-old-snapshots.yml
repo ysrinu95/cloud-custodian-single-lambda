@@ -1,0 +1,18 @@
+policies:
+- name: ebs-old-snapshots
+  resource: aws.ebs-snapshot
+  description: Find EBS snapshots older than 90 days that might be safe to delete
+    for cost savings.
+  filters:
+  - OwnerId: self
+  - type: age
+    days: 90
+  - not:
+    - type: value
+      key: Description
+      op: regex
+      value: .*Created by CreateImage.*
+  actions:
+  - type: tag
+    key: CostOptimization
+    value: OldSnapshot

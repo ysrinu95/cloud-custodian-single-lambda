@@ -1,0 +1,17 @@
+policies:
+- name: iam-policy-monitoring-realtime
+  resource: aws.iam-policy
+  description: Monitor IAM policies in real-time for overly permissive policies. Triggers
+    when IAM policies are created or modified.
+  filters:
+  - type: has-allow-all
+  actions:
+  - type: notify
+    template: default
+    priority_header: '1'
+    subject: IAM Policy Alert - Overly Permissive Policy Detected - {{ account }}
+    to:
+    - security-team
+    transport:
+      type: sns
+      topic: arn:aws:sns:{region}:{account_id}:cloud-custodian-notifications

@@ -1,0 +1,40 @@
+policies:
+- name: ec2-public-instance-remediation-event
+  resource: aws.ec2
+  description: 'Stops EC2 instances launched with public IPs. Triggered by Lambda on CloudTrail event: RunInstances. Lambda passes the instance ID from event data.'
+  filters:
+  - type: value
+    key: State.Name
+    value: running
+  - type: value
+    key: PublicIpAddress
+    value: not-null
+  actions:
+  - type: tag
+    tags:
+      c7n-violation: public-ip-detected
+      c7n-remediation-date: '{now:%Y-%m-%d}'
+      c7n-remediation-action: instance-stopped
+  - type: stop
+  - type: post-finding
+    severity_label: HIGH
+    compliance_status: FAILED
+    title: EC2 Instance Launched with Public IP - Stopped
+    description: 'EC2 instance was launched with a public IP address in violation of security policy. The instance has been automatically stopped.'
+    recommendation: 'Launch instances in private subnets and use load balancers or NAT gateways for external access. Review security group rules.'
+    types:
+    - Software and Configuration Checks/AWS Security Best Practices
+  - template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+    type: notify
+    priority_header: 1
+    subject: '[c7n] [{{ account }}] EC2 Instance Launched with Public IP - Stopped
+      ({{ region }})'
+    violation_desc: EC2 instance launched with public IP address
+    action_desc: 'Actions taken: The violating EC2 instance has been stopped.'

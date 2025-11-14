@@ -1,0 +1,11 @@
+policies:
+- name: nat-gateways-unused
+  resource: aws.nat-gateway
+  description: Find NAT Gateways that might not be actively used. These are expensive
+    and should be reviewed for cost optimization.
+  filters:
+  - State: available
+  actions:
+  - type: tag
+    key: CostReview
+    value: NATGatewayUsage

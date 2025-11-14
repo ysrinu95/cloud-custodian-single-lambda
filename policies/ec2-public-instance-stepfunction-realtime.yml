@@ -1,0 +1,70 @@
+policies:
+- name: ec2-public-instance-stepfunction-realtime
+  resource: aws.ec2
+  description: 'Immediately triggers Step Function workflow for automated risk assessment \nand\ \ remediation based on risk level (HIGH/MEDIUM/LOW).\n"'
+  filters:
+  - type: value
+    key: State.Name
+    value: running
+  - or:
+    - type: value
+      key: PublicIpAddress
+      value: not-null
+    - type: value
+      key: NetworkInterfaces[].Association.PublicIp
+      value: not-null
+  - type: value
+    key: Tags[?Key == 'PublicInstanceApproved'] | length(@)
+    value: 0
+  actions:
+  - type: invoke-sfn
+    state-machine: arn:aws:states:{region}:{account}:stateMachine:EC2PublicInstanceRemediation
+  - type: tag
+    key: SecurityFinding
+    value: PublicInstanceDetected
+  - type: tag
+    key: DetectionSource
+    value: CloudCustodian-RealTime
+  - type: tag
+    key: DetectionTime
+    value: '{now:%Y-%m-%d %H:%M:%S UTC}'
+  - type: notify
+    template: aws-basic_email
+    priority_header: '1'
+    violation_desc: Public EC2 Instance Detected - Step Function Triggered
+    action_desc: '🚨 SECURITY ALERT: Public EC2 Instance Detected
+
+
+      Instance: {InstanceId}
+
+      Public IP: {PublicIpAddress}
+
+      Instance Type: {InstanceType}
+
+      Launch Time: {LaunchTime}
+
+      VPC: {VpcId}
+
+      Subnet: {SubnetId}
+
+
+      ⚡ Step Function workflow has been automatically triggered for:
+
+      • Risk assessment and categorization
+
+      • Automated remediation based on risk level
+
+      • Security team notification
+
+      • Compliance tracking
+
+
+      🔗 Monitor workflow: https://{region}.console.aws.amazon.com/states/home?region={region}#/executions
+
+      '
+    to:
+    - security-team@optum.com
+    - infrastructure-team@optum.com
+    transport:
+      type: sqs
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue

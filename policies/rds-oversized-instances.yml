@@ -1,0 +1,20 @@
+policies:
+- name: rds-oversized-instances
+  resource: aws.rds
+  description: Find RDS instances that might be oversized based on CPU and connection
+    metrics.
+  filters:
+  - type: metrics
+    name: CPUUtilization
+    days: 14
+    value: 20
+    op: less-than
+  - type: metrics
+    name: DatabaseConnections
+    days: 14
+    value: 10
+    op: less-than
+  actions:
+  - type: tag
+    key: CostOptimization
+    value: OverSizedRDS

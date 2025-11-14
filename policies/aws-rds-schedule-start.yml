@@ -1,0 +1,40 @@
+policies:
+- name: aws-rds-schedule-start
+  resource: aws.rds
+  description: 'Starts RDS instances based on the c7n-schedule tag'
+  filters:
+  - type: onhour
+    tag: c7n-schedule
+    default_tz: utc
+    onhour: 1
+  - DBInstanceStatus: stopped
+  - type: value
+    key: tag:c7n-schedule
+    op: glob
+    value: '*on=*'
+  actions:
+  - type: start
+  - template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+    type: notify
+    action_desc: Resource has been STARTED per the tagged c7n-schedule
+vars:
+  tags:
+    contact: ysrinu95@gmail.com
+    environment: production
+    repo: ysrinu95/cloud-custodian
+  email-notify:
+    template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue

@@ -1,0 +1,14 @@
+policies:
+- name: cloudwatch-large-log-groups
+  resource: aws.log-group
+  description: Find CloudWatch log groups that are very large and might benefit from
+    log retention policy optimization.
+  filters:
+  - type: value
+    key: storedBytes
+    op: greater-than
+    value: 10737418240
+  actions:
+  - type: tag
+    key: CostOptimization
+    value: LargeLogGroup

@@ -1,0 +1,42 @@
+policies:
+- name: aws-cloudwatch-stale-log-groups
+  resource: aws.log-group
+  description: 'Notifies of CloudWatch log groups found to be unused'
+  filters:
+  - type: last-write
+    days: 365
+  - not:
+    - type: value
+      key: logGroupName
+      op: regex
+      value: ^/aws/lambda/custodian-
+  - tag:c7n-exception:unused: absent
+  actions:
+  - template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+    type: notify
+    subject: '[c7n] [{{ account }}] CloudWatch Log Groups Are Unused ({{ region }})'
+    violation_desc: CloudWatch log groups not written to in the last year
+    action_desc: 'Please check the unused log groups and delete if unused
+
+      '
+vars:
+  tags:
+    contact: ysrinu95@gmail.com
+    environment: production
+    repo: ysrinu95/cloud-custodian
+  email-notify:
+    template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue

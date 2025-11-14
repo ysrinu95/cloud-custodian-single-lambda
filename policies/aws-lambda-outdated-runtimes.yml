@@ -1,0 +1,56 @@
+policies:
+- name: aws-lambda-outdated-runtimes
+  resource: aws.lambda
+  description: 'Reports Lambda functions using runtimes that will be deprecated soon'
+  filters:
+  - type: value
+    key: Runtime
+    value:
+    - nodejs18.x
+    - python3.9
+    op: in
+  - not:
+    - type: value
+      key: FunctionName
+      op: regex
+      value: (aws-controltower)-\w+
+      value_type: normalize
+  actions:
+  - template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+    type: notify
+    subject: '[c7n] [{{ account }}] Lambda Functions Using Outdated Runtimes Report
+      ({{ region }})'
+    violation_desc: Lambda functions configured to use an outdated runtime that will
+      be deprecated soon
+    action_desc: 'No action taken. Functions should be updated to the latest runtime.<br>
+
+      These functions are nearing deprecation within the next 6 months. They will
+      soon no longer receive security patches.<br>
+
+      Once Phase 2 deprecation ends, they will additionally no longer be able to be
+      updated.<br>
+
+      <a href="https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html">Documentation</a>
+
+      '
+vars:
+  tags:
+    contact: ysrinu95@gmail.com
+    environment: production
+    repo: ysrinu95/cloud-custodian
+  email-notify:
+    template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue

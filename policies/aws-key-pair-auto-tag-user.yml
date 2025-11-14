@@ -1,0 +1,25 @@
+policies:
+- name: aws-key-pair-auto-tag-user
+  resource: aws.key-pair
+  description: 'Auto-tags key pair resources with creator info'
+  filters:
+  - tag:c7n:created-by: absent
+  actions: []
+vars:
+  tags:
+    contact: ysrinu95@gmail.com
+    environment: production
+    repo: ysrinu95/cloud-custodian
+  auto-tag:
+    filters:
+    - tag:c7n:created-by: absent
+    actions:
+    - type: auto-tag-user
+      tag: c7n:created-by
+      principal_id_tag: c7n:created-by-principal
+  temp-condition:
+  - type: value
+    key: account_id
+    op: in
+    value:
+    - '172327596604'

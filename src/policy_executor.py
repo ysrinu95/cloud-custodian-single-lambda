@@ -173,7 +173,7 @@ class PolicyExecutor:
         
         Args:
             policy: Single policy configuration
-            event_info: Event information
+            event_info: Event information (includes raw CloudTrail event)
             dryrun: Dry-run mode flag
             
         Returns:
@@ -206,6 +206,48 @@ class PolicyExecutor:
                     'key': 'Name',
                     'value': bucket_name
                 })
+            
+            # For EC2 resources, filter by instance ID if available
+            instance_id = event_info.get('instance_id')
+            if instance_id and policy.get('resource') == 'aws.ec2':
+                logger.info(f"Adding instance filter for: {instance_id}")
+                
+                if 'filters' not in policy:
+                    policy['filters'] = []
+                
+                policy['filters'].insert(0, {
+                    'type': 'value',
+                    'key': 'InstanceId',
+                    'value': instance_id
+                })
+            
+            # For IAM users, filter by username if available
+            username = event_info.get('username')
+            if username and policy.get('resource') == 'aws.iam-user':
+                logger.info(f"Adding user filter for: {username}")
+                
+                if 'filters' not in policy:
+                    policy['filters'] = []
+                
+                policy['filters'].insert(0, {
+                    'type': 'value',
+                    'key': 'UserName',
+                    'value': username
+                })
+            
+            # For security groups, filter by group ID if available
+            group_id = event_info.get('group_id')
+            if group_id and policy.get('resource') == 'aws.security-group':
+                logger.info(f"Adding security group filter for: {group_id}")
+                
+                if 'filters' not in policy:
+                    policy['filters'] = []
+                
+                policy['filters'].insert(0, {
+                    'type': 'value',
+                    'key': 'GroupId',
+                    'value': group_id
+                })
         
         # Create temporary file for policy
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yml', delete=False) as tmp_file:
@@ -213,7 +255,10 @@ class PolicyExecutor:
             tmp_policy_path = tmp_file.name
         
         try:
-            # Create policy collection
+            # Extract raw CloudTrail event data for policy context
+            raw_event = event_info.get('raw_event', {})
+            
+            # Create policy collection with event context
             options = {
                 'region': self.region,
                 'log_group': f'/aws/lambda/cloud-custodian',
@@ -225,10 +270,17 @@ class PolicyExecutor:
             # Load policies
             collection = PolicyCollection.from_data(policy_config, options)
             
-            # Execute policies
+            # Execute policies with event context
             results = []
             for p in collection:
                 logger.info(f"Running policy: {p.name}")
+                
+                # Set event context if available
+                # This allows policies to access event data via {event.userIdentity.principalId}, etc.
+                if raw_event:
+                    logger.info(f"Passing CloudTrail event context to policy")
+                    p.data['event'] = raw_event.get('detail', {})
+                    logger.debug(f"Event context: {json.dumps(p.data.get('event', {}), default=str)}")
                 
                 # Run the policy
                 resources_matched = p.run()
@@ -239,6 +291,7 @@ class PolicyExecutor:
                     'resources_matched': len(resources_matched) if resources_matched else 0,
                     'action_taken': not dryrun,
                     'dryrun': dryrun,
+                    'event_context_provided': bool(raw_event),
                 }
                 
                 logger.info(f"Policy {p.name} matched {result['resources_matched']} resources")

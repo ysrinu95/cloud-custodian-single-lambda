@@ -1,0 +1,36 @@
+policies:
+- name: aws-rds-schedule-stop
+  resource: aws.rds
+  description: 'Stops RDS instances based on the c7n-schedule tag'
+  filters:
+  - type: offhour
+    tag: c7n-schedule
+    default_tz: utc
+    offhour: 1
+  - DBInstanceStatus: available
+  actions:
+  - type: stop
+  - template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+    type: notify
+    action_desc: Resource has been STOPPED per the tagged c7n-schedule
+vars:
+  tags:
+    contact: ysrinu95@gmail.com
+    environment: production
+    repo: ysrinu95/cloud-custodian
+  email-notify:
+    template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue

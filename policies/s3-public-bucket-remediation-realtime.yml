@@ -1,0 +1,23 @@
+policies:
+- name: s3-public-bucket-remediation-realtime
+  resource: aws.s3
+  description: Monitor S3 buckets in real-time and automatically secure public buckets.
+    Triggers when S3 buckets are created or modified.
+  filters:
+  - type: check-public-block
+    BlockPublicAcls: false
+  actions:
+  - type: set-public-block
+    BlockPublicAcls: true
+    BlockPublicPolicy: true
+    IgnorePublicAcls: true
+    RestrictPublicBuckets: true
+  - type: notify
+    template: default
+    priority_header: '2'
+    subject: S3 Bucket Secured - {{ account }} {{ region }}
+    to:
+    - resource-owner
+    transport:
+      type: sns
+      topic: arn:aws:sns:{region}:{account_id}:cloud-custodian-notifications

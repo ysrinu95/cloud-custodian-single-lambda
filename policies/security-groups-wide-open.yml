@@ -1,0 +1,20 @@
+policies:
+- name: security-groups-wide-open
+  resource: aws.security-group
+  description: Find security groups with rules that allow all traffic (0.0.0.0/0)
+    on sensitive ports. This is a security risk.
+  filters:
+  - or:
+    - type: ingress
+      Ports:
+      - 80
+      - 443
+      - 22
+      - 3389
+      - 3306
+      - 5432
+      Cidr: 0.0.0.0/0
+  actions:
+  - type: tag
+    key: SecurityReview
+    value: WideOpenPorts

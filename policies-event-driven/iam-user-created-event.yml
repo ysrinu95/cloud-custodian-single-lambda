@@ -1,0 +1,31 @@
+policies:
+- name: iam-new-user-tagging-event
+  resource: aws.iam-user
+  description: 'Auto-tags new IAM users with creator information. Triggered by Lambda on CloudTrail event: CreateUser. Lambda passes the username from event data.'
+  actions:
+  - type: tag
+    tags:
+      CreatedBy: '{event.userIdentity.principalId}'
+      CreatedByArn: '{event.userIdentity.arn}'
+      CreatedDate: '{now:%Y-%m-%d}'
+      CreatedViaEvent: CreateUser
+  - type: post-finding
+    severity_label: INFORMATIONAL
+    compliance_status: PASSED
+    title: New IAM User Created and Tagged
+    description: 'New IAM user was created and tagged with creator information.'
+    recommendation: Ensure appropriate permissions are assigned and MFA is enabled.
+    types:
+    - Software and Configuration Checks/AWS Security Best Practices
+  - template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+    type: notify
+    subject: '[c7n] [{{ account }}] New IAM User Created ({{ region }})'
+    violation_desc: A new IAM user was created
+    action_desc: 'Actions taken: User has been tagged with creator information.'

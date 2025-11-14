@@ -54,7 +54,8 @@ policies:
         state: false
     actions:
       - type: set-bucket-encryption
-        encryption: AES256
+        enabled: true
+        crypto: AES256
       - type: notify
         subject: "S3 Bucket Encryption Enabled"
         to:

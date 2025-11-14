@@ -1,0 +1,28 @@
+policies:
+- name: ec2-untagged-instances-vpc-periodic
+  resource: aws.ec2
+  description: Periodic policy running inside VPC. Scans all EC2 instances daily for
+    missing required tags. Demonstrates scheduled VPC-deployed Lambda function.
+  filters:
+  - type: value
+    key: State.Name
+    value: running
+  - or:
+    - tag:CostCenter: absent
+    - tag:Owner: absent
+    - tag:Application: absent
+  actions:
+  - type: tag
+    key: ComplianceStatus
+    value: NonCompliant-MissingTags
+  - type: tag
+    key: LastScanned
+    value: '{now:%Y-%m-%d}'
+  - type: notify
+    template: default.html
+    subject: '[Cloud Custodian] EC2 Instances Missing Required Tags'
+    to:
+    - operations@example.com
+    transport:
+      type: sqs
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/cloud-custodian-mailer

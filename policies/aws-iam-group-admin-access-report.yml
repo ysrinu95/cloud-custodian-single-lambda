@@ -1,0 +1,43 @@
+policies:
+- name: aws-iam-group-admin-access-report
+  resource: aws.iam-group
+  description: 'Notifies of IAM groups with administrator permissions'
+  filters:
+  - or:
+    - type: has-specific-managed-policy
+      value: AdministratorAccess
+    - type: check-permissions
+      match: allowed
+      actions:
+      - '*:*'
+  actions:
+  - template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+    type: notify
+    subject: '[c7n] [{{ account }}] IAM Groups With Administrator Permissions'
+    violation_desc: IAM principal not following a least-privilege model
+    action_desc: 'Please update the resources to follow a least-privilege model.<br>
+
+      <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege">Documentation</a>
+
+      '
+vars:
+  tags:
+    contact: ysrinu95@gmail.com
+    environment: production
+    repo: ysrinu95/cloud-custodian
+  email-notify:
+    template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue

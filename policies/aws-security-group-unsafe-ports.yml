@@ -1,0 +1,96 @@
+policies:
+- name: aws-security-group-unsafe-ports
+  resource: aws.security-group
+  description: 'Detects and removes security group rules allowing public internet access over unsafe ports'
+  filters:
+  - or:
+    - type: ingress
+      Ports:
+      - 3389
+      - 20
+      - 23
+      - 110
+      - 143
+      - 3306
+      - 8080
+      - 1433
+      - 9200
+      - 9300
+      - 25
+      - 445
+      - 135
+      - 21
+      - 1434
+      - 4333
+      - 5432
+      - 5500
+      - 5601
+      - 22
+      - 3000
+      - 5000
+      - 8088
+      - 8888
+      Cidr:
+        value: 0.0.0.0/0
+    - type: ingress
+      Ports:
+      - 3389
+      - 20
+      - 23
+      - 110
+      - 143
+      - 3306
+      - 8080
+      - 1433
+      - 9200
+      - 9300
+      - 25
+      - 445
+      - 135
+      - 21
+      - 1434
+      - 4333
+      - 5432
+      - 5500
+      - 5601
+      - 22
+      - 3000
+      - 5000
+      - 8088
+      - 8888
+      CidrV6:
+        value: ::/0
+  actions:
+  - type: remove-permissions
+    ingress: matched
+  - template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+    type: notify
+    priority_header: 1
+    subject: '[c7n] [{{ account }}] Open Security Group Rule Created ({{ region }})'
+    violation_desc: Security group with rules open to the world
+    action_desc: "Actions taken: The violating security group rule has been removed\
+      \ as it typically allows \ndirect incoming public internet traffic access to\
+      \ your resource. This violates AWS \nsecurity best practice. <br>          \n\
+      <a href=\"https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-standards-fsbp-controls.html#ec2-19-remediation\"\
+      >Documentation</a> \n"
+vars:
+  tags:
+    contact: ysrinu95@gmail.com
+    environment: production
+    repo: ysrinu95/cloud-custodian
+  email-notify:
+    template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue

@@ -1,0 +1,12 @@
+policies:
+- name: ec2-untagged-instances
+  resource: aws.ec2
+  description: Find EC2 instances that are missing required tags. This is a common
+    compliance requirement for cost allocation and governance.
+  filters:
+  - State.Name: running
+  - tag:Environment: absent
+  actions:
+  - type: tag
+    key: ComplianceStatus
+    value: NonCompliant-MissingTags

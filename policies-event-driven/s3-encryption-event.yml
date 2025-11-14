@@ -1,0 +1,47 @@
+policies:
+- name: s3-encryption-remediation-event
+  resource: aws.s3
+  description: 'Re-enables S3 bucket encryption when it is removed. Triggered by Lambda on CloudTrail events: DeleteBucketEncryption, CreateBucket. Lambda passes the bucket name from event data.'
+  filters:
+  - type: bucket-encryption
+    state: false
+  actions:
+  - type: set-bucket-encryption
+    enabled: true
+    crypto: AES256
+  - type: tag
+    tags:
+      c7n-remediation: encryption-enabled
+      c7n-remediation-date: '{now:%Y-%m-%d}'
+      c7n-encryption-type: AES256
+  - type: post-finding
+    severity_label: MEDIUM
+    compliance_status: FAILED
+    title: S3 Bucket Encryption Disabled - Re-enabled
+    description: 'S3 bucket encryption was disabled or not configured.
+
+      Default AES256 encryption has been automatically enabled.
+
+      '
+    recommendation: 'Consider using AWS KMS encryption for additional key management
+      capabilities.
+
+      Ensure bucket policies enforce encryption for all uploads.
+
+      '
+    types:
+    - Software and Configuration Checks/AWS Security Best Practices
+  - template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+    type: notify
+    priority_header: 1
+    subject: '[c7n] [{{ account }}] S3 Bucket Encryption Disabled - Re-enabled ({{
+      region }})'
+    violation_desc: S3 bucket encryption was disabled or not configured
+    action_desc: 'Actions taken: Default AES256 encryption has been enabled.'

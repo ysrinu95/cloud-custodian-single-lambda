@@ -1,0 +1,55 @@
+policies:
+- name: aws-phd-health-event-issue
+  resource: aws.health-event
+  description: 'Notifies of Personal Health Dashboard issue events'
+  filters:
+  - type: value
+    key: eventTypeCategory
+    value: issue
+  - type: value
+    key: lastUpdatedTime
+    op: less-than
+    value_type: age
+    value: 0.021
+  - type: value
+    key: region
+    op: in
+    value:
+    - global
+    - us-east-1
+    - us-west-2
+    - us-east-2
+  actions:
+  - template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+    type: notify
+    title: PHD - Operational Issue Notification
+    action_desc: See Personal Health Dashboard 'Open and recent issues' tab @ https://health.aws.amazon.com
+      for more info.
+vars:
+  tags:
+    contact: ysrinu95@gmail.com
+    environment: production
+    repo: ysrinu95/cloud-custodian
+  email-notify:
+    template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+  phd-conditions:
+  - region: us-east-1
+  - type: value
+    key: account_id
+    op: in
+    value:
+    - '101300729637'

@@ -1,0 +1,12 @@
+policies:
+- name: ebs-unattached-volumes
+  resource: aws.ebs
+  description: Find EBS volumes that are not attached to any instance. These incur
+    storage costs.
+  filters:
+  - State: available
+  actions:
+  - type: snapshot
+  - type: tag
+    key: CostOptimization
+    value: UnattachedVolume

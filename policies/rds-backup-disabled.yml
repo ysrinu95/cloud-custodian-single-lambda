@@ -1,0 +1,12 @@
+policies:
+- name: rds-backup-disabled
+  resource: aws.rds
+  description: Find RDS instances that don't have automated backups enabled. This
+    is important for data protection and compliance.
+  filters:
+  - BackupRetentionPeriod: 0
+  - ReadReplicaSourceDBInstanceIdentifier: absent
+  actions:
+  - type: tag
+    key: ComplianceIssue
+    value: BackupDisabled

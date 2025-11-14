@@ -1,0 +1,36 @@
+policies:
+- name: macie-sensitive-data-findings
+  resource: aws.s3
+  description: Respond to AWS Macie sensitive data discovery findings in S3 buckets.
+    This policy triggers when Macie detects PII, credentials, or sensitive data.
+  filters: []
+  actions:
+  - type: set-bucket-encryption
+    crypto: AES256
+  - type: toggle-versioning
+    enabled: true
+  - type: set-public-block
+    BlockPublicAcls: true
+    BlockPublicPolicy: true
+    IgnorePublicAcls: true
+    RestrictPublicBuckets: true
+  - type: tag
+    key: MacieFinding
+    value: SensitiveDataDetected
+  - type: notify
+    template: aws-basic_email
+    priority_header: '1'
+    violation_desc: Macie Sensitive Data Finding
+    action_desc: 'AWS Macie has detected sensitive data (PII, credentials, financial
+      info) in an S3 bucket.
+
+      Automatic remediation applied: encryption enabled, versioning enabled, public
+      access blocked.
+
+      '
+    to:
+    - data-security-team@optum.com
+    - compliance-team@optum.com
+    transport:
+      type: sqs
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue

@@ -1,0 +1,46 @@
+policies:
+- name: aws-rds-snapshot-old
+  resource: rds-snapshot
+  description: 'Notifies of and deletes old RDS instance manual snapshots'
+  filters:
+  - type: value
+    key: SnapshotType
+    value: manual
+    op: eq
+  - type: age
+    days: 90
+    op: ge
+  - tag:c7n-exception:retention: absent
+  actions:
+  - delete
+  - template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+    type: notify
+    priority_header: 1
+    subject: '[c7n] [{{ account }}] RDS Instance Snapshots older than 90 days ({{
+      region }})'
+    violation_desc: RDS Snapshots older than 90 days
+    action_desc: 'Actions taken: RDS Instance Snapshots older than 90 days have been
+      deleted. <br>
+
+      '
+vars:
+  tags:
+    contact: ysrinu95@gmail.com
+    environment: production
+    repo: ysrinu95/cloud-custodian
+  email-notify:
+    template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue

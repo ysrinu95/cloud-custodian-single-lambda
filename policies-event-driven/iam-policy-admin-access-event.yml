@@ -1,0 +1,46 @@
+policies:
+- name: iam-admin-policy-alert-event
+  resource: aws.iam-policy
+  description: 'Event-driven policy to detect and alert on IAM policies with admin
+    access (*:*). Triggered by Lambda on CloudTrail events: CreatePolicy, CreatePolicyVersion
+    Lambda passes the policy ARN from event data.'
+  filters:
+  - type: has-allow-all
+  actions:
+  - type: tag
+    tags:
+      c7n-alert: admin-access-policy
+      c7n-detected-date: '{now:%Y-%m-%d}'
+      c7n-severity: high
+  - type: post-finding
+    severity_label: CRITICAL
+    compliance_status: FAILED
+    title: IAM Policy with Admin Access Created
+    description: 'An IAM policy with admin access (*:*) was created.
+
+      Review and ensure this level of access is required and properly restricted.
+
+      '
+    recommendation: 'Follow principle of least privilege. Grant only specific permissions
+      required.
+
+      Use AWS managed policies when possible and restrict custom policies to specific
+      actions.
+
+      '
+    types:
+    - Software and Configuration Checks/AWS Security Best Practices
+  - template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+    type: notify
+    priority_header: 1
+    subject: '[c7n] [{{ account }}] IAM Policy with Admin Access Created ({{ region
+      }})'
+    violation_desc: IAM policy with admin access (*:*) was created
+    action_desc: 'Actions taken: Policy has been tagged for review.'

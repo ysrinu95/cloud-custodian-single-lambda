@@ -1,0 +1,26 @@
+policies:
+- name: ec2-public-ip-vpc-deployed
+  resource: aws.ec2
+  description: Event-driven policy deployed inside VPC for enhanced security. Automatically
+    terminates EC2 instances launched with public IP addresses. This policy demonstrates
+    Cloud Custodian Lambda deployment within a VPC.
+  filters:
+  - type: value
+    key: PublicIpAddress
+    value: not-null
+  - type: value
+    key: State.Name
+    value: running
+  actions:
+  - type: terminate
+    force: true
+  - type: notify
+    template: default.html
+    priority_header: '1'
+    subject: '[Cloud Custodian] EC2 Instance Terminated - Public IP Violation (VPC-Deployed
+      Policy)'
+    to:
+    - security-team@example.com
+    transport:
+      type: sqs
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/cloud-custodian-mailer

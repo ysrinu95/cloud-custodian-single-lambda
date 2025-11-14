@@ -1,0 +1,14 @@
+policies:
+- name: ec2-public-instances-stepfunction-remediation
+  resource: aws.ec2
+  description: 'Detects EC2 instances with public IPs and triggers Step Function remediation workflow. This policy triggers a Step Function that handles notification, tagging, and remediation of publicly accessible EC2 instances.'
+  filters:
+  - type: value
+    key: State.Name
+    value: running
+  - type: value
+    key: PublicIpAddress
+    value: not-null
+  actions:
+  - type: invoke-sfn
+    state-machine: arn:aws:states:{region}:172327596604:stateMachine:EC2PublicInstanceRemediation

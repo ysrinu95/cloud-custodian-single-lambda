@@ -1,0 +1,43 @@
+policies:
+- name: aws-asg-schedule-start
+  resource: aws.asg
+  description: 'Resumes ASG based on the c7n-schedule tag'
+  filters:
+  - type: onhour
+    tag: c7n-schedule
+    default_tz: utc
+    onhour: 1
+  - tag:suspended-by-c7n-schedule: present
+  - type: value
+    key: tag:c7n-schedule
+    op: glob
+    value: '*on=*'
+  actions:
+  - type: untag
+    tags:
+    - suspended-by-c7n-schedule
+  - type: resume
+  - template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+    type: notify
+    action_desc: Resource has been RESUMED per the tagged c7n-schedule
+vars:
+  tags:
+    contact: ysrinu95@gmail.com
+    environment: production
+    repo: ysrinu95/cloud-custodian
+  email-notify:
+    template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue

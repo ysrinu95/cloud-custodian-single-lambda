@@ -1,0 +1,45 @@
+policies:
+- name: aws-lambda-outdated-runtime-creation
+  resource: aws.lambda
+  description: 'Notify when a Lambda function is created with an outdated runtime.'
+  filters:
+  - type: value
+    key: Runtime
+    value:
+    - nodejs18.x
+    op: in
+  actions:
+  - template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+    type: notify
+    subject: '[c7n] [{{ account }}] Lambda Function Created with Outdated Runtime
+      ({{ region }})'
+    violation_desc: Lambda function Created with outdated runtime
+    action_desc: 'Functions should be created using a runtime that is not pending
+      deprecation.<br>
+
+      These runtimes will soon no longer receive security patches.<br>
+
+      <a href="https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html">Documentation</a>
+
+      '
+vars:
+  tags:
+    contact: ysrinu95@gmail.com
+    environment: production
+    repo: ysrinu95/cloud-custodian
+  email-notify:
+    template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue

@@ -1,0 +1,15 @@
+policies:
+- name: lambda-unused-functions
+  resource: aws.lambda
+  description: Find Lambda functions that haven't been invoked recently. While Lambda
+    has no cost when not running, these might be cleanup candidates.
+  filters:
+  - type: metrics
+    name: Invocations
+    days: 30
+    value: 1
+    op: less-than
+  actions:
+  - type: tag
+    key: CostOptimization
+    value: UnusedLambda

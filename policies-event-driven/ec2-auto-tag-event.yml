@@ -1,0 +1,11 @@
+policies:
+- name: ec2-auto-tag-creator-event
+  resource: aws.ec2
+  description: 'Auto-tags new EC2 instances with creator information. Triggered by Lambda on CloudTrail event: RunInstances. Lambda passes instance ID from event data. Creator info extracted from CloudTrail event.'
+  actions:
+  - type: tag
+    tags:
+      LaunchDate: '{now:%Y-%m-%d}'
+      LaunchTime: '{now:%H:%M:%S}'
+      LaunchEvent: RunInstances
+      ManagedBy: CloudCustodian

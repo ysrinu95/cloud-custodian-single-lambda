@@ -70,17 +70,41 @@ class EventValidator:
             'request_parameters': detail.get('requestParameters', {}),
             'response_elements': detail.get('responseElements', {}),
             'user_identity': detail.get('userIdentity', {}),
+            'raw_event': event,  # Include the complete raw event for policy context
         }
         
         # Validate event source
-        if event_info['event_source'] != 's3.amazonaws.com':
-            raise ValueError(f"Unsupported event source: {event_info['event_source']}")
+        event_source = event_info['event_source']
         
-        # Extract bucket name
-        bucket_name = self._extract_bucket_name(event_info)
-        event_info['bucket_name'] = bucket_name
+        # Support multiple AWS services
+        supported_sources = [
+            's3.amazonaws.com',
+            'ec2.amazonaws.com',
+            'iam.amazonaws.com',
+            'securityhub.amazonaws.com',
+            'guardduty.amazonaws.com'
+        ]
         
-        logger.info(f"Event validated: {event_info['event_name']} on bucket {bucket_name}")
+        if event_source not in supported_sources:
+            logger.warning(f"Event source {event_source} not in typical supported list, proceeding anyway")
+        
+        # Extract resource identifiers based on service
+        if event_source == 's3.amazonaws.com':
+            bucket_name = self._extract_bucket_name(event_info)
+            event_info['bucket_name'] = bucket_name
+        elif event_source == 'ec2.amazonaws.com':
+            instance_id = self._extract_instance_id(event_info)
+            if instance_id:
+                event_info['instance_id'] = instance_id
+            group_id = self._extract_security_group_id(event_info)
+            if group_id:
+                event_info['group_id'] = group_id
+        elif event_source == 'iam.amazonaws.com':
+            username = self._extract_username(event_info)
+            if username:
+                event_info['username'] = username
+        
+        logger.info(f"Event validated: {event_info['event_name']}")
         
         return {
             'valid': True,
@@ -121,6 +145,67 @@ class EventValidator:
                 return bucket_name
         
         raise ValueError("Could not extract bucket name from event")
+    
+    def _extract_instance_id(self, event_info: Dict[str, Any]) -> Optional[str]:
+        """Extract EC2 instance ID from event information"""
+        request_params = event_info.get('request_parameters', {})
+        response_elements = event_info.get('response_elements', {})
+        
+        # Try response elements first (for RunInstances)
+        if isinstance(response_elements, dict):
+            instances_set = response_elements.get('instancesSet', {})
+            if isinstance(instances_set, dict):
+                items = instances_set.get('items', [])
+                if items and len(items) > 0:
+                    return items[0].get('instanceId')
+        
+        # Try request parameters
+        instance_id = request_params.get('instanceId')
+        if instance_id:
+            return instance_id
+        
+        # Try instancesSet in request
+        instances_set = request_params.get('instancesSet', {})
+        if isinstance(instances_set, dict):
+            items = instances_set.get('items', [])
+            if items and len(items) > 0:
+                return items[0].get('instanceId')
+        
+        return None
+    
+    def _extract_security_group_id(self, event_info: Dict[str, Any]) -> Optional[str]:
+        """Extract security group ID from event information"""
+        request_params = event_info.get('request_parameters', {})
+        response_elements = event_info.get('response_elements', {})
+        
+        # Try request parameters
+        group_id = request_params.get('groupId')
+        if group_id:
+            return group_id
+        
+        # Try response elements (for CreateSecurityGroup)
+        if isinstance(response_elements, dict):
+            group_id = response_elements.get('groupId')
+            if group_id:
+                return group_id
+        
+        return None
+    
+    def _extract_username(self, event_info: Dict[str, Any]) -> Optional[str]:
+        """Extract IAM username from event information"""
+        request_params = event_info.get('request_parameters', {})
+        
+        # Try userName in request parameters
+        username = request_params.get('userName')
+        if username:
+            return username
+        
+        # Try user in request parameters
+        username = request_params.get('user')
+        if username:
+            return username
+        
+        return None
     
     def get_policy_mapping(self, event_info: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """

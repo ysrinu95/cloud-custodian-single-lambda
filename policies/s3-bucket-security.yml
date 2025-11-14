@@ -3,10 +3,6 @@ policies:
   - name: s3-bucket-public-access-check
     resource: s3
     description: Check and remediate S3 buckets with public access on creation
-    mode:
-      type: cloudtrail
-      events:
-        - CreateBucket
     filters:
       - or:
           - type: value
@@ -15,9 +11,8 @@ policies:
           - type: value
             key: Acl
             value: "public-read-write"
-          - type: public-block
-            key: BlockPublicAcls
-            value: false
+          - type: check-public-block
+            BlockPublicAcls: false
     actions:
       - type: set-public-block
         BlockPublicAcls: true
@@ -29,15 +24,14 @@ policies:
         subject: "Cloud Custodian: Public S3 Bucket Detected and Remediated"
         to:
           - security@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
 
   # Policy 2: Check S3 bucket ACL modifications
   - name: s3-bucket-acl-check
     resource: s3
     description: Monitor and remediate S3 bucket ACL changes that expose data publicly
-    mode:
-      type: cloudtrail
-      events:
-        - PutBucketAcl
     filters:
       - or:
           - type: value
@@ -55,15 +49,14 @@ policies:
         subject: "Cloud Custodian: S3 Bucket ACL Made Public - Remediated"
         to:
           - security@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
 
   # Policy 3: Check S3 bucket policy modifications
   - name: s3-bucket-policy-check
     resource: s3
     description: Monitor S3 bucket policy changes for public access
-    mode:
-      type: cloudtrail
-      events:
-        - PutBucketPolicy
     filters:
       - type: has-statement
         statement_ids:
@@ -72,7 +65,9 @@ policies:
           - Effect: Allow
             Principal: "*"
     actions:
-      - type: delete-bucket-policy
+      - type: remove-statements
+        statement_ids:
+          - "*"
       - type: set-public-block
         BlockPublicPolicy: true
         RestrictPublicBuckets: true
@@ -81,15 +76,14 @@ policies:
         subject: "Cloud Custodian: S3 Bucket Policy Allows Public Access - Remediated"
         to:
           - security@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
 
   # Policy 4: Alert when public access block is removed
   - name: s3-bucket-public-block-removed
     resource: s3
     description: Alert when S3 public access block settings are removed
-    mode:
-      type: cloudtrail
-      events:
-        - DeleteBucketPublicAccessBlock
     actions:
       - type: set-public-block
         BlockPublicAcls: true
@@ -102,19 +96,17 @@ policies:
         subject: "CRITICAL: S3 Bucket Public Access Block Removed - Restored"
         to:
           - security@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
 
   # Policy 5: Check public access block modifications
   - name: s3-bucket-public-block-check
     resource: s3
     description: Verify S3 public access block settings are properly configured
-    mode:
-      type: cloudtrail
-      events:
-        - PutBucketPublicAccessBlock
     filters:
-      - type: public-block
-        key: BlockPublicAcls
-        value: false
+      - type: check-public-block
+        BlockPublicAcls: false
     actions:
       - type: set-public-block
         BlockPublicAcls: true
@@ -126,47 +118,9 @@ policies:
         subject: "Cloud Custodian: S3 Bucket Public Access Block Weak - Strengthened"
         to:
           - security@example.com
-
-  # Policy 6: Check S3 CORS configuration
-  - name: s3-bucket-cors-check
-    resource: s3
-    description: Monitor S3 CORS configurations for overly permissive settings
-    mode:
-      type: cloudtrail
-      events:
-        - PutBucketCors
-    filters:
-      - type: cors
-        AllowedOrigins:
-          - "*"
-    actions:
-      - type: notify
-        template: default
-        subject: "Cloud Custodian: S3 Bucket CORS Configuration Allows All Origins"
-        to:
-          - security@example.com
-
-  # Policy 7: Check S3 static website configuration
-  - name: s3-bucket-website-check
-    resource: s3
-    description: Monitor S3 buckets configured for static website hosting
-    mode:
-      type: cloudtrail
-      events:
-        - PutBucketWebsite
-    filters:
-      - type: bucket-website
-    actions:
-      - type: set-public-block
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
-      - type: notify
-        template: default
-        subject: "Cloud Custodian: S3 Bucket Website Hosting Enabled - Secured"
-        to:
-          - security@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
 
   # Policy 8: Default check for any S3 event
   - name: s3-bucket-default-check
@@ -174,9 +128,8 @@ policies:
     description: Default security check for S3 buckets
     filters:
       - or:
-          - type: public-block
-            key: BlockPublicAcls
-            value: false
+          - type: check-public-block
+            BlockPublicAcls: false
           - type: value
             key: Acl
             value_type: swap
@@ -195,3 +148,6 @@ policies:
         subject: "Cloud Custodian: S3 Bucket Security Issue Detected - Remediated"
         to:
           - security@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue

@@ -1,0 +1,38 @@
+policies:
+- name: iam-access-analyzer-external-access
+  resource: aws.access-analyzer-finding
+  description: 'Detects IAM Access Analyzer findings indicating external access to resources. This policy triggers when resources are shared with external principals.'
+  filters:
+  - type: value
+    key: status
+    value: ACTIVE
+  - type: value
+    key: resourceType
+    op: in
+    value:
+    - AWS::S3::Bucket
+    - AWS::IAM::Role
+    - AWS::KMS::Key
+    - AWS::Lambda::Function
+    - AWS::SQS::Queue
+  actions:
+  - type: post-finding
+    compliance_status: WARNING
+    types:
+    - Software and Configuration Checks/AWS Security Best Practices
+  - type: notify
+    template: aws-basic_email
+    priority_header: '2'
+    violation_desc: IAM Access Analyzer External Access Detected
+    action_desc: 'IAM Access Analyzer has detected that a resource is accessible by
+      an external principal.
+
+      Review the finding to determine if this access is intended.
+
+      '
+    to:
+    - iam-team@optum.com
+    - security-team@optum.com
+    transport:
+      type: sqs
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue

@@ -1,0 +1,52 @@
+policies:
+- name: aws-lambda-unused-functions
+  resource: aws.lambda
+  description: 'Notifies of Lambda functions appear to be unused.'
+  filters:
+  - type: metrics
+    name: Invocations
+    op: equal
+    statistics: Sum
+    days: 365
+    value: 0
+    missing-value: 0
+  - type: value
+    key: LastModified
+    op: gt
+    value: 183
+    value_type: age
+  - not:
+    - type: value
+      key: FunctionName
+      op: regex
+      value: (custodian)-\w+
+      value_type: normalize
+  actions:
+  - template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+    type: notify
+    subject: '[c7n] [{{ account }}] Lambda Functions are unused ({{ region }})'
+    violation_desc: Lambda Functions that appear to be unused
+    action_desc: 'No action taken. Please delete if not needed.
+
+      '
+vars:
+  tags:
+    contact: ysrinu95@gmail.com
+    environment: production
+    repo: ysrinu95/cloud-custodian
+  email-notify:
+    template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue

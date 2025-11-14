@@ -1,0 +1,39 @@
+policies:
+- name: aws-s3-no-encryption
+  resource: aws.s3
+  description: 'Notifies of S3 buckets without encyrption enabled'
+  filters:
+  - type: bucket-encryption
+    state: false
+  actions:
+  - template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+    type: notify
+    subject: '[c7n] [{{ account }}] S3 Buckets Without Encryption Report ({{ region
+      }})'
+    violation_desc: S3 buckets without encryption enabled
+    action_desc: 'No action taken. Encryption should be added to buckets.<br>
+
+      <a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-encryption.html">Documentation</a>
+
+      '
+vars:
+  tags:
+    contact: ysrinu95@gmail.com
+    environment: production
+    repo: ysrinu95/cloud-custodian
+  email-notify:
+    template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue

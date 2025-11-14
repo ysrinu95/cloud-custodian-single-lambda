@@ -1,0 +1,38 @@
+policies:
+- name: aws-ec2-public-ips
+  resource: aws.ec2
+  description: 'Notifies of instances found with a public IP address'
+  filters:
+  - type: value
+    key: PublicIpAddress
+    value: present
+  actions:
+  - template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+    type: notify
+    subject: '[c7n] [{{ account }}] EC2 Instances With Public IP Report ({{ region
+      }})'
+    violation_desc: EC2 instances with a public IP address
+    action_desc: 'No action taken. EC2 instances should be on private subnets.
+
+      '
+vars:
+  tags:
+    contact: ysrinu95@gmail.com
+    environment: production
+    repo: ysrinu95/cloud-custodian
+  email-notify:
+    template: aws-basic_email.html
+    to:
+    - ysrinu95@gmail.com
+    - event-owner
+    - resource-owner
+    transport:
+      type: sqs
+      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue

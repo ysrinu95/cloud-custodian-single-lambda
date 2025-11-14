@@ -1,0 +1,11 @@
+policies:
+- name: elb-no-targets
+  resource: aws.elb
+  description: Find Classic Load Balancers with no registered instances. These incur
+    costs without providing value.
+  filters:
+  - Instances: []
+  actions:
+  - type: tag
+    key: CostOptimization
+    value: UnusedELB

@@ -1,0 +1,24 @@
+policies:
+- name: rds-public-access-remediation-realtime
+  resource: aws.rds
+  description: Monitor RDS instances in real-time and flag publicly accessible databases.
+    Triggers when RDS instances are created or modified.
+  filters:
+  - PubliclyAccessible: true
+  actions:
+  - type: tag
+    key: SecurityAlert
+    value: PubliclyAccessible
+  - type: tag
+    key: ReviewRequired
+    value: Immediate
+  - type: notify
+    template: default
+    priority_header: '1'
+    subject: RDS Security Alert - Publicly Accessible Database - {{ account }}
+    to:
+    - security-team
+    - database-team
+    transport:
+      type: sns
+      topic: arn:aws:sns:{region}:{account_id}:cloud-custodian-notifications

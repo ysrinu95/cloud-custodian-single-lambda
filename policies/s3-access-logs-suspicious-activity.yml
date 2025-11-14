@@ -1,0 +1,28 @@
+policies:
+- name: s3-access-logs-suspicious-activity
+  resource: aws.s3
+  description: Monitor S3 access logs for suspicious activity patterns. This policy
+    analyzes S3 access logs and triggers on anomalous access patterns.
+  filters:
+  - type: bucket-logging
+    op: enabled
+  actions:
+  - type: tag
+    key: SuspiciousAccess
+    value: Detected-{now:%Y-%m-%d}
+  - type: toggle-versioning
+    enabled: true
+  - type: notify
+    template: aws-basic_email
+    priority_header: '2'
+    violation_desc: Suspicious S3 Access Pattern Detected
+    action_desc: 'Suspicious access patterns detected in S3 access logs.
+
+      This may indicate unauthorized access or data exfiltration attempts.
+
+      '
+    to:
+    - security-operations@optum.com
+    transport:
+      type: sqs
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
