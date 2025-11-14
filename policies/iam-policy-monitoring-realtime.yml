@@ -7,7 +7,7 @@ policies:
   - type: has-allow-all
   actions:
   - type: notify
-    template: default
+    template: aws-basic_email.html
     priority_header: '1'
     subject: IAM Policy Alert - Overly Permissive Policy Detected - {{ account }}
     to:

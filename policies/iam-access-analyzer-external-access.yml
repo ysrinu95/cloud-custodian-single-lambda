@@ -21,7 +21,7 @@ policies:
     types:
     - Software and Configuration Checks/AWS Security Best Practices
   - type: notify
-    template: aws-basic_email
+    template: aws-basic_email.html
     priority_header: '2'
     violation_desc: IAM Access Analyzer External Access Detected
     action_desc: 'IAM Access Analyzer has detected that a resource is accessible by

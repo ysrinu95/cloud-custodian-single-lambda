@@ -15,7 +15,7 @@ policies:
   - type: terminate
     force: true
   - type: notify
-    template: default.html
+    template: aws-basic_email.html
     priority_header: '1'
     subject: '[Cloud Custodian] EC2 Instance Terminated - Public IP Violation (VPC-Deployed
       Policy)'

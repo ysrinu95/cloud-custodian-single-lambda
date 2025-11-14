@@ -13,7 +13,7 @@ policies:
     key: ReviewRequired
     value: Immediate
   - type: notify
-    template: default
+    template: aws-basic_email.html
     priority_header: '1'
     subject: RDS Security Alert - Publicly Accessible Database - {{ account }}
     to:

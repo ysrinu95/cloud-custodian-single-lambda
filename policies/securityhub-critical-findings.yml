@@ -31,7 +31,7 @@ policies:
     types:
     - Software and Configuration Checks/AWS Security Best Practices
   - type: notify
-    template: aws-basic_email
+    template: aws-basic_email.html
     priority_header: '1'
     violation_desc: Security Hub Critical Finding Detected
     action_desc: 'A critical or high severity Security Hub finding has been detected.

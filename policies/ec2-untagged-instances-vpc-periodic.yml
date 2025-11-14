@@ -19,7 +19,7 @@ policies:
     key: LastScanned
     value: '{now:%Y-%m-%d}'
   - type: notify
-    template: default.html
+    template: aws-basic_email.html
     subject: '[Cloud Custodian] EC2 Instances Missing Required Tags'
     to:
     - operations@example.com

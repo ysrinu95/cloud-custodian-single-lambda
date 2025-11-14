@@ -20,7 +20,7 @@ policies:
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
       - type: notify
-        template: default
+        template: aws-basic_email.html
         subject: "Cloud Custodian: Public S3 Bucket Detected and Remediated"
         to:
           - security@example.com
@@ -45,7 +45,7 @@ policies:
         BlockPublicAcls: true
         IgnorePublicAcls: true
       - type: notify
-        template: default
+        template: aws-basic_email.html
         subject: "Cloud Custodian: S3 Bucket ACL Made Public - Remediated"
         to:
           - security@example.com
@@ -72,7 +72,7 @@ policies:
         BlockPublicPolicy: true
         RestrictPublicBuckets: true
       - type: notify
-        template: default
+        template: aws-basic_email.html
         subject: "Cloud Custodian: S3 Bucket Policy Allows Public Access - Remediated"
         to:
           - security@example.com
@@ -91,7 +91,7 @@ policies:
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
       - type: notify
-        template: default
+        template: aws-basic_email.html
         priority_header: "1"
         subject: "CRITICAL: S3 Bucket Public Access Block Removed - Restored"
         to:
@@ -114,7 +114,7 @@ policies:
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
       - type: notify
-        template: default
+        template: aws-basic_email.html
         subject: "Cloud Custodian: S3 Bucket Public Access Block Weak - Strengthened"
         to:
           - security@example.com
@@ -144,7 +144,7 @@ policies:
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
       - type: notify
-        template: default
+        template: aws-basic_email.html
         subject: "Cloud Custodian: S3 Bucket Security Issue Detected - Remediated"
         to:
           - security@example.com

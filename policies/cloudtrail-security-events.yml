@@ -4,7 +4,7 @@ policies:
   description: 'This policy triggers on critical API calls that may indicate security issues.'
   actions:
   - type: notify
-    template: aws-basic_email
+    template: aws-basic_email.html
     priority_header: '1'
     violation_desc: Critical CloudTrail Security Event Detected
     action_desc: 'A critical security event has been detected in CloudTrail logs.

@@ -13,7 +13,7 @@ policies:
     key: Environment
     value: unspecified
   - type: notify
-    template: default
+    template: aws-basic_email.html
     priority_header: '1'
     subject: EC2 Instance Auto-Tagged - {{ account }} {{ region }}
     to:

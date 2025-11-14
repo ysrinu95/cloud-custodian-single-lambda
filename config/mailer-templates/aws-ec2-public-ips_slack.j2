@@ -1,0 +1,33 @@
+{
+   "attachments":[
+      {
+         "fallback":"Cloud Custodian Policy Violation",
+         "title":"AWS Policy Alert",
+         "color":"{{ action['slack_msg_color']|default("danger") }}",
+         "fields":[
+            {
+               "title":"Violation Description",
+               "value":"{{ action['violation_desc'] }}"
+            },
+            {
+               "title":"Resources",
+               "value":"{%- for resource in resources -%}
+                        {{ resource['InstanceId'] }} | name={{ resource_tag(resource, 'Name') }} | state={{ resource['State']['Name']}} \n
+                        {%- endfor -%}"
+            },
+            {
+               "title":"Account",
+               "value":"{{ account }}"
+            },
+            {
+               "title":"Region",
+               "value":"{{ region }}"
+            }
+         ]
+      }
+   ],
+   {%- if not recipient.startswith('https://') %}
+   "channel":"{{ recipient }}",
+   {%- endif -%}
+   "username":"Cloud Custodian"
+}

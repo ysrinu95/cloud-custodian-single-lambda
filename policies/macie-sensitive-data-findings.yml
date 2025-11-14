@@ -18,7 +18,7 @@ policies:
     key: MacieFinding
     value: SensitiveDataDetected
   - type: notify
-    template: aws-basic_email
+    template: aws-basic_email.html
     priority_header: '1'
     violation_desc: Macie Sensitive Data Finding
     action_desc: 'AWS Macie has detected sensitive data (PII, credentials, financial

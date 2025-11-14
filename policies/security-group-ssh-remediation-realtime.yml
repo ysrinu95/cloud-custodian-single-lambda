@@ -12,7 +12,7 @@ policies:
   - type: remove-permissions
     ingress: matched
   - type: notify
-    template: default
+    template: aws-basic_email.html
     priority_header: '3'
     subject: Security Group SSH Access Restricted - {{ account }} {{ region }}
     to:

@@ -14,7 +14,7 @@ policies:
     key: AutoRemediation
     value: Required
   - type: notify
-    template: default
+    template: aws-basic_email.html
     priority_header: '2'
     subject: EBS Compliance Alert - Unencrypted Volumes Found - {{ account }}
     to:

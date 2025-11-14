@@ -8,7 +8,7 @@ policies:
     function: custodian-security-findings-aggregator
     async: false
   - type: notify
-    template: aws-basic_email
+    template: aws-basic_email.html
     priority_header: '3'
     subject: Daily Security Findings Summary - {account}
     violation_desc: Daily Security Findings Report

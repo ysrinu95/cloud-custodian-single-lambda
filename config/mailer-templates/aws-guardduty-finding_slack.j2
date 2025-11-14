@@ -1,0 +1,31 @@
+{
+   "attachments":[
+      {
+         "fallback":"Cloud Custodian GuardDuty Alert",
+         "title":"Cloud Custodian GuardDuty Alert",
+         "color":"{{ action['slack_msg_color']|default("danger") }}",
+         "fields":[
+            {
+               "title":"Violation Description",
+               "value":"{{ action['violation_desc'] }}"
+            },
+            {
+               "title":"Account",
+               "value":"{{ event.detail.accountId }} | {{ event.detail.region }}"
+            },
+            {
+               "title":"Finding Details",
+               "value":"{{ event.detail.type }}  |  {{ event.detail.description }}"
+            },
+            {
+               "title":"Action Description",
+               "value":"{{ action['action_desc'] }}"
+            }
+         ]
+      }
+   ],
+   {%- if not recipient.startswith('https://') %}
+   "channel":"{{ recipient }}",
+   {%- endif -%}
+   "username":"Cloud Custodian"
+}

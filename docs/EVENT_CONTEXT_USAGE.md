@@ -144,7 +144,7 @@ policies:
     - security@example.com
     transport:
       type: sqs
-      queue: https://sqs.us-west-2.amazonaws.com/123456789012/custodian-mailer-queue
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
 ```
 
 ## Event Field Reference

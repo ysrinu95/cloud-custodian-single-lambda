@@ -29,7 +29,7 @@ policies:
     key: DetectionTime
     value: '{now:%Y-%m-%d %H:%M:%S UTC}'
   - type: notify
-    template: aws-basic_email
+    template: aws-basic_email.html
     priority_header: '1'
     violation_desc: Public EC2 Instance Detected - Step Function Triggered
     action_desc: '🚨 SECURITY ALERT: Public EC2 Instance Detected

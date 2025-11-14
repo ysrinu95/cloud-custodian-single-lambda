@@ -13,7 +13,7 @@ policies:
     IgnorePublicAcls: true
     RestrictPublicBuckets: true
   - type: notify
-    template: default
+    template: aws-basic_email.html
     priority_header: '2'
     subject: S3 Bucket Secured - {{ account }} {{ region }}
     to:

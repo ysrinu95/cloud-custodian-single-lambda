@@ -23,7 +23,7 @@ policies:
     function: custodian-config-compliance-tagger
     async: true
   - type: notify
-    template: aws-basic_email
+    template: aws-basic_email.html
     priority_header: '2'
     violation_desc: AWS Config Rule Compliance Violation
     action_desc: 'A resource has become non-compliant with AWS Config rules.

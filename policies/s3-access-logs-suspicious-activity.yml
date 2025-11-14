@@ -13,7 +13,7 @@ policies:
   - type: toggle-versioning
     enabled: true
   - type: notify
-    template: aws-basic_email
+    template: aws-basic_email.html
     priority_header: '2'
     violation_desc: Suspicious S3 Access Pattern Detected
     action_desc: 'Suspicious access patterns detected in S3 access logs.
