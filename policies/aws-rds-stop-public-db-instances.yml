@@ -15,7 +15,7 @@ policies:
     - resource-owner
     transport:
       type: sqs
-      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
     type: notify
     priority_header: 1
     subject: '[c7n] [{{ account }}] Public RDS DB Instances Launched ({{ region }})'
@@ -38,4 +38,4 @@ vars:
     - resource-owner
     transport:
       type: sqs
-      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue

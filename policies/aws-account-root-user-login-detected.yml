@@ -11,7 +11,7 @@ policies:
     - resource-owner
     transport:
       type: sqs
-      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
     type: notify
     violation_desc: 'A user has logged into the AWS Console with the Root user'
     action_desc: 'Please investigate and if needed revoke the root users session along with any other restrictive actions if it''s an unapproved root login'
@@ -28,7 +28,7 @@ vars:
     - resource-owner
     transport:
       type: sqs
-      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
   phd-conditions:
   - region: us-east-1
   - type: value

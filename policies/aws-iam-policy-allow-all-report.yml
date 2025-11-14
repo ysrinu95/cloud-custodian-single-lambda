@@ -16,7 +16,7 @@ policies:
     - resource-owner
     transport:
       type: sqs
-      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
     type: notify
     subject: '[c7n] [{{ account }}] IAM Policies Which Allow All Permissions'
     violation_desc: IAM policy not following a least-privilege model
@@ -38,4 +38,4 @@ vars:
     - resource-owner
     transport:
       type: sqs
-      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue

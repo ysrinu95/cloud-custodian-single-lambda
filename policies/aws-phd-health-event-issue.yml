@@ -27,7 +27,7 @@ policies:
     - resource-owner
     transport:
       type: sqs
-      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
     type: notify
     title: PHD - Operational Issue Notification
     action_desc: See Personal Health Dashboard 'Open and recent issues' tab @ https://health.aws.amazon.com
@@ -45,7 +45,7 @@ vars:
     - resource-owner
     transport:
       type: sqs
-      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
   phd-conditions:
   - region: us-east-1
   - type: value

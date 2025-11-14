@@ -13,7 +13,7 @@ policies:
     - resource-owner
     transport:
       type: sqs
-      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
     type: notify
     subject: '[c7n] [{{ account }}] IAM Policies Are Unused'
     violation_desc: IAM policies that appear to be unused
@@ -35,4 +35,4 @@ vars:
     - resource-owner
     transport:
       type: sqs
-      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue

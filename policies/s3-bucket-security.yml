@@ -26,7 +26,7 @@ policies:
           - security@example.com
         transport:
           type: sqs
-          queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
 
   # Policy 2: Check S3 bucket ACL modifications
   - name: s3-bucket-acl-check
@@ -51,7 +51,7 @@ policies:
           - security@example.com
         transport:
           type: sqs
-          queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
 
   # Policy 3: Check S3 bucket policy modifications
   - name: s3-bucket-policy-check
@@ -78,7 +78,7 @@ policies:
           - security@example.com
         transport:
           type: sqs
-          queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
 
   # Policy 4: Alert when public access block is removed
   - name: s3-bucket-public-block-removed
@@ -98,7 +98,7 @@ policies:
           - security@example.com
         transport:
           type: sqs
-          queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
 
   # Policy 5: Check public access block modifications
   - name: s3-bucket-public-block-check
@@ -120,7 +120,7 @@ policies:
           - security@example.com
         transport:
           type: sqs
-          queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
 
   # Policy 8: Default check for any S3 event
   - name: s3-bucket-default-check
@@ -150,4 +150,4 @@ policies:
           - security@example.com
         transport:
           type: sqs
-          queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue

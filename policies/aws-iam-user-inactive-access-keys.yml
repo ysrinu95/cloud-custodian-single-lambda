@@ -31,7 +31,7 @@ policies:
     - resource-owner
     transport: &id002
       type: sqs
-      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
     type: notify
     subject: '[c7n] [{{ account }}] IAM Users With Access Keys Not Recently Used'
     violation_desc: IAM user access keys not used in the last 90 days
@@ -63,4 +63,4 @@ vars:
     - resource-owner
     transport:
       type: sqs
-      queue: https://sqs.us-west-2.amazonaws.com/172327596604/custodian-mailer-queue
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
