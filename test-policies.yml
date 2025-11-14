@@ -1,12 +1,12 @@
 policies:
-  # Test case: EC2 instance with public IP should be stopped
-  - name: test-ec2-stop-public-instances
+  # Test policy: Simply list EC2 instances with public IPs
+  - name: test-ec2-list-public-instances
     resource: aws.ec2
     description: |
-      Test policy to verify that EC2 instances with public IP addresses are stopped.
-      This test creates an EC2 instance with a public IP and verifies it gets stopped.
+      Test policy to list EC2 instances with public IP addresses.
+      Use this to verify EC2 instances are created correctly before testing stop policies.
     
-    # Test filters to find running EC2 instances with public IPs
+    # Find running EC2 instances with public IPs
     filters:
       - type: value
         key: State.Name
@@ -14,31 +14,3 @@ policies:
       - type: value
         key: PublicIpAddress
         value: present
-    
-    actions:
-      # Stop the instance
-      - type: stop
-        force: true
-      
-      # Notify about the action
-      - type: notify
-        template: aws-basic_email.html
-        to:
-          - ysrinu95@gmail.com
-        transport:
-          type: sqs
-          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
-        priority_header: 1
-        subject: '[TEST] [c7n] [{{ account }}] Public EC2 Instance Stopped ({{ region }})'
-        violation_desc: EC2 instance with public IP address detected during test
-        action_desc: |
-          Actions taken: The EC2 instance has been stopped as part of security policy enforcement.
-          
-          Instance Details:
-          - Instance ID: {{ resources[0].InstanceId }}
-          - Public IP: {{ resources[0].PublicIpAddress }}
-          - Instance Type: {{ resources[0].InstanceType }}
-          - Launch Time: {{ resources[0].LaunchTime }}
-          - State: {{ resources[0].State.Name }}
-          
-          This is a test execution of the aws-ec2-stop-public-instances policy.

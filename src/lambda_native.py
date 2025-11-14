@@ -118,41 +118,56 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         validator = EventValidator(policy_mapping)
         
         # Validate event and get policy details
-        logger.info("Validating event and determining policy...")
+        logger.info("Validating event and determining policies...")
         policy_details = validator.get_policy_details(event)
         
         event_info = policy_details['event_info']
-        policy_config = policy_details['policy_config']
+        policies = policy_details['policies']
         
-        logger.info(f"Event validated: {event_info['event_name']} on bucket {event_info['bucket_name']}")
-        logger.info(f"Policy to execute: {policy_config['policy_name']} from {policy_config['policy_file']}")
+        logger.info(f"Event validated: {event_info['event_name']}")
+        logger.info(f"Found {len(policies)} policies to execute")
         
-        # Execute the policy
-        logger.info("Executing Cloud Custodian policy...")
-        execution_result = executor.execute_policy(
-            policy_config=policy_config,
-            event_info=event_info,
-            dryrun=dryrun
-        )
+        # Execute all policies mapped to this event
+        execution_results = []
+        for policy_config in policies:
+            logger.info(f"Executing policy: {policy_config['policy_name']} from {policy_config['source_file']}")
+            
+            try:
+                execution_result = executor.execute_policy(
+                    policy_config=policy_config,
+                    event_info=event_info,
+                    dryrun=dryrun
+                )
+                
+                execution_results.append({
+                    'policy_name': policy_config['policy_name'],
+                    'status': 'success',
+                    'result': execution_result
+                })
+                logger.info(f"Policy {policy_config['policy_name']} executed successfully")
+                
+            except Exception as policy_error:
+                logger.error(f"Policy {policy_config['policy_name']} execution failed: {str(policy_error)}")
+                execution_results.append({
+                    'policy_name': policy_config['policy_name'],
+                    'status': 'failed',
+                    'error': str(policy_error)
+                })
         
-        logger.info(f"Policy execution completed successfully")
+        logger.info(f"All policies execution completed. Success: {sum(1 for r in execution_results if r['status'] == 'success')}/{len(policies)}")
         
         # Return success response
         return {
             'statusCode': 200,
             'body': json.dumps({
-                'message': 'Cloud Custodian policy executed successfully',
+                'message': f'Executed {len(policies)} Cloud Custodian policies',
                 'event_info': {
                     'event_name': event_info['event_name'],
-                    'bucket_name': event_info['bucket_name'],
                     'event_time': event_info['event_time'],
+                    'aws_region': event_info.get('aws_region', 'us-east-1'),
                 },
-                'policy_executed': {
-                    'policy_name': policy_config['policy_name'],
-                    'policy_file': policy_config['policy_file'],
-                    'description': policy_config['mapping_description'],
-                },
-                'execution_result': execution_result,
+                'policies_executed': len(policies),
+                'execution_results': execution_results,
                 'dryrun': dryrun,
             }, default=str)
         }

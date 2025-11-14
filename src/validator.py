@@ -7,6 +7,7 @@ policy should be executed based on the policy mapping configuration.
 
 import json
 import logging
+import os
 from typing import Dict, Any, Optional, List
 
 logger = logging.getLogger()
@@ -24,10 +25,10 @@ class EventValidator:
             policy_mapping: Dictionary containing policy mapping configuration
         """
         self.policy_mapping = policy_mapping
-        self.mappings = policy_mapping.get('mappings', [])
+        self.event_mapping = policy_mapping.get('event_mapping', {})
         self.default_policy = policy_mapping.get('default_policy', {})
         
-        logger.info(f"EventValidator initialized with {len(self.mappings)} mappings")
+        logger.info(f"EventValidator initialized with {len(self.event_mapping)} event types")
     
     def validate_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -207,47 +208,40 @@ class EventValidator:
         
         return None
     
-    def get_policy_mapping(self, event_info: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def get_policy_mappings(self, event_info: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
-        Get policy mapping for the given event
+        Get all policy mappings for the given event
         
         Args:
             event_info: Validated event information
             
         Returns:
-            Policy mapping configuration or None if not found
+            List of policy mapping configurations for this event type
         """
         event_name = event_info.get('event_name', '')
         
-        logger.info(f"Looking up policy mapping for event: {event_name}")
+        logger.info(f"Looking up policy mappings for event: {event_name}")
         
-        # Find matching mapping
-        matching_mappings = [
-            mapping for mapping in self.mappings
-            if mapping.get('event_type') == event_name and mapping.get('enabled', True)
-        ]
+        # Get all policies mapped to this event type
+        policies = self.event_mapping.get(event_name, [])
         
-        if not matching_mappings:
-            logger.warning(f"No mapping found for event {event_name}, using default policy")
-            return self.default_policy if self.default_policy.get('enabled', True) else None
+        if not policies:
+            logger.warning(f"No policies found for event {event_name}")
+            return []
         
-        # Sort by priority (lower number = higher priority)
-        matching_mappings.sort(key=lambda x: x.get('priority', 999))
+        logger.info(f"Found {len(policies)} policies for event {event_name}")
         
-        selected_mapping = matching_mappings[0]
-        logger.info(f"Selected mapping: {selected_mapping}")
-        
-        return selected_mapping
+        return policies
     
     def get_policy_details(self, event: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Validate event and return policy execution details
+        Validate event and return policy execution details for all mapped policies
         
         Args:
             event: EventBridge event
             
         Returns:
-            Dictionary containing policy execution details
+            Dictionary containing event info and list of policies to execute
             
         Raises:
             ValueError: If event is invalid or no policy mapping found
@@ -256,37 +250,46 @@ class EventValidator:
         validation_result = self.validate_event(event)
         event_info = validation_result['event_info']
         
-        # Get policy mapping
-        policy_mapping = self.get_policy_mapping(event_info)
+        # Get all policy mappings for this event
+        policy_mappings = self.get_policy_mappings(event_info)
         
-        if not policy_mapping:
-            raise ValueError(f"No enabled policy found for event {event_info['event_name']}")
+        if not policy_mappings:
+            raise ValueError(f"No policies found for event {event_info['event_name']}")
         
-        # Extract S3 configuration
-        s3_bucket = self.policy_mapping.get('s3_policy_bucket')
-        s3_prefix = self.policy_mapping.get('s3_policy_prefix', '')
+        # Extract S3 configuration from environment variables
+        s3_bucket = os.environ.get('POLICY_MAPPING_BUCKET')
+        s3_prefix = os.environ.get('POLICY_PREFIX', 'policies/')
         
         if not s3_bucket:
-            raise ValueError("S3 policy bucket not configured in policy mapping")
+            raise ValueError("POLICY_MAPPING_BUCKET environment variable not set")
         
-        policy_file = policy_mapping.get('policy_file')
-        policy_name = policy_mapping.get('policy_name')
+        # Build policy configs for all mapped policies
+        policies_to_execute = []
+        for policy_mapping in policy_mappings:
+            source_file = policy_mapping.get('source_file')
+            policy_name = policy_mapping.get('policy_name')
+            
+            if not source_file or not policy_name:
+                logger.warning(f"Skipping invalid policy mapping: {policy_mapping}")
+                continue
+            
+            # Construct S3 key
+            s3_key = f"{s3_prefix}{source_file}".replace('//', '/')
+            
+            policies_to_execute.append({
+                's3_bucket': s3_bucket,
+                's3_key': s3_key,
+                'source_file': source_file,
+                'policy_name': policy_name,
+                'resource': policy_mapping.get('resource', ''),
+                'mode_type': policy_mapping.get('mode_type', 'cloudtrail')
+            })
         
-        if not policy_file or not policy_name:
-            raise ValueError("Invalid policy mapping: missing policy_file or policy_name")
-        
-        # Construct S3 key
-        s3_key = f"{s3_prefix}{policy_file}".replace('//', '/')
+        logger.info(f"Prepared {len(policies_to_execute)} policies for execution")
         
         result = {
             'event_info': event_info,
-            'policy_config': {
-                's3_bucket': s3_bucket,
-                's3_key': s3_key,
-                'policy_file': policy_file,
-                'policy_name': policy_name,
-                'mapping_description': policy_mapping.get('description', ''),
-            }
+            'policies': policies_to_execute
         }
         
         logger.info(f"Policy details: {json.dumps(result, default=str)}")
@@ -307,20 +310,25 @@ def validate_policy_mapping_config(config: Dict[str, Any]) -> bool:
     Raises:
         ValueError: If configuration is invalid
     """
-    required_fields = ['version', 'mappings']
+    required_fields = ['version', 'event_mapping']
     for field in required_fields:
         if field not in config:
             raise ValueError(f"Missing required field: {field}")
     
-    mappings = config.get('mappings', [])
-    if not isinstance(mappings, list):
-        raise ValueError("'mappings' must be a list")
+    event_mapping = config.get('event_mapping', {})
+    if not isinstance(event_mapping, dict):
+        raise ValueError("'event_mapping' must be a dictionary")
     
-    for idx, mapping in enumerate(mappings):
-        required_mapping_fields = ['event_type', 'policy_file', 'policy_name']
-        for field in required_mapping_fields:
-            if field not in mapping:
-                raise ValueError(f"Mapping {idx}: missing required field '{field}'")
+    # Validate each event type has a list of policies
+    for event_type, policies in event_mapping.items():
+        if not isinstance(policies, list):
+            raise ValueError(f"Event '{event_type}': policies must be a list")
+        
+        for idx, policy in enumerate(policies):
+            required_policy_fields = ['policy_name', 'resource', 'source_file']
+            for field in required_policy_fields:
+                if field not in policy:
+                    raise ValueError(f"Event '{event_type}', policy {idx}: missing required field '{field}'")
     
-    logger.info("Policy mapping configuration is valid")
+    logger.info(f"Policy mapping configuration is valid with {len(event_mapping)} event types")
     return True
