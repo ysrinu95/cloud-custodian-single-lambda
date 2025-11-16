@@ -182,8 +182,14 @@ class PolicyExecutor:
         from c7n.policy import PolicyCollection
         from c7n import resources
         
-        # Load all Cloud Custodian resource providers
-        resources.load_resources()
+        # Load only AWS Cloud Custodian resource providers (not Azure, GCP, etc.)
+        # This avoids import errors for cloud providers we don't use
+        try:
+            resources.load_resources(['aws.*'])
+        except Exception as e:
+            logger.warning(f"Could not load specific AWS resources, falling back to default: {e}")
+            # Fallback: just import the base AWS resources module
+            import c7n.resources.aws
         
         logger.info(f"Executing Cloud Custodian policy: {policy.get('name')}")
         
