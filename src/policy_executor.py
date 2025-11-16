@@ -182,6 +182,9 @@ class PolicyExecutor:
         from c7n.policy import PolicyCollection
         from c7n import resources
         
+        # Load all Cloud Custodian resource providers
+        resources.load_resources()
+        
         logger.info(f"Executing Cloud Custodian policy: {policy.get('name')}")
         
         # Prepare policy configuration
