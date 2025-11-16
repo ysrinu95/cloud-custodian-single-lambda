@@ -272,7 +272,7 @@ class PolicyExecutor:
             
             options = Config.empty(
                 region=self.region,
-                log_group=f'/aws/lambda/cloud-custodian',
+                log_group=f'/c7n/lambda/cloud-custodian',
                 output_dir='/tmp/custodian-output',
                 cache='/tmp/custodian-cache',
                 dryrun=dryrun,
