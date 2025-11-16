@@ -1,11 +1,7 @@
 policies:
   - name: efs-unencrypted-remediation-realtime
     resource: aws.efs
-    description: |
-      Monitor EFS file systems in real-time and automatically remediate unencrypted file systems.
-      Note: EFS encryption cannot be enabled after creation. This policy will delete unencrypted
-      file systems and notify administrators to recreate them with encryption enabled.
-      Triggers when EFS file systems are created.
+    description: Detects and deletes unencrypted EFS file systems. EFS encryption must be enabled at creation time.
     
     mode:
       type: cloudtrail
