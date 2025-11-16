@@ -15,9 +15,12 @@ policies:
   - type: notify
     template: aws-basic_email.html
     priority_header: '2'
-    subject: S3 Bucket Secured - {{ account }} {{ region }}
+    subject: '[c7n] [{{ account }}] S3 Bucket Secured - Public Access Blocked ({{ region }})'
     to:
+    - ysrinu95@gmail.com
     - resource-owner
     transport:
-      type: sns
-      topic: arn:aws:sns:{region}:{account_id}:cloud-custodian-notifications
+      type: sqs
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+    violation_desc: 'S3 bucket had public access enabled'
+    action_desc: 'Actions taken: Public access block has been enabled on the bucket. All public ACLs and policies are now blocked.'
