@@ -43,6 +43,12 @@ provider "aws" {
 }
 
 # ========================================
+# Data Sources
+# ========================================
+
+data "aws_caller_identity" "current" {}
+
+# ========================================
 # Variables
 # ========================================
 
@@ -255,12 +261,27 @@ resource "aws_iam_policy" "custodian_policy" {
         Action = [
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
-          "logs:PutLogEvents"
+          "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
         ]
         Resource = [
           aws_cloudwatch_log_group.lambda_logs.arn,
           "${aws_cloudwatch_log_group.lambda_logs.arn}:*"
         ]
+      },
+      # CloudWatch Logs for Cloud Custodian policy execution
+      {
+        Sid    = "CloudCustodianLogsAccess"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
+        ]
+        Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/custodian-*"
       }
     ]
   })
