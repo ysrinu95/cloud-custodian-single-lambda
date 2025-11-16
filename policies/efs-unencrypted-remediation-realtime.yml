@@ -16,6 +16,13 @@ policies:
       - type: value
         key: Encrypted
         value: false
+      
+      # Only match file systems created in the last 5 minutes (real-time detection)
+      - type: value
+        key: CreationTime
+        value_type: age
+        op: less-than
+        value: 5
     
     actions:
       # Tag the unencrypted file system before deletion
