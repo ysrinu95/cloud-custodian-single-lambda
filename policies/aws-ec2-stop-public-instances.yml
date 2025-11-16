@@ -2,7 +2,13 @@ policies:
 - name: aws-ec2-stop-public-instances
   resource: aws.ec2
   description: 'Notifies of and stops EC2 instances launched in a public subnet'
-  filters: []
+  filters:
+    - type: value
+      key: State.Name
+      value: running
+    - type: value
+      key: PublicIpAddress
+      value: not-null
   actions:
   - type: stop
     force: true
