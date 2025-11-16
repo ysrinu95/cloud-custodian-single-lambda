@@ -5,42 +5,145 @@ A complete solution for running Cloud Custodian policies in AWS Lambda triggered
 ## 🏗️ Architecture
 
 ```
-┌─────────────────┐
-│  CloudTrail     │
-│  S3 API Calls   │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  EventBridge    │
-│  Event Rule     │
-└────────┬────────┘
-         │ Trigger
-         ▼
-┌─────────────────┐      ┌──────────────────┐
-│  Lambda         │◄─────┤  Lambda Layer    │
-│  Function       │      │  (Cloud          │
-│                 │      │   Custodian)     │
-└────────┬────────┘      └──────────────────┘
-         │
-         ├──► CloudWatch Logs
-         │
-         ├──► AWS Resources (EC2, S3, RDS, etc.)
-         │
-         └──► SNS (Notifications)
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          Event Sources                                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  ┌──────────────┐       ┌──────────────┐       ┌──────────────┐        │
+│  │  CloudTrail  │       │ Security Hub │       │  GuardDuty   │        │
+│  │              │       │              │       │              │        │
+│  │ • EC2 Events │       │ • Findings   │       │ • Findings   │        │
+│  │ • S3 Events  │       │ • Compliance │       │ • Threats    │        │
+│  │ • IAM Events │       │ • Standards  │       │ • Anomalies  │        │
+│  └──────┬───────┘       └──────┬───────┘       └──────┬───────┘        │
+│         │                      │                       │                │
+│         └──────────────────────┴───────────────────────┘                │
+│                                │                                         │
+└────────────────────────────────┼─────────────────────────────────────────┘
+                                 │
+                                 ▼
+                    ┌────────────────────────┐
+                    │   EventBridge Rules    │
+                    ├────────────────────────┤
+                    │ • CloudTrail Rule      │
+                    │   (EC2, S3, IAM APIs)  │
+                    │                        │
+                    │ • Security Hub Rule    │
+                    │   (Findings Import)    │
+                    └───────────┬────────────┘
+                                │
+                                │ Trigger
+                                ▼
+              ┌─────────────────────────────────┐
+              │   Lambda: Custodian Executor    │
+              │   (cloud-custodian-executor)    │
+              ├─────────────────────────────────┤
+              │                                 │
+              │  Components:                    │
+              │  • Event Validator              │◄─── Native Library
+              │  • Policy Executor              │     (Cloud Custodian)
+              │  • Policy Mapping Engine        │
+              │                                 │
+              │  Policies:                      │
+              │  • EC2: Terminate Public        │
+              │  • S3: Block Public Access      │
+              │  • Security Hub: Notify         │
+              └────────┬────────────────────────┘
+                       │
+        ┌──────────────┼──────────────┐
+        │              │              │
+        ▼              ▼              ▼
+   ┌─────────┐   ┌─────────┐   ┌─────────────┐
+   │   EC2   │   │   S3    │   │     SQS     │
+   │ Actions │   │ Actions │   │   Queue     │
+   └─────────┘   └─────────┘   └──────┬──────┘
+                                       │
+                                       │ Trigger
+                                       ▼
+                          ┌────────────────────────┐
+                          │  Lambda: Mailer        │
+                          │  (custodian-mailer)    │
+                          ├────────────────────────┤
+                          │                        │
+                          │  • SQS Message Parser  │
+                          │  • Template Renderer   │
+                          │  • Email Formatter     │
+                          └───────────┬────────────┘
+                                      │
+                                      ▼
+                             ┌────────────────┐
+                             │   Amazon SES   │
+                             │                │
+                             │ Email Delivery │
+                             └────────────────┘
+                                      │
+                                      ▼
+                              [ Email Recipients ]
+
+              ┌─────────────────────────────────────┐
+              │      Supporting Services            │
+              ├─────────────────────────────────────┤
+              │  • CloudWatch Logs (Monitoring)     │
+              │  • S3 Bucket (Policy Storage)       │
+              │  • IAM Roles (Permissions)          │
+              │  • GitHub Actions (CI/CD)           │
+              └─────────────────────────────────────┘
 ```
+
+### Architecture Components
+
+1. **Event Sources**:
+   - **CloudTrail**: Captures EC2, S3, and IAM API calls in real-time
+   - **Security Hub**: Aggregates security findings from AWS services
+   - **GuardDuty**: Threat detection findings integrated via Security Hub
+
+2. **EventBridge Rules**:
+   - **CloudTrail Rule**: Triggers on `RunInstances`, `CreateBucket` events
+   - **Security Hub Rule**: Triggers on `Security Hub Findings - Imported` events
+
+3. **Lambda Executor**:
+   - Validates incoming events (CloudTrail or Security Hub)
+   - Maps events to appropriate Cloud Custodian policies
+   - Executes policies using native Cloud Custodian library
+   - Takes remediation actions on AWS resources
+   - Sends notifications to SQS queue
+
+4. **Lambda Mailer**:
+   - Polls SQS queue for notification messages
+   - Renders email templates with finding details
+   - Sends formatted emails via Amazon SES
+
+5. **Policy Execution Flow**:
+   - **EC2**: Terminates instances with public IPs → Email notification
+   - **S3**: Enables public access blocks on public buckets → Email notification
+   - **Security Hub**: Filters HIGH/CRITICAL findings → Email notification
 
 ## 🎯 Features
 
-- **Two Execution Modes**:
-  - **Native Mode**: Uses Cloud Custodian as a Python library (recommended)
-  - **CLI Mode**: Executes `custodian` CLI commands via subprocess
+- **Native Library Execution**: Uses Cloud Custodian as a Python library for optimal performance
+- **Multi-Source Event Processing**: 
+  - **CloudTrail Events**: Real-time API call monitoring (EC2, S3, IAM)
+  - **Security Hub Findings**: Aggregated security findings from AWS Security Hub
+  - **GuardDuty & Macie**: Threat detection and data security findings via Security Hub
   
-- **EventBridge Integration**: Event-driven policy execution triggered by S3 CloudTrail events
-- **Terraform Infrastructure**: Complete IaC for Lambda, layers, IAM, and EventBridge
-- **GitHub Actions CI/CD**: Automated building and deployment
-- **Lambda Layers**: Optimized Cloud Custodian dependencies
-- **Flexible Policy Management**: Support for inline, S3, or packaged policies
+- **Event-Driven Architecture**: EventBridge rules trigger Lambda functions based on:
+  - Resource creation/modification (CloudTrail)
+  - Security findings and compliance issues (Security Hub)
+  
+- **Automated Remediation**: 
+  - EC2: Terminate instances with public IPs
+  - S3: Enable public access blocks on public buckets
+  - Security Hub: Alert on HIGH/CRITICAL findings
+  
+- **Email Notifications**: 
+  - SQS-based notification queue
+  - Dedicated mailer Lambda function
+  - Amazon SES integration
+  - Rich HTML email templates with finding details
+  
+- **Terraform Infrastructure**: Complete IaC for Lambda, EventBridge, IAM, SQS, and SES
+- **GitHub Actions CI/CD**: Automated policy upload to S3 on every commit
+- **Policy Mapping Engine**: Dynamic event-to-policy mapping with JSON configuration
 
 ## 📋 Prerequisites
 
@@ -86,43 +189,114 @@ For the EventBridge rule to trigger on S3 events, you **must** have CloudTrail e
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/ysrinu95/cloud-custodian-single-lambda.git
 cd cloud-custodian-single-lambda
 ```
 
-### 2. Build the Lambda Layer
+### 2. Configure AWS Credentials
 
-**On Linux/macOS:**
+Ensure AWS CLI is configured with appropriate credentials:
 ```bash
-chmod +x scripts/build_layer.sh
-./scripts/build_layer.sh
+aws configure
 ```
 
-**On Windows:**
-```powershell
-.\scripts\build_layer.ps1
+Required permissions:
+- Lambda (create/update functions)
+- IAM (create/update roles and policies)
+- EventBridge (create/update rules)
+- S3 (create bucket for policies)
+- SQS (create queues)
+- SES (verify email addresses)
+- CloudTrail (view trails)
+- Security Hub (read findings)
+
+### 3. Verify Prerequisites
+
+**CloudTrail**: Ensure CloudTrail is enabled and logging S3/EC2 events
+```bash
+aws cloudtrail describe-trails
+aws cloudtrail get-trail-status --name <trail-name>
 ```
 
-### 3. Configure Terraform
+**Security Hub**: Enable Security Hub if not already enabled
+```bash
+aws securityhub describe-hub
+# If not enabled:
+aws securityhub enable-security-hub
+```
+
+**SES Email**: Verify sender email address
+```bash
+aws ses verify-email-identity --email-address your-email@example.com
+```
+
+### 4. Configure Terraform
+
+Edit `terraform/terraform.tfvars`:
+```hcl
+aws_region   = "us-east-1"
+environment  = "dev"
+account_id   = "123456789012"
+mailer_email = "your-email@example.com"
+```
+
+### 5. Deploy Infrastructure
 
 ```bash
 cd terraform
-cp terraform.tfvars.example terraform.tfvars
-```
-
-Edit `terraform.tfvars`:
-```hcl
-aws_region             = "us-east-1"
-environment            = "dev"
-lambda_execution_mode  = "native"  # or "cli"
-```
-
-### 4. Deploy Infrastructure
-
-```bash
 terraform init
 terraform plan
 terraform apply
+```
+
+This will create:
+- 2 Lambda functions (executor + mailer)
+- 2 EventBridge rules (CloudTrail + Security Hub)
+- IAM roles with necessary permissions
+- SQS queue for notifications
+- S3 bucket for policy storage
+
+### 6. Upload Policies
+
+Policies are automatically uploaded to S3 via GitHub Actions on every commit.
+
+**Manual upload** (if needed):
+```bash
+aws s3 cp policies/ s3://ysr95-custodian-policies/policies/ --recursive --exclude "*" --include "*.yml"
+```
+
+### 7. Test the Setup
+
+**Test EC2 Policy**:
+```bash
+# Launch an EC2 instance with a public IP
+aws ec2 run-instances \
+  --image-id ami-0c55b159cbfafe1f0 \
+  --instance-type t2.micro \
+  --associate-public-ip-address
+
+# Check logs after 1-2 minutes
+aws logs tail /aws/lambda/cloud-custodian-executor-dev --follow
+```
+
+**Test S3 Policy**:
+```bash
+# Create a bucket without public access blocks
+aws s3api create-bucket --bucket test-public-bucket-$(date +%s) --region us-east-1
+
+# Check logs after 5-15 minutes (CloudTrail delay)
+aws logs tail /aws/lambda/cloud-custodian-executor-dev --follow
+```
+
+**Test Security Hub Policy**:
+```bash
+# Update a HIGH severity finding
+aws securityhub batch-update-findings \
+  --finding-identifiers Id="<finding-arn>",ProductArn="<product-arn>" \
+  --note Text="Testing Cloud Custodian",UpdatedBy="Test"
+
+# Check logs
+aws logs tail /aws/lambda/cloud-custodian-executor-dev --follow
 ```
 
 ## 📁 Project Structure
@@ -131,30 +305,98 @@ terraform apply
 cloud-custodian-single-lambda/
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml              # GitHub Actions workflow
+│       └── upload-policies.yml     # GitHub Actions: Upload policies to S3
+├── config/
+│   └── policy-mapping.json         # Event-to-policy mapping configuration
+├── docs/
+│   ├── ADR-001-EventBridge-Lambda-Architecture.md
+│   ├── EVENT-DRIVEN-ARCHITECTURE.md
+│   ├── EVENT_CONTEXT_USAGE.md
+│   └── NFR-Cloud-Custodian-Lambda.md
 ├── policies/
-│   ├── sample-policies.yml         # Example policies
-│   └── test-policy.yml             # Test policy
-├── src/
-│   ├── lambda_native.py            # Native mode handler
-│   └── lambda_cli.py               # CLI mode handler
+│   ├── aws-ec2-stop-public-instances.yml           # EC2 remediation policy
+│   ├── s3-public-bucket-remediation-realtime.yml   # S3 remediation policy
+│   └── security-hub-findings-notification.yml      # Security Hub policy
 ├── scripts/
-│   ├── build_layer.sh              # Layer build script (Linux/macOS)
-│   ├── build_layer.ps1             # Layer build script (Windows)
-│   └── test_layer.sh               # Layer test script
+│   ├── build_layer.sh              # Build Lambda layer (Linux/macOS)
+│   ├── test_ec2_policy.ps1         # Test EC2 policy
+│   ├── test_ec2_policy.py          # Python test script
+│   └── transform_policy_mapping.py # Policy mapping transformer
+├── src/
+│   ├── lambda_native.py            # Lambda entry point
+│   ├── policy_executor.py          # Policy execution engine
+│   └── validator.py                # Event validator (CloudTrail + Security Hub)
 ├── terraform/
-│   ├── main.tf                     # Terraform configuration
+│   ├── cloud-custodian.tf          # Main infrastructure config
 │   ├── variables.tf                # Input variables
 │   ├── outputs.tf                  # Output values
-│   ├── lambda.tf                   # Lambda resources
-│   ├── iam.tf                      # IAM roles and policies
-│   ├── eventbridge.tf              # EventBridge rules
-│   └── terraform.tfvars.example    # Example variables
+│   ├── terraform.tfvars            # Variable values
+│   └── lambda-function.zip         # Lambda deployment package
+├── cloudtrail-event-selectors.json # CloudTrail event configuration
 ├── requirements.txt                # Python dependencies
 └── README.md                       # This file
 ```
 
-## 🔧 Configuration
+## � Active Policies
+
+### 1. EC2 Public Instance Termination
+**File**: `policies/aws-ec2-stop-public-instances.yml`
+
+**Trigger**: CloudTrail `RunInstances` event
+
+**Function**: Automatically terminates EC2 instances launched with public IP addresses
+
+**Actions**:
+- Terminates the instance
+- Sends email notification with instance details
+
+**Status**: ✅ Tested and operational
+
+---
+
+### 2. S3 Public Bucket Remediation
+**File**: `policies/s3-public-bucket-remediation-realtime.yml`
+
+**Trigger**: CloudTrail `CreateBucket` event
+
+**Function**: Automatically secures S3 buckets that allow public access
+
+**Actions**:
+- Enables all four public access block settings:
+  - BlockPublicAcls: true
+  - IgnorePublicAcls: true
+  - BlockPublicPolicy: true
+  - RestrictPublicBuckets: true
+- Sends email notification with bucket details
+
+**Status**: ✅ Tested and operational
+
+---
+
+### 3. Security Hub Findings Notification
+**File**: `policies/security-hub-findings-notification.yml`
+
+**Trigger**: Security Hub `Findings - Imported` event
+
+**Function**: Alerts on HIGH and CRITICAL security findings from Security Hub, GuardDuty, and Macie
+
+**Filters**:
+- Severity: HIGH or CRITICAL
+- Sources: AWS Security Hub, GuardDuty, Macie
+
+**Actions**:
+- Sends detailed email notification including:
+  - Finding severity and description
+  - Affected resources
+  - Remediation recommendations
+  - Timeline (first observed, last updated)
+  - Direct links to AWS Console
+
+**Status**: 🔄 Deployed, pending testing
+
+---
+
+## �🔧 Configuration
 
 ### Execution Modes
 
