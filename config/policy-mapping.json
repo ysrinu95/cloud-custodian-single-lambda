@@ -3,9 +3,9 @@
   "description": "Cloud Custodian Policy Event Mapping",
   "generated_at": "auto-generated",
   "statistics": {
-    "total_policies": 2,
-    "event_driven_policies": 2,
-    "unique_events": 2
+    "total_policies": 3,
+    "event_driven_policies": 3,
+    "unique_events": 3
   },
   "event_mapping": {
     "RunInstances": [
@@ -21,6 +21,13 @@
         "resource": "aws.s3",
         "source_file": "s3-public-bucket-remediation-realtime.yml"
       }
+    ],
+    "Security Hub Findings - Imported": [
+      {
+        "policy_name": "security-hub-findings-notification",
+        "resource": "aws.security-hub-finding",
+        "source_file": "security-hub-findings-notification.yml"
+      }
     ]
   },
   "policies": {
@@ -35,6 +42,12 @@
       "source_file": "s3-public-bucket-remediation-realtime.yml",
       "mode_type": "cloudtrail",
       "description": "Monitor S3 buckets in real-time and automatically secure public buckets.\nTriggers when S3 buckets are created or modified.\n"
+    },
+    "security-hub-findings-notification": {
+      "resource": "aws.security-hub-finding",
+      "source_file": "security-hub-findings-notification.yml",
+      "mode_type": "cloudtrail",
+      "description": "Monitor Security Hub findings in real-time and notify on HIGH and CRITICAL severity findings.\nTriggers when Security Hub imports new findings.\n"
     }
   }
 }

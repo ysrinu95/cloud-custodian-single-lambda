@@ -1,0 +1,65 @@
+policies:
+  - name: security-hub-findings-notification
+    resource: aws.security-hub-finding
+    description: Monitor Security Hub findings in real-time and notify on HIGH and CRITICAL severity findings.
+    
+    mode:
+      type: cloudtrail
+      events:
+        - source: aws.securityhub
+          event: Security Hub Findings - Imported
+      role: arn:aws:iam::172327596604:role/cloud-custodian-lambda-role-dev
+      timeout: 300
+    
+    filters:
+      # Filter for HIGH and CRITICAL severity findings
+      - type: value
+        key: Severity.Label
+        op: in
+        value: ["HIGH", "CRITICAL"]
+    
+    actions:
+      # Send notification for security findings
+      - type: notify
+        template: aws-basic_email.html
+        priority_header: 1
+        subject: '[SECURITY ALERT] [{{ account }}] {{ title }} - {{ region }}'
+        violation_desc: 'Security Hub has detected a {{ Severity.Label }} severity finding'
+        action_desc: |
+          Security Finding Details:
+          
+          Title: {{ Title }}
+          Description: {{ Description }}
+          Severity: {{ Severity.Label }} (Score: {{ Severity.Normalized }}/100)
+          Status: {{ Workflow.Status }}
+          Compliance Status: {{ Compliance.Status }}
+          
+          Affected Resources:
+          {% for resource in Resources %}
+          - {{ resource.Type }}: {{ resource.Id }}
+          {% endfor %}
+          
+          Recommendation:
+          {{ Remediation.Recommendation.Text }}
+          
+          Generator: {{ GeneratorId }}
+          First Observed: {{ FirstObservedAt }}
+          Last Observed: {{ LastObservedAt }}
+          Updated: {{ UpdatedAt }}
+          
+          Please review this finding in AWS Security Hub and take appropriate remediation action.
+          
+          Finding ARN: {{ Id }}
+        to:
+          - ysrinu95@gmail.com
+          - resource-owner
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+          region: us-east-1
+
+vars:
+  tags:
+    contact: ysrinu95@gmail.com
+    environment: production
+    repo: ysrinu95/cloud-custodian

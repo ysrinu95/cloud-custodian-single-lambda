@@ -219,7 +219,10 @@ resource "aws_iam_policy" "custodian_policy" {
           "cloudwatch:ListMetrics",
           "tag:GetResources",
           "tag:GetTagKeys",
-          "tag:GetTagValues"
+          "tag:GetTagValues",
+          "securityhub:GetFindings",
+          "securityhub:BatchUpdateFindings",
+          "securityhub:DescribeHub"
         ]
         Resource = "*"
       },
@@ -547,6 +550,50 @@ resource "aws_lambda_permission" "allow_eventbridge" {
   function_name = aws_lambda_function.custodian.function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.custodian_multi_resource_events[0].arn
+}
+
+# EventBridge Rule for Security Hub Findings
+# Captures security findings from AWS Security Hub
+
+resource "aws_cloudwatch_event_rule" "custodian_security_findings" {
+  count = var.enable_eventbridge_rule ? 1 : 0
+
+  name        = "${var.project_name}-security-findings-${var.environment}"
+  description = "Trigger Cloud Custodian Lambda on Security Hub findings"
+
+  event_pattern = jsonencode({
+    source      = ["aws.securityhub"]
+    detail-type = ["Security Hub Findings - Imported"]
+  })
+
+  tags = merge(
+    var.tags,
+    {
+      Name = "${var.project_name}-security-findings-${var.environment}"
+    }
+  )
+}
+
+resource "aws_cloudwatch_event_target" "lambda_target_security" {
+  count = var.enable_eventbridge_rule ? 1 : 0
+
+  rule      = aws_cloudwatch_event_rule.custodian_security_findings[0].name
+  target_id = "CloudCustodianLambdaSecurityFindings"
+  arn       = aws_lambda_function.custodian.arn
+
+  # Lambda will receive the full Security Hub finding event
+}
+
+# Lambda permission for Security Hub EventBridge to invoke function
+
+resource "aws_lambda_permission" "allow_eventbridge_security" {
+  count = var.enable_eventbridge_rule ? 1 : 0
+
+  statement_id  = "AllowExecutionFromEventBridgeSecurityHub"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.custodian.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.custodian_security_findings[0].arn
 }
 
 # ========================================
