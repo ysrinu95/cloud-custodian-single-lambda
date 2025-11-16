@@ -261,9 +261,7 @@ resource "aws_iam_policy" "custodian_policy" {
         Action = [
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
-          "logs:PutLogEvents",
-          "logs:DescribeLogGroups",
-          "logs:DescribeLogStreams"
+          "logs:PutLogEvents"
         ]
         Resource = [
           aws_cloudwatch_log_group.lambda_logs.arn,
@@ -281,7 +279,7 @@ resource "aws_iam_policy" "custodian_policy" {
           "logs:DescribeLogGroups",
           "logs:DescribeLogStreams"
         ]
-        Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/custodian-*"
+        Resource = "*"
       }
     ]
   })
