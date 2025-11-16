@@ -289,6 +289,16 @@ resource "aws_iam_policy" "custodian_policy" {
           "iam:ListAccountAliases"
         ]
         Resource = "*"
+      },
+      # SQS permissions for Cloud Custodian notifications
+      {
+        Sid    = "CloudCustodianSQSAccess"
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage",
+          "sqs:GetQueueUrl"
+        ]
+        Resource = "arn:aws:sqs:*:${data.aws_caller_identity.current.account_id}:custodian-mailer-queue*"
       }
     ]
   })
