@@ -7,6 +7,16 @@
     "event_driven_policies": 98,
     "unique_events": 78
   },
+  "mappings": [
+    {
+      "event_type": "RunInstances",
+      "policy_file": "policies/aws-ec2-stop-public-instances.yml",
+      "policy_name": "aws-ec2-stop-public-instances",
+      "resource": "aws.ec2",
+      "priority": 1,
+      "enabled": true
+    }
+  ],
   "event_mapping": {
     "ConsoleLogin": [
       {

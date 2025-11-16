@@ -1,0 +1,149 @@
+name: Upload Policies to S3
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'policies/**/*.yml'
+      - 'config/policy-mapping.json'
+  workflow_dispatch:
+    inputs:
+      force_upload:
+        description: 'Force upload all policies'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: us-east-1
+  S3_BUCKET: ysr95-custodian-policies
+
+jobs:
+  upload-policies:
+    name: Upload Policies and Mapping to S3
+    runs-on: ubuntu-latest
+    
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Fetch last 2 commits to compare changes
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          # OIDC authentication
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Validate policy mapping JSON
+        run: |
+          echo "Validating policy-mapping.json..."
+          if ! jq empty config/policy-mapping.json; then
+            echo "❌ Invalid JSON in policy-mapping.json"
+            exit 1
+          fi
+          echo "✅ policy-mapping.json is valid JSON"
+      
+      - name: Count policy files
+        id: count
+        run: |
+          POLICY_COUNT=$(find policies -name "*.yml" -type f | wc -l)
+          echo "policy_count=$POLICY_COUNT" >> $GITHUB_OUTPUT
+          echo "Found $POLICY_COUNT policy files"
+      
+      - name: Upload policy mapping configuration
+        run: |
+          echo "Uploading policy-mapping.json to S3..."
+          aws s3 cp config/policy-mapping.json \
+            s3://${{ env.S3_BUCKET }}/config/policy-mapping.json \
+            --region ${{ env.AWS_REGION }} \
+            --content-type "application/json"
+          echo "✅ Policy mapping uploaded successfully"
+      
+      - name: Upload all policy files
+        if: github.event.inputs.force_upload == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          echo "Force uploading all policy files..."
+          aws s3 sync policies/ \
+            s3://${{ env.S3_BUCKET }}/policies/ \
+            --region ${{ env.AWS_REGION }} \
+            --exclude "*.md" \
+            --include "*.yml" \
+            --delete
+          echo "✅ All ${{ steps.count.outputs.policy_count }} policies uploaded"
+      
+      - name: Upload changed policy files only
+        if: github.event.inputs.force_upload != 'true' && github.event_name == 'push'
+        run: |
+          echo "Uploading only changed policy files..."
+          
+          # Get list of changed policy files
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD -- policies/*.yml || echo "")
+          
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "ℹ️ No policy files changed"
+            exit 0
+          fi
+          
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          
+          # Upload each changed file
+          UPLOADED=0
+          while IFS= read -r file; do
+            if [ -f "$file" ]; then
+              echo "Uploading $file..."
+              aws s3 cp "$file" \
+                "s3://${{ env.S3_BUCKET }}/$file" \
+                --region ${{ env.AWS_REGION }}
+              UPLOADED=$((UPLOADED + 1))
+            fi
+          done <<< "$CHANGED_FILES"
+          
+          echo "✅ Uploaded $UPLOADED changed policy files"
+      
+      - name: Verify uploads
+        run: |
+          echo "Verifying uploaded files..."
+          
+          # Verify policy mapping
+          if aws s3 ls "s3://${{ env.S3_BUCKET }}/config/policy-mapping.json" --region ${{ env.AWS_REGION }}; then
+            echo "✅ policy-mapping.json exists in S3"
+          else
+            echo "❌ policy-mapping.json not found in S3"
+            exit 1
+          fi
+          
+          # Count policies in S3
+          S3_POLICY_COUNT=$(aws s3 ls "s3://${{ env.S3_BUCKET }}/policies/" --recursive --region ${{ env.AWS_REGION }} | grep ".yml$" | wc -l)
+          echo "S3 has $S3_POLICY_COUNT policy files"
+          
+          LOCAL_COUNT="${{ steps.count.outputs.policy_count }}"
+          if [ "$S3_POLICY_COUNT" -lt "$LOCAL_COUNT" ]; then
+            echo "⚠️ Warning: S3 has fewer policies ($S3_POLICY_COUNT) than local ($LOCAL_COUNT)"
+          else
+            echo "✅ S3 policy count looks good"
+          fi
+      
+      - name: Summary
+        run: |
+          echo "## Upload Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Upload completed successfully**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **S3 Bucket:** \`${{ env.S3_BUCKET }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Region:** \`${{ env.AWS_REGION }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Local Policy Count:** ${{ steps.count.outputs.policy_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger:** \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ github.event.inputs.force_upload }}" == "true" ]; then
+            echo "- **Mode:** Force upload (all files)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Mode:** Incremental upload (changed files only)" >> $GITHUB_STEP_SUMMARY
+          fi
