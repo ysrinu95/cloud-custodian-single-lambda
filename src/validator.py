@@ -51,10 +51,18 @@ class EventValidator:
         
         detail_type = event.get('detail-type', '')
         
-        # Validate it's a CloudTrail API call
-        if detail_type != 'AWS API Call via CloudTrail':
+        # Handle different event types
+        if detail_type == 'AWS API Call via CloudTrail':
+            # CloudTrail event processing
+            return self._validate_cloudtrail_event(event)
+        elif detail_type == 'Security Hub Findings - Imported':
+            # Security Hub event processing
+            return self._validate_securityhub_event(event)
+        else:
             raise ValueError(f"Unsupported event type: {detail_type}")
-        
+    
+    def _validate_cloudtrail_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate CloudTrail API call events"""
         # Extract event details
         detail = event.get('detail', {})
         if not detail:
@@ -106,6 +114,37 @@ class EventValidator:
                 event_info['username'] = username
         
         logger.info(f"Event validated: {event_info['event_name']}")
+        
+        return {
+            'valid': True,
+            'event_info': event_info
+        }
+    
+    def _validate_securityhub_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate Security Hub Findings events"""
+        # Extract event details
+        detail = event.get('detail', {})
+        if not detail:
+            raise ValueError("Invalid event: missing 'detail' field")
+        
+        # Security Hub events use 'detail-type' as the event name
+        detail_type = event.get('detail-type', '')
+        
+        # Extract key information
+        event_info = {
+            'event_name': detail_type,  # Use the detail-type as event name
+            'event_source': event.get('source', 'aws.securityhub'),
+            'event_time': event.get('time', ''),
+            'aws_region': event.get('region', 'us-east-1'),
+            'source_ip': '',  # Security Hub events don't have source IP
+            'user_agent': '',  # Security Hub events don't have user agent
+            'request_parameters': {},
+            'response_elements': detail,  # The findings are in the detail
+            'user_identity': {},
+            'raw_event': event,  # Include the complete raw event for policy context
+        }
+        
+        logger.info(f"Security Hub event validated: {event_info['event_name']}")
         
         return {
             'valid': True,
