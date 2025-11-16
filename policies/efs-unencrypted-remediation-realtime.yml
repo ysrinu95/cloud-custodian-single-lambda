@@ -1,0 +1,64 @@
+policies:
+  - name: efs-unencrypted-remediation-realtime
+    resource: aws.efs
+    description: |
+      Monitor EFS file systems in real-time and automatically remediate unencrypted file systems.
+      Note: EFS encryption cannot be enabled after creation. This policy will delete unencrypted
+      file systems and notify administrators to recreate them with encryption enabled.
+      Triggers when EFS file systems are created.
+    
+    mode:
+      type: cloudtrail
+      events:
+        - source: elasticfilesystem.amazonaws.com
+          event: CreateFileSystem
+          ids: "responseElements.fileSystemId"
+      role: arn:aws:iam::172327596604:role/cloud-custodian-lambda-role-dev
+      timeout: 300
+    
+    filters:
+      - type: value
+        key: Encrypted
+        value: false
+    
+    actions:
+      # Tag the unencrypted file system before deletion
+      - type: tag
+        tags:
+          c7n:violation: "unencrypted-efs"
+          c7n:action: "deleted-for-encryption"
+          c7n:timestamp: "{now:%Y-%m-%d}"
+      
+      # Delete the unencrypted file system
+      # Note: This is a destructive action. Consider using mark-for-op instead for testing
+      - type: delete
+      
+      # Send notification
+      - type: notify
+        template: aws-basic_email.html
+        priority_header: 1
+        subject: '[c7n] [{{ account }}] EFS File System Deleted - Encryption Required ({{ region }})'
+        violation_desc: 'EFS file system was created without encryption'
+        action_desc: |
+          Actions taken: The unencrypted EFS file system has been deleted.
+          
+          IMPORTANT: EFS encryption can only be enabled at creation time.
+          Please recreate the file system with encryption enabled using:
+          - AWS Console: Enable "Encryption" option during creation
+          - AWS CLI: Use --encrypted flag
+          - Terraform: Set encrypted = true
+          
+          Deleted File System: {{ resource['FileSystemId'] }}
+        to:
+          - ysrinu95@gmail.com
+          - resource-owner
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+          region: us-east-1
+
+vars:
+  tags:
+    contact: ysrinu95@gmail.com
+    environment: production
+    repo: ysrinu95/cloud-custodian

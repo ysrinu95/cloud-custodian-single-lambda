@@ -188,6 +188,9 @@ resource "aws_iam_policy" "custodian_policy" {
         Action = [
           "ec2:Describe*",
           "rds:Describe*",
+          "elasticfilesystem:DescribeFileSystems",
+          "elasticfilesystem:DescribeMountTargets",
+          "elasticfilesystem:DescribeTags",
           "s3:ListAllMyBuckets",
           "s3:GetBucketLocation",
           "s3:GetBucketTagging",
@@ -200,7 +203,11 @@ resource "aws_iam_policy" "custodian_policy" {
           "s3:GetBucketWebsite",
           "s3:GetBucketLogging",
           "s3:GetBucketLifecycleConfiguration",
+          "s3:GetLifecycleConfiguration",
+          "s3:GetBucketNotification",
+          "s3:GetBucketNotificationConfiguration",
           "s3:GetReplicationConfiguration",
+          "s3:GetAccountPublicAccessBlock",
           "lambda:ListFunctions",
           "lambda:GetFunction",
           "lambda:ListVersionsByFunction",
@@ -236,6 +243,9 @@ resource "aws_iam_policy" "custodian_policy" {
           "s3:PutBucketCORS",
           "s3:PutBucketWebsite",
           "s3:DeleteBucketWebsite",
+          "elasticfilesystem:DeleteFileSystem",
+          "elasticfilesystem:CreateTags",
+          "elasticfilesystem:DeleteTags",
           "lambda:DeleteFunction",
           "lambda:PublishVersion",
           "sns:Publish",
@@ -413,13 +423,13 @@ resource "aws_cloudwatch_event_rule" "custodian_multi_resource_events" {
   count = var.enable_eventbridge_rule ? 1 : 0
 
   name        = "${var.project_name}-multi-resource-events-${var.environment}"
-  description = "Trigger Cloud Custodian Lambda on S3, EC2, and IAM CloudTrail events"
+  description = "Trigger Cloud Custodian Lambda on S3, EC2, IAM, and EFS CloudTrail events"
 
   event_pattern = jsonencode({
-    source      = ["aws.s3", "aws.ec2", "aws.iam"]
+    source      = ["aws.s3", "aws.ec2", "aws.iam", "aws.elasticfilesystem"]
     detail-type = ["AWS API Call via CloudTrail"]
     detail = {
-      eventSource = ["s3.amazonaws.com", "ec2.amazonaws.com", "iam.amazonaws.com"]
+      eventSource = ["s3.amazonaws.com", "ec2.amazonaws.com", "iam.amazonaws.com", "elasticfilesystem.amazonaws.com"]
       eventName = [
         # S3 Events
         "CreateBucket",
@@ -457,7 +467,10 @@ resource "aws_cloudwatch_event_rule" "custodian_multi_resource_events" {
         "DeleteUserPolicy",
         "DeleteRolePolicy",
         "UpdateAccessKey",
-        "CreateLoginProfile"
+        "CreateLoginProfile",
+        
+        # EFS Events
+        "CreateFileSystem"
       ]
     }
   })
