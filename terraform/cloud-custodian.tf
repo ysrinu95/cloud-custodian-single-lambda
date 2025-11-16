@@ -288,6 +288,22 @@ resource "aws_iam_policy" "custodian_policy" {
           }
         }
       },
+      # EventBridge permissions for Cloud Custodian policy execution
+      {
+        Sid    = "CloudCustodianEventBridge"
+        Effect = "Allow"
+        Action = [
+          "events:PutRule",
+          "events:DeleteRule",
+          "events:DescribeRule",
+          "events:EnableRule",
+          "events:DisableRule",
+          "events:PutTargets",
+          "events:RemoveTargets",
+          "events:ListTargetsByRule"
+        ]
+        Resource = "arn:aws:events:${var.aws_region}:${data.aws_caller_identity.current.account_id}:rule/custodian-*"
+      },
       # S3 access for policy files (if using S3)
       {
         Sid    = "S3PolicyAccess"
