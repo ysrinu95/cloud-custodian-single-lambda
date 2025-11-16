@@ -4,9 +4,6 @@ policies:
   description: 'Notifies of and terminates EC2 instances launched in a public subnet'
   filters:
     - type: value
-      key: State.Name
-      value: running
-    - type: value
       key: PublicIpAddress
       value: not-null
   actions:
