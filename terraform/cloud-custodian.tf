@@ -472,10 +472,10 @@ resource "aws_cloudwatch_event_rule" "custodian_multi_resource_events" {
   description = "Trigger Cloud Custodian Lambda on S3, EC2, IAM, and EFS CloudTrail events"
 
   event_pattern = jsonencode({
-    source      = ["aws.s3", "aws.ec2", "aws.iam", "aws.elasticfilesystem"]
+    source      = ["aws.s3", "aws.ec2", "aws.iam"]
     detail-type = ["AWS API Call via CloudTrail"]
     detail = {
-      eventSource = ["s3.amazonaws.com", "ec2.amazonaws.com", "iam.amazonaws.com", "elasticfilesystem.amazonaws.com"]
+      eventSource = ["s3.amazonaws.com", "ec2.amazonaws.com", "iam.amazonaws.com"]
       eventName = [
         # S3 Events
         "CreateBucket",
@@ -513,10 +513,7 @@ resource "aws_cloudwatch_event_rule" "custodian_multi_resource_events" {
         "DeleteUserPolicy",
         "DeleteRolePolicy",
         "UpdateAccessKey",
-        "CreateLoginProfile",
-        
-        # EFS Events
-        "CreateFileSystem"
+        "CreateLoginProfile"
       ]
     }
   })
