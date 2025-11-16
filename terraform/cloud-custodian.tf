@@ -268,7 +268,9 @@ resource "aws_iam_policy" "custodian_policy" {
           "lambda:PublishVersion",
           "lambda:AddPermission",
           "lambda:RemovePermission",
-          "lambda:GetFunctionConfiguration"
+          "lambda:GetFunctionConfiguration",
+          "lambda:TagResource",
+          "lambda:UntagResource"
         ]
         Resource = "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:custodian-*"
       },
