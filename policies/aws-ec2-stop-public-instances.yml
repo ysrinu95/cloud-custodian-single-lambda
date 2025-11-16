@@ -1,7 +1,7 @@
 policies:
 - name: aws-ec2-stop-public-instances
   resource: aws.ec2
-  description: 'Notifies of and stops EC2 instances launched in a public subnet'
+  description: 'Notifies of and terminates EC2 instances launched in a public subnet'
   filters:
     - type: value
       key: State.Name
@@ -10,8 +10,7 @@ policies:
       key: PublicIpAddress
       value: not-null
   actions:
-  - type: stop
-    force: true
+  - type: terminate
   - template: aws-basic_email.html
     to:
     - ysrinu95@gmail.com
@@ -24,7 +23,7 @@ policies:
     priority_header: 1
     subject: '[c7n] [{{ account }}] Public EC2 Instance Launched ({{ region }})'
     violation_desc: EC2 instance launched in a public subnet
-    action_desc: "Actions taken: The violating EC2 instance has been stopped. <br>\n\
+    action_desc: "Actions taken: The violating EC2 instance has been terminated. <br>\n\
       To expose an application or service publicly, a load balancer should be placed\n\
       in a public subnet which routes the traffic internally. <br>          \n<a href=\"\
       https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-standards-fsbp-controls.html#ec2-9-remediation\"\

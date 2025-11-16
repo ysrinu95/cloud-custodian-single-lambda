@@ -280,6 +280,15 @@ resource "aws_iam_policy" "custodian_policy" {
           "logs:DescribeLogStreams"
         ]
         Resource = "*"
+      },
+      # IAM permissions for Cloud Custodian notifications
+      {
+        Sid    = "CloudCustodianIAMAccess"
+        Effect = "Allow"
+        Action = [
+          "iam:ListAccountAliases"
+        ]
+        Resource = "*"
       }
     ]
   })
