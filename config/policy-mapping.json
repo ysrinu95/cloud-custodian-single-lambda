@@ -22,34 +22,9 @@
     ],
     "RunInstances": [
       {
-        "policy_name": "ec2-public-instances-stepfunction-remediation",
-        "resource": "aws.ec2",
-        "source_file": "ec2-public-instances-stepfunction-remediation.yml"
-      },
-      {
-        "policy_name": "ec2-public-ip-vpc-deployed",
-        "resource": "aws.ec2",
-        "source_file": "ec2-public-ip-vpc-deployed.yml"
-      },
-      {
         "policy_name": "aws-ec2-stop-public-instances",
         "resource": "aws.ec2",
         "source_file": "aws-ec2-stop-public-instances.yml"
-      },
-      {
-        "policy_name": "ec2-public-instance-stepfunction-realtime",
-        "resource": "aws.ec2",
-        "source_file": "ec2-public-instance-stepfunction-realtime.yml"
-      },
-      {
-        "policy_name": "aws-ec2-auto-tag-user",
-        "resource": "aws.ec2",
-        "source_file": "aws-ec2-auto-tag-user.yml"
-      },
-      {
-        "policy_name": "ec2-untagged-instances-realtime",
-        "resource": "aws.ec2",
-        "source_file": "ec2-untagged-instances-realtime.yml"
       }
     ],
     "AuthorizeSecurityGroupIngress": [
