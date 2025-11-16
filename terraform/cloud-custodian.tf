@@ -246,8 +246,15 @@ resource "aws_iam_policy" "custodian_policy" {
           "elasticfilesystem:DeleteFileSystem",
           "elasticfilesystem:CreateTags",
           "elasticfilesystem:DeleteTags",
+          "lambda:CreateFunction",
           "lambda:DeleteFunction",
+          "lambda:UpdateFunctionCode",
+          "lambda:UpdateFunctionConfiguration",
           "lambda:PublishVersion",
+          "lambda:AddPermission",
+          "lambda:RemovePermission",
+          "lambda:GetFunctionConfiguration",
+          "iam:PassRole",
           "sns:Publish",
           "ses:SendEmail"
         ]
