@@ -1,7 +1,7 @@
 policies:
   - name: security-hub-findings-notification
     resource: aws.security-hub-finding
-    description: Monitor Security Hub findings in real-time and notify on HIGH and CRITICAL severity findings.
+    description: Monitor Security Hub findings from all sources (GuardDuty, Macie, Security Hub, etc.) in real-time and notify on HIGH and CRITICAL severity findings.
     
     mode:
       type: cloudtrail
@@ -28,26 +28,46 @@ policies:
         action_desc: |
           Security Finding Details:
           
+          Source: {{ ProductName }} ({{ CompanyName }})
+          Product ARN: {{ ProductArn }}
+          
           Title: {{ Title }}
           Description: {{ Description }}
+          
           Severity: {{ Severity.Label }} (Score: {{ Severity.Normalized }}/100)
           Status: {{ Workflow.Status }}
-          Compliance Status: {{ Compliance.Status }}
+          {% if Compliance.Status %}Compliance Status: {{ Compliance.Status }}{% endif %}
+          
+          Finding Types:
+          {% for type in Types %}
+          - {{ type }}
+          {% endfor %}
           
           Affected Resources:
           {% for resource in Resources %}
           - {{ resource.Type }}: {{ resource.Id }}
+            {% if resource.Region %}Region: {{ resource.Region }}{% endif %}
           {% endfor %}
           
+          {% if Remediation.Recommendation.Text %}
           Recommendation:
           {{ Remediation.Recommendation.Text }}
+          {% if Remediation.Recommendation.Url %}
+          Documentation: {{ Remediation.Recommendation.Url }}
+          {% endif %}
+          {% endif %}
+          
+          Timeline:
+          - First Observed: {{ FirstObservedAt }}
+          - Last Observed: {{ LastObservedAt }}
+          - Updated: {{ UpdatedAt }}
           
           Generator: {{ GeneratorId }}
-          First Observed: {{ FirstObservedAt }}
-          Last Observed: {{ LastObservedAt }}
-          Updated: {{ UpdatedAt }}
           
           Please review this finding in AWS Security Hub and take appropriate remediation action.
+          {% if SourceUrl %}
+          View in Console: {{ SourceUrl }}
+          {% endif %}
           
           Finding ARN: {{ Id }}
         to:

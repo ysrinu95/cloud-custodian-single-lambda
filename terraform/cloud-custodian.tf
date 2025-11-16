@@ -222,7 +222,14 @@ resource "aws_iam_policy" "custodian_policy" {
           "tag:GetTagValues",
           "securityhub:GetFindings",
           "securityhub:BatchUpdateFindings",
-          "securityhub:DescribeHub"
+          "securityhub:DescribeHub",
+          "guardduty:GetFindings",
+          "guardduty:ListFindings",
+          "guardduty:ListDetectors",
+          "guardduty:GetDetector",
+          "macie2:GetFindings",
+          "macie2:ListFindings",
+          "macie2:GetMacieSession"
         ]
         Resource = "*"
       },
