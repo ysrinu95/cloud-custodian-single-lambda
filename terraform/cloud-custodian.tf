@@ -246,15 +246,6 @@ resource "aws_iam_policy" "custodian_policy" {
           "elasticfilesystem:DeleteFileSystem",
           "elasticfilesystem:CreateTags",
           "elasticfilesystem:DeleteTags",
-          "lambda:CreateFunction",
-          "lambda:DeleteFunction",
-          "lambda:UpdateFunctionCode",
-          "lambda:UpdateFunctionConfiguration",
-          "lambda:PublishVersion",
-          "lambda:AddPermission",
-          "lambda:RemovePermission",
-          "lambda:GetFunctionConfiguration",
-          "iam:PassRole",
           "sns:Publish",
           "ses:SendEmail"
         ]
@@ -262,6 +253,36 @@ resource "aws_iam_policy" "custodian_policy" {
         Condition = {
           StringEquals = {
             "aws:RequestedRegion" = var.aws_region
+          }
+        }
+      },
+      # Lambda management permissions for Cloud Custodian policy execution
+      {
+        Sid    = "CloudCustodianLambdaManagement"
+        Effect = "Allow"
+        Action = [
+          "lambda:CreateFunction",
+          "lambda:DeleteFunction",
+          "lambda:UpdateFunctionCode",
+          "lambda:UpdateFunctionConfiguration",
+          "lambda:PublishVersion",
+          "lambda:AddPermission",
+          "lambda:RemovePermission",
+          "lambda:GetFunctionConfiguration"
+        ]
+        Resource = "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:custodian-*"
+      },
+      # IAM PassRole permission for Lambda functions created by Cloud Custodian
+      {
+        Sid    = "CloudCustodianPassRole"
+        Effect = "Allow"
+        Action = [
+          "iam:PassRole"
+        ]
+        Resource = aws_iam_role.lambda_role.arn
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "lambda.amazonaws.com"
           }
         }
       },
