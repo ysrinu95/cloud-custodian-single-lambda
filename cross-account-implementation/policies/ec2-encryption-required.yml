@@ -1,0 +1,15 @@
+policies:
+  - name: ec2-encryption-required
+    resource: ec2
+    description: Stop EC2 instances with unencrypted EBS volumes
+    mode:
+      type: cloudtrail
+      events:
+        - RunInstances
+      role: arn:aws:iam::{account_id}:role/CloudCustodianExecutionRole
+    filters:
+      - type: ebs
+        key: Encrypted
+        value: false
+    actions:
+      - type: stop

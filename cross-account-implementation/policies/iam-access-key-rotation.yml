@@ -1,0 +1,19 @@
+policies:
+  - name: iam-access-key-rotation
+    resource: iam-user
+    description: Deactivate IAM access keys older than 90 days
+    mode:
+      type: cloudtrail
+      events:
+        - CreateAccessKey
+      role: arn:aws:iam::{account_id}:role/CloudCustodianExecutionRole
+    filters:
+      - type: access-key
+        key: CreateDate
+        value_type: age
+        value: 90
+        op: greater-than
+    actions:
+      - type: remove-keys
+        disable: true
+        age: 90

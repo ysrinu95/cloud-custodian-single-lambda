@@ -1,0 +1,16 @@
+policies:
+  - name: guardduty-auto-remediation
+    resource: aws.guardduty-finding
+    description: Auto-remediate GuardDuty findings for known threats
+    mode:
+      type: cloudtrail
+      events:
+        - CreateMembers
+      role: arn:aws:iam::{account_id}:role/CloudCustodianExecutionRole
+    filters:
+      - type: value
+        key: Severity
+        value: 7
+        op: greater-than
+    actions:
+      - type: archive

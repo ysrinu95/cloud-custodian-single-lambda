@@ -1,0 +1,155 @@
+{
+  "version": "1.0",
+  "description": "Multi-Account Cloud Custodian Policy Mapping with Global and Account-Specific Configurations",
+  "generated_at": "2024-01-01T00:00:00Z",
+  "statistics": {
+    "total_policies": 3,
+    "event_driven_policies": 3,
+    "unique_events": 3,
+    "managed_accounts": 2
+  },
+  "event_mapping": {
+    "RunInstances": [
+      {
+        "policy_name": "aws-ec2-stop-public-instances",
+        "resource": "aws.ec2",
+        "source_file": "aws-ec2-stop-public-instances.yml",
+        "description": "Stops EC2 instances launched in public subnets"
+      }
+    ],
+    "CreateBucket": [
+      {
+        "policy_name": "s3-public-bucket-remediation-realtime",
+        "resource": "aws.s3",
+        "source_file": "s3-public-bucket-remediation-realtime.yml",
+        "description": "Automatically secures public S3 buckets"
+      }
+    ],
+    "Security Hub Findings - Imported": [
+      {
+        "policy_name": "security-hub-findings-notification",
+        "resource": "aws.security-hub-finding",
+        "source_file": "security-hub-findings-notification.yml",
+        "description": "Notifies on HIGH and CRITICAL Security Hub findings"
+      }
+    ]
+  },
+  "account_mapping": {
+    "172327596604": {
+      "name": "srini-optum (Central Management Account)",
+      "environment": "production",
+      "description": "Central management account hosting Cloud Custodian Lambda with strict security controls",
+      "event_mapping": {
+        "RunInstances": [
+          {
+            "policy_name": "aws-ec2-stop-public-instances",
+            "resource": "aws.ec2",
+            "source_file": "aws-ec2-stop-public-instances.yml",
+            "enforcement_level": "strict",
+            "description": "Central Account: Immediately stop public EC2 instances"
+          }
+        ],
+        "CreateBucket": [
+          {
+            "policy_name": "s3-public-bucket-remediation-realtime",
+            "resource": "aws.s3",
+            "source_file": "s3-public-bucket-remediation-realtime.yml",
+            "enforcement_level": "strict",
+            "description": "Central Account: Block all public S3 buckets and enable encryption"
+          }
+        ],
+        "Security Hub Findings - Imported": [
+          {
+            "policy_name": "security-hub-findings-notification",
+            "resource": "aws.security-hub-finding",
+            "source_file": "security-hub-findings-notification.yml",
+            "enforcement_level": "auto-remediate",
+            "notification_channels": ["ops-team", "security-team"],
+            "description": "Central Account: Auto-remediate critical findings"
+          }
+        ]
+      },
+      "iam_role": "arn:aws:iam::172327596604:role/CloudCustodian-CrossAccount-ExecutionRole",
+      "external_id": "cloud-custodian-172327596604"
+    },
+    "813185901390": {
+      "name": "Cloud Custodian Test Member",
+      "environment": "test",
+      "description": "Member test account for validating cross-account Cloud Custodian execution",
+      "event_mapping": {
+        "RunInstances": [
+          {
+            "policy_name": "aws-ec2-stop-public-instances",
+            "resource": "aws.ec2",
+            "source_file": "aws-ec2-stop-public-instances.yml",
+            "enforcement_level": "notify",
+            "description": "Test Account: Notify on public EC2 instances for validation"
+          }
+        ],
+        "CreateBucket": [
+          {
+            "policy_name": "s3-public-bucket-remediation-realtime",
+            "resource": "aws.s3",
+            "source_file": "s3-public-bucket-remediation-realtime.yml",
+            "enforcement_level": "moderate",
+            "description": "Test Account: Block public access for testing remediation"
+          }
+        ],
+        "Security Hub Findings - Imported": [
+          {
+            "policy_name": "security-hub-findings-notification",
+            "resource": "aws.security-hub-finding",
+            "source_file": "security-hub-findings-notification.yml",
+            "enforcement_level": "notify-only",
+            "notification_channels": ["dev-team"],
+            "description": "Test Account: Notify on findings for validation"
+          }
+        ]
+      },
+      "iam_role": "arn:aws:iam::813185901390:role/CloudCustodian-CrossAccount-ExecutionRole",
+      "external_id": "cloud-custodian-813185901390",
+      "notes": "Test member account for cross-account Cloud Custodian validation and testing"
+    }
+  },
+  "policies": {
+    "aws-ec2-stop-public-instances": {
+      "resource": "aws.ec2",
+      "source_file": "aws-ec2-stop-public-instances.yml",
+      "mode_type": "cloudtrail",
+      "description": "Notifies of and stops EC2 instances launched in a public subnet",
+      "severity": "high",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "s3-public-bucket-remediation-realtime": {
+      "resource": "aws.s3",
+      "source_file": "s3-public-bucket-remediation-realtime.yml",
+      "mode_type": "cloudtrail",
+      "description": "Monitor S3 buckets in real-time and automatically secure public buckets",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "security-hub-findings-notification": {
+      "resource": "aws.security-hub-finding",
+      "source_file": "security-hub-findings-notification.yml",
+      "mode_type": "cloudtrail",
+      "description": "Monitor Security Hub findings in real-time and notify on HIGH and CRITICAL severity findings",
+      "severity": "variable",
+      "compliance_frameworks": ["CIS", "AWS-Foundational-Security"]
+    }
+  },
+  "enforcement_levels": {
+    "strict": "Immediate automated remediation without notification delay",
+    "auto-remediate": "Automated remediation with notification",
+    "moderate": "Partial remediation with manual review options",
+    "notify": "Notification only, manual remediation required",
+    "notify-only": "Notification without any automated action"
+  },
+  "metadata": {
+    "version": "2.0.0",
+    "last_updated": "2025-11-20T00:00:00Z",
+    "author": "Cloud Custodian Team",
+    "description": "Multi-tier policy mapping supporting global defaults and account-specific overrides for intelligent cross-account policy execution",
+    "central_account_id": "172327596604",
+    "member_account_ids": ["813185901390"]
+  }
+}

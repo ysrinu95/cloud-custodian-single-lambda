@@ -1,0 +1,24 @@
+policies:
+  - name: security-hub-auto-remediation
+    resource: aws.securityhub-finding
+    description: Auto-remediate critical and high severity Security Hub findings
+    mode:
+      type: cloudtrail
+      events:
+        - BatchImportFindings
+      role: arn:aws:iam::{account_id}:role/CloudCustodianExecutionRole
+    filters:
+      - type: value
+        key: Severity.Label
+        value:
+          - CRITICAL
+          - HIGH
+        op: in
+      - type: value
+        key: Workflow.Status
+        value: NEW
+    actions:
+      - type: post-finding
+        severity_normalized: 0
+        workflow_status: RESOLVED
+        note: "Auto-remediated by Cloud Custodian"
