@@ -7,6 +7,13 @@ terraform {
       version = "~> 5.0"
     }
   }
+
+  backend "s3" {
+    bucket  = "ysr95-cloud-custodian-tf-bkt"
+    key     = "cross-account-implementation/central-account/terraform.tfstate"
+    region  = "us-east-1"
+    encrypt = true
+  }
 }
 
 provider "aws" {
