@@ -1,6 +1,6 @@
 terraform {
   required_version = ">= 1.0"
-  
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -40,9 +40,9 @@ resource "aws_cloudwatch_event_rule" "forward_to_central" {
 
 # EventBridge Target - Central account event bus
 resource "aws_cloudwatch_event_target" "central_bus" {
-  rule      = aws_cloudwatch_event_rule.forward_to_central.name
-  arn       = var.central_event_bus_arn
-  role_arn  = aws_iam_role.eventbridge_cross_account.arn
+  rule     = aws_cloudwatch_event_rule.forward_to_central.name
+  arn      = var.central_event_bus_arn
+  role_arn = aws_iam_role.eventbridge_cross_account.arn
 }
 
 # IAM Role for EventBridge cross-account event forwarding
@@ -103,7 +103,7 @@ resource "aws_iam_role" "custodian_execution" {
     }]
   })
 
-  max_session_duration = 3600  # 1 hour
+  max_session_duration = 3600 # 1 hour
 
   tags = {
     Name        = "Cloud Custodian Execution Role"

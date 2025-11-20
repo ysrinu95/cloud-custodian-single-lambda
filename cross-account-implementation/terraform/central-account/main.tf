@@ -1,6 +1,6 @@
 terraform {
   required_version = ">= 1.0"
-  
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -112,11 +112,11 @@ resource "aws_lambda_function" "custodian_cross_account_executor" {
 
   environment {
     variables = {
-      POLICY_BUCKET            = var.policy_bucket
-      ACCOUNT_MAPPING_KEY      = "config/account-policy-mapping.json"
-      CROSS_ACCOUNT_ROLE_NAME  = "CloudCustodianExecutionRole"
-      EXTERNAL_ID_PREFIX       = "cloud-custodian"
-      LOG_LEVEL                = var.log_level
+      POLICY_BUCKET           = var.policy_bucket
+      ACCOUNT_MAPPING_KEY     = "config/account-policy-mapping.json"
+      CROSS_ACCOUNT_ROLE_NAME = "CloudCustodianExecutionRole"
+      EXTERNAL_ID_PREFIX      = "cloud-custodian"
+      LOG_LEVEL               = var.log_level
     }
   }
 
@@ -258,10 +258,10 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "policies" {
 
 # SQS Queue for Notifications (optional)
 resource "aws_sqs_queue" "notifications" {
-  count                     = var.create_notification_queue ? 1 : 0
-  name                      = "cloud-custodian-notifications-${var.environment}"
+  count                      = var.create_notification_queue ? 1 : 0
+  name                       = "cloud-custodian-notifications-${var.environment}"
   visibility_timeout_seconds = 300
-  message_retention_seconds = 1209600  # 14 days
+  message_retention_seconds  = 1209600 # 14 days
 
   tags = {
     Name        = "Cloud Custodian Notifications"
@@ -274,7 +274,7 @@ resource "aws_sqs_queue" "notifications" {
 resource "aws_sqs_queue" "notifications_dlq" {
   count                     = var.create_notification_queue ? 1 : 0
   name                      = "cloud-custodian-notifications-dlq-${var.environment}"
-  message_retention_seconds = 1209600  # 14 days
+  message_retention_seconds = 1209600 # 14 days
 
   tags = {
     Name        = "Cloud Custodian Notifications DLQ"
