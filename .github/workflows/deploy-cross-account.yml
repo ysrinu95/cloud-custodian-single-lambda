@@ -395,9 +395,10 @@ jobs:
       - name: Assume Role in Member Account
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ github.event.inputs.member_account_id }}:role/OrganizationAccountAccessRole
+          role-to-assume: arn:aws:iam::${{ github.event.inputs.member_account_id || secrets.MEMBER_ACCOUNT_ID }}:role/OrganizationAccountAccessRole
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 3600
+          role-session-name: GitHubActions-MemberAccountDeployment
 
       - name: Get Member Account ID
         id: member-account
