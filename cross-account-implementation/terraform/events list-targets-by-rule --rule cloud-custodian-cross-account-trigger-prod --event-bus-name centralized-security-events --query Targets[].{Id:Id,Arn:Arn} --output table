@@ -1,7 +1,0 @@
-[
-    {
-        "Name": "cloud-custodian-cross-account-trigger-prod",
-        "State": "ENABLED",
-        "EventPattern": "{\"account\":[\"813185901390\"],\"source\":[\"aws.cloudtrail\",\"aws.securityhub\",\"aws.guardduty\",\"aws.config\"]}"
-    }
-]
