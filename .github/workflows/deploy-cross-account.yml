@@ -321,6 +321,7 @@ jobs:
             -var="environment=prod" \
             -var="member_account_ids=[\"${{ github.event.inputs.member_account_id || secrets.MEMBER_ACCOUNT_ID }}\"]" \
             -var="policy_bucket=${{ steps.vars.outputs.policy_bucket }}" \
+            -var="create_policy_bucket=false" \
             -var="lambda_package_path=lambda-function.zip" \
             -var="lambda_layer_path=../../layers/cloud-custodian-layer.zip" \
             -out=tfplan
