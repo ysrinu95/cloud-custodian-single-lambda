@@ -224,7 +224,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 policy_config = load_policy_from_s3(policy_name)
                 
                 # Execute policy
-                result = executor.execute_policy(policy_config)
+                result = executor.execute_policy(policy_config, event_info)
                 results.append(result)
                 
                 logger.info(f"Policy '{policy_name}' execution completed: {result}")

@@ -29,15 +29,8 @@ resource "aws_cloudwatch_event_rule" "forward_to_central" {
   description = "Forward security events from this member account to central security account"
 
   event_pattern = jsonencode({
-    source = [
-      "aws.cloudtrail",
-      "aws.ec2",
-      "aws.s3",
-      "aws.securityhub",
-      "aws.guardduty",
-      "aws.config",
-      "aws.macie"
-    ]
+    source      = ["aws.ec2", "aws.s3", "aws.securityhub", "aws.guardduty", "aws.config", "aws.macie"]
+    detail-type = ["AWS API Call via CloudTrail", "Security Hub Findings - Imported", "GuardDuty Finding", "Config Rules Compliance Change"]
   })
 
   tags = {
