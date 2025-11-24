@@ -421,9 +421,14 @@ jobs:
         id: plan
         run: |
           cd cross-account-implementation/terraform/member-account
+          
+          # Get central event bus ARN
+          CENTRAL_EVENT_BUS_ARN="arn:aws:events:${{ env.AWS_REGION }}:${{ steps.central-account.outputs.account_id }}:event-bus/centralized-security-events"
+          
           terraform plan \
             -var="central_account_id=${{ steps.central-account.outputs.account_id }}" \
-            -var="member_account_id=${{ steps.member-account.outputs.account_id }}" \
+            -var="central_event_bus_arn=$CENTRAL_EVENT_BUS_ARN" \
+            -var="environment=test" \
             -out=tfplan
           
           echo "✅ Terraform plan completed"
