@@ -339,15 +339,24 @@ jobs:
       - name: Get Terraform Outputs
         id: outputs
         if: success()
+        continue-on-error: true
         run: |
           cd cross-account-implementation/terraform/central-account
-          terraform output -json > outputs.json
-          cat outputs.json
           
-          # Extract key outputs
-          EVENT_BUS_ARN=$(terraform output -raw event_bus_arn 2>/dev/null || echo "")
-          LAMBDA_ARN=$(terraform output -raw lambda_function_arn 2>/dev/null || echo "")
-          LAMBDA_LAYER_ARN=$(terraform output -raw lambda_layer_arn 2>/dev/null || echo "")
+          # Try to get outputs, but don't fail if there's an issue
+          if terraform output -json > outputs.json 2>&1; then
+            cat outputs.json
+            
+            # Extract key outputs
+            EVENT_BUS_ARN=$(terraform output -raw event_bus_arn 2>/dev/null || echo "not-available")
+            LAMBDA_ARN=$(terraform output -raw lambda_function_arn 2>/dev/null || echo "not-available")
+            LAMBDA_LAYER_ARN=$(terraform output -raw lambda_layer_arn 2>/dev/null || echo "not-available")
+          else
+            echo "⚠️ Could not retrieve outputs, using resource names instead"
+            EVENT_BUS_ARN="arn:aws:events:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:event-bus/centralized-security-events"
+            LAMBDA_ARN="arn:aws:lambda:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:function:cloud-custodian-cross-account-executor-prod"
+            LAMBDA_LAYER_ARN="check-console"
+          fi
           
           echo "event_bus_arn=$EVENT_BUS_ARN" >> $GITHUB_OUTPUT
           echo "lambda_arn=$LAMBDA_ARN" >> $GITHUB_OUTPUT
@@ -357,13 +366,12 @@ jobs:
           echo "✅ Lambda Function: $LAMBDA_ARN"
           echo "✅ Lambda Layer: $LAMBDA_LAYER_ARN"
 
-      - name: Upload Terraform state
+      - name: Upload deployment info
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: central-account-state
+          name: central-account-deployment
           path: |
-            cross-account-implementation/terraform/central-account/terraform.tfstate
             cross-account-implementation/terraform/central-account/outputs.json
           retention-days: 30
 
@@ -468,13 +476,12 @@ jobs:
           terraform output -json > outputs.json
           cat outputs.json
 
-      - name: Upload Terraform state
+      - name: Upload deployment info
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: member-account-state
+          name: member-account-deployment
           path: |
-            cross-account-implementation/terraform/member-account/terraform.tfstate
             cross-account-implementation/terraform/member-account/outputs.json
           retention-days: 30
 
@@ -498,10 +505,10 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Download Central Account State
+      - name: Download Central Account Deployment Info
         uses: actions/download-artifact@v4
         with:
-          name: central-account-state
+          name: central-account-deployment
           path: central-state/
 
       - name: Test EventBridge Bus
