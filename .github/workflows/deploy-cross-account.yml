@@ -379,33 +379,53 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials (Central Account)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          # Option 1: OIDC (Recommended)
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Get Central Account ID
-        id: central-account
+      - name: Configure AWS credentials and assume member account role
+        id: member-creds
         run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
-
-      - name: Assume Role in Member Account
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::${{ github.event.inputs.member_account_id || secrets.MEMBER_ACCOUNT_ID }}:role/OrganizationAccountAccessRole
-          aws-region: ${{ env.AWS_REGION }}
-          role-duration-seconds: 3600
-          role-session-name: GitHubActions-MemberAccountDeployment
-
-      - name: Get Member Account ID
-        id: member-account
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
-          echo "✅ Member Account ID: $ACCOUNT_ID"
+          # First authenticate to central account via OIDC
+          echo "Configuring credentials for central account..."
+          
+          # Get OIDC token
+          OIDC_TOKEN=$(curl -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r '.value')
+          
+          # Assume OIDC role in central account
+          CENTRAL_CREDS=$(aws sts assume-role-with-web-identity \
+            --role-arn arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role \
+            --role-session-name GitHubActions-Central \
+            --web-identity-token $OIDC_TOKEN \
+            --duration-seconds 3600 \
+            --query 'Credentials' \
+            --output json)
+          
+          # Export central account credentials
+          export AWS_ACCESS_KEY_ID=$(echo $CENTRAL_CREDS | jq -r '.AccessKeyId')
+          export AWS_SECRET_ACCESS_KEY=$(echo $CENTRAL_CREDS | jq -r '.SecretAccessKey')
+          export AWS_SESSION_TOKEN=$(echo $CENTRAL_CREDS | jq -r '.SessionToken')
+          
+          # Get central account ID
+          CENTRAL_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "central_account_id=$CENTRAL_ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "✅ Central Account ID: $CENTRAL_ACCOUNT_ID"
+          
+          # Now assume OrganizationAccountAccessRole in member account
+          MEMBER_ACCOUNT_ID="${{ github.event.inputs.member_account_id || secrets.MEMBER_ACCOUNT_ID }}"
+          echo "Assuming role in member account $MEMBER_ACCOUNT_ID..."
+          
+          MEMBER_CREDS=$(aws sts assume-role \
+            --role-arn arn:aws:iam::${MEMBER_ACCOUNT_ID}:role/OrganizationAccountAccessRole \
+            --role-session-name GitHubActions-MemberDeploy \
+            --duration-seconds 3600 \
+            --query 'Credentials' \
+            --output json)
+          
+          # Export member account credentials for subsequent steps
+          echo "AWS_ACCESS_KEY_ID=$(echo $MEMBER_CREDS | jq -r '.AccessKeyId')" >> $GITHUB_ENV
+          echo "AWS_SECRET_ACCESS_KEY=$(echo $MEMBER_CREDS | jq -r '.SecretAccessKey')" >> $GITHUB_ENV
+          echo "AWS_SESSION_TOKEN=$(echo $MEMBER_CREDS | jq -r '.SessionToken')" >> $GITHUB_ENV
+          
+          echo "member_account_id=$MEMBER_ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "✅ Successfully assumed role in member account"
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -423,10 +443,10 @@ jobs:
           cd cross-account-implementation/terraform/member-account
           
           # Get central event bus ARN
-          CENTRAL_EVENT_BUS_ARN="arn:aws:events:${{ env.AWS_REGION }}:${{ steps.central-account.outputs.account_id }}:event-bus/centralized-security-events"
+          CENTRAL_EVENT_BUS_ARN="arn:aws:events:${{ env.AWS_REGION }}:${{ steps.member-creds.outputs.central_account_id }}:event-bus/centralized-security-events"
           
           terraform plan \
-            -var="central_account_id=${{ steps.central-account.outputs.account_id }}" \
+            -var="central_account_id=${{ steps.member-creds.outputs.central_account_id }}" \
             -var="central_event_bus_arn=$CENTRAL_EVENT_BUS_ARN" \
             -var="environment=test" \
             -out=tfplan
@@ -605,9 +625,12 @@ jobs:
           cd cross-account-implementation/terraform/member-account
           terraform init
           
+          CENTRAL_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          CENTRAL_EVENT_BUS_ARN="arn:aws:events:${{ env.AWS_REGION }}:${CENTRAL_ACCOUNT_ID}:event-bus/centralized-security-events"
+          
           terraform destroy -auto-approve \
-            -var="central_account_id=${{ secrets.CENTRAL_ACCOUNT_ID }}" \
-            -var="member_account_id=${{ github.event.inputs.member_account_id }}"
+            -var="central_account_id=${CENTRAL_ACCOUNT_ID}" \
+            -var="central_event_bus_arn=${CENTRAL_EVENT_BUS_ARN}"
           
           echo "✅ Member account infrastructure destroyed"
 
