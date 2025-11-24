@@ -56,8 +56,8 @@ resource "aws_cloudwatch_event_rule" "custodian_cross_account_trigger" {
   event_bus_name = aws_cloudwatch_event_bus.centralized.name
 
   event_pattern = jsonencode({
-    source = ["aws.ec2"]
-    account = var.member_account_ids
+    source      = ["aws.ec2"]
+    account     = var.member_account_ids
     detail-type = ["AWS API Call via CloudTrail"]
     detail = {
       eventName = ["RunInstances"]

@@ -29,7 +29,7 @@ resource "aws_cloudwatch_event_rule" "forward_to_central" {
   description = "Forward security events from this member account to central security account"
 
   event_pattern = jsonencode({
-    source = ["aws.ec2"]
+    source      = ["aws.ec2"]
     detail-type = ["AWS API Call via CloudTrail"]
     detail = {
       eventName = ["RunInstances"]
