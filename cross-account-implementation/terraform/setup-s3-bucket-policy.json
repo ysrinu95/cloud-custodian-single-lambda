@@ -1,0 +1,34 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowCentralAccountFullAccess",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::172327596604:root"
+      },
+      "Action": "s3:*",
+      "Resource": [
+        "arn:aws:s3:::ysr95-cloud-custodian-tf-bkt",
+        "arn:aws:s3:::ysr95-cloud-custodian-tf-bkt/*"
+      ]
+    },
+    {
+      "Sid": "AllowMemberAccountTerraformStateAccess",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::813185901390:role/OrganizationAccountAccessRole"
+      },
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::ysr95-cloud-custodian-tf-bkt",
+        "arn:aws:s3:::ysr95-cloud-custodian-tf-bkt/cross-account-implementation/member-account/*"
+      ]
+    }
+  ]
+}
