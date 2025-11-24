@@ -31,6 +31,8 @@ resource "aws_cloudwatch_event_rule" "forward_to_central" {
   event_pattern = jsonencode({
     source = [
       "aws.cloudtrail",
+      "aws.ec2",
+      "aws.s3",
       "aws.securityhub",
       "aws.guardduty",
       "aws.config",

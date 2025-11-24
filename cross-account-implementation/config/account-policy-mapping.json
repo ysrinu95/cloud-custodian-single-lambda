@@ -106,7 +106,7 @@
           }
         ]
       },
-      "iam_role": "arn:aws:iam::813185901390:role/CloudCustodian-CrossAccount-ExecutionRole",
+      "iam_role": "arn:aws:iam::813185901390:role/CloudCustodianExecutionRole",
       "external_id": "cloud-custodian-813185901390",
       "notes": "Test member account for cross-account Cloud Custodian validation and testing"
     }

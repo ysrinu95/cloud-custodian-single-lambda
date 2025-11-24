@@ -58,9 +58,12 @@ resource "aws_cloudwatch_event_rule" "custodian_cross_account_trigger" {
   event_pattern = jsonencode({
     source = [
       "aws.cloudtrail",
+      "aws.ec2",
+      "aws.s3",
       "aws.securityhub",
       "aws.guardduty",
-      "aws.config"
+      "aws.config",
+      "aws.macie"
     ]
     account = var.member_account_ids
   })
