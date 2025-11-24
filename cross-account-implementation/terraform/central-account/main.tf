@@ -64,7 +64,7 @@ resource "aws_cloudwatch_event_rule" "custodian_cross_account_trigger" {
       "aws.config",
       "aws.macie"
     ]
-    account      = var.member_account_ids
+    account     = var.member_account_ids
     detail-type = ["AWS API Call via CloudTrail", "Security Hub Findings - Imported", "GuardDuty Finding", "Config Rules Compliance Change"]
   })
 
