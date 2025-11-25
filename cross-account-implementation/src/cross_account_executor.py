@@ -372,10 +372,7 @@ class CrossAccountExecutor:
                 dryrun=dryrun,
             )
             
-            # Set the session on the options object
-            options['session_factory'] = CrossAccountSessionFactory(self.session)
-            
-            # Load policies
+            # Load policies (don't set session_factory in options as it's not JSON serializable)
             collection = PolicyCollection.from_data(policy_config, options)
             
             # Execute policies with cross-account session and event context
