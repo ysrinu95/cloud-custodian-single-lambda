@@ -104,6 +104,16 @@ class CrossAccountExecutor:
             logger.info(f"Successfully assumed role in account {self.account_id}")
             logger.info(f"Session expires at: {self.credentials['Expiration']}")
             
+            # Verify the assumed role identity
+            try:
+                sts_verify = self.session.client('sts')
+                identity = sts_verify.get_caller_identity()
+                logger.info(f"VERIFIED: Assumed role identity - Account: {identity['Account']}, ARN: {identity['Arn']}")
+                if identity['Account'] != self.account_id:
+                    logger.error(f"WARNING: Assumed role account {identity['Account']} does not match target account {self.account_id}")
+            except Exception as e:
+                logger.warning(f"Could not verify assumed role identity: {e}")
+            
             return {
                 'account_id': self.account_id,
                 'role_arn': self.role_arn,
@@ -305,19 +315,21 @@ class CrossAccountExecutor:
                     'value': bucket_name
                 })
             
-            # For EC2 resources, filter by instance ID if available
-            instance_id = event_info.get('instance_id')
-            if instance_id and policy.get('resource') == 'aws.ec2':
-                logger.info(f"Adding instance filter for: {instance_id}")
-                
-                if 'filters' not in policy:
-                    policy['filters'] = []
-                
-                policy['filters'].insert(0, {
-                    'type': 'value',
-                    'key': 'InstanceId',
-                    'value': instance_id
-                })
+            # For EC2 resources, DON'T filter by instance ID automatically
+            # The policy's own filters (like PublicIpAddress) should determine which instances to match
+            # Adding instance ID filter can cause issues if the instance is still pending
+            # instance_id = event_info.get('instance_id')
+            # if instance_id and policy.get('resource') == 'aws.ec2':
+            #     logger.info(f"Adding instance filter for: {instance_id}")
+            #     
+            #     if 'filters' not in policy:
+            #         policy['filters'] = []
+            #     
+            #     policy['filters'].insert(0, {
+            #         'type': 'value',
+            #         'key': 'InstanceId',
+            #         'value': instance_id
+            #     })
             
             # For IAM users, filter by username if available
             username = event_info.get('username')
