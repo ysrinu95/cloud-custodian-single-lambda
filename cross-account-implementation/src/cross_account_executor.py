@@ -389,15 +389,22 @@ class CrossAccountExecutor:
                 # Ensure policy uses the cross-account session factory
                 p.session_factory = session_factory
                 
-                # Get the resource manager and override its session factory
-                # This must be done before p.run() to ensure it uses cross-account credentials
-                resource_manager = p.load()
-                if resource_manager:
-                    logger.info(f"Overriding resource manager session factory for {p.resource_type}")
-                    resource_manager.session_factory = session_factory
-                    # Also override the session_factory method if it exists
-                    if hasattr(resource_manager, '_session_factory'):
-                        resource_manager._session_factory = session_factory
+                # Access the resource manager property (it's lazy-loaded)
+                # and override its session factory before it's used
+                try:
+                    # The resource_manager property triggers lazy loading
+                    rm = p.resource_manager
+                    if rm:
+                        logger.info(f"Overriding resource manager session factory for {p.resource_type}")
+                        rm.session_factory = session_factory
+                        # Also try to override get_client method to use our session
+                        original_get_client = rm.get_client
+                        def get_client_with_session(service_name):
+                            logger.debug(f"Getting {service_name} client with cross-account session")
+                            return self.session.client(service_name, region_name=self.region)
+                        rm.get_client = get_client_with_session
+                except Exception as e:
+                    logger.warning(f"Could not override resource manager: {e}")
                 
                 # Set event context if available
                 if raw_event:
