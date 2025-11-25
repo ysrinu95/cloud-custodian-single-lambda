@@ -22,6 +22,18 @@ logger = logging.getLogger()
 logger.setLevel(os.getenv('LOG_LEVEL', 'INFO'))
 
 
+class CrossAccountSessionFactory:
+    """
+    Session factory that returns a specific boto3 session for Cloud Custodian
+    """
+    def __init__(self, session):
+        self.session = session
+    
+    def __call__(self, *args, **kwargs):
+        """Return the pre-configured cross-account session"""
+        return self.session
+
+
 class CrossAccountExecutor:
     """
     Handles cross-account Cloud Custodian policy execution
@@ -350,6 +362,7 @@ class CrossAccountExecutor:
             raw_event = event_info.get('raw_event', {})
             
             # Create policy collection with cross-account session
+            # Pass the session directly to Config
             options = Config.empty(
                 region=self.region,
                 account_id=self.account_id,
@@ -358,6 +371,9 @@ class CrossAccountExecutor:
                 cache='/tmp/custodian-cache',
                 dryrun=dryrun,
             )
+            
+            # Set the session on the options object
+            options['session_factory'] = CrossAccountSessionFactory(self.session)
             
             # Load policies
             collection = PolicyCollection.from_data(policy_config, options)
