@@ -1,0 +1,39 @@
+[
+  {
+    "SchemaVersion": "2018-10-08",
+    "Id": "test-finding-member-001",
+    "ProductArn": "arn:aws:securityhub:us-east-1:813185901390:product/813185901390/default",
+    "GeneratorId": "cloud-custodian-test",
+    "AwsAccountId": "813185901390",
+    "Types": [
+      "Software and Configuration Checks/AWS Security Best Practices"
+    ],
+    "CreatedAt": "2025-11-25T17:30:00.000Z",
+    "UpdatedAt": "2025-11-25T17:30:00.000Z",
+    "Severity": {
+      "Label": "CRITICAL",
+      "Normalized": 90
+    },
+    "Title": "Test SecurityHub Finding - Member Account",
+    "Description": "This is a test finding created in the member account to validate cross-account SecurityHub event handling and auto-remediation via Cloud Custodian Lambda.",
+    "Remediation": {
+      "Recommendation": {
+        "Text": "This is a test finding for cross-account Cloud Custodian integration testing"
+      }
+    },
+    "Resources": [
+      {
+        "Type": "Other",
+        "Id": "arn:aws:ec2:us-east-1:813185901390:instance/test-instance",
+        "Partition": "aws",
+        "Region": "us-east-1"
+      }
+    ],
+    "Compliance": {
+      "Status": "FAILED"
+    },
+    "Workflow": {
+      "Status": "NEW"
+    }
+  }
+]
