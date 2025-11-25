@@ -361,8 +361,10 @@ class CrossAccountExecutor:
             # Extract raw CloudTrail event data for policy context
             raw_event = event_info.get('raw_event', {})
             
+            # Create session factory for cross-account credentials
+            session_factory = CrossAccountSessionFactory(self.session)
+            
             # Create policy collection with cross-account session
-            # Pass the session directly to Config
             options = Config.empty(
                 region=self.region,
                 account_id=self.account_id,
@@ -372,7 +374,10 @@ class CrossAccountExecutor:
                 dryrun=dryrun,
             )
             
-            # Load policies (don't set session_factory in options as it's not JSON serializable)
+            # Monkey-patch the options to include session_factory for PolicyCollection
+            options.session_factory = session_factory
+            
+            # Load policies with the session factory
             collection = PolicyCollection.from_data(policy_config, options)
             
             # Execute policies with cross-account session and event context
@@ -381,13 +386,18 @@ class CrossAccountExecutor:
             for p in collection:
                 logger.info(f"Running policy: {p.name} in account {self.account_id}")
                 
-                # Override the policy's session factory to use cross-account credentials
-                # This is critical - Cloud Custodian needs to use the assumed role session
-                p.session_factory = CrossAccountSessionFactory(self.session)
+                # Ensure policy uses the cross-account session factory
+                p.session_factory = session_factory
                 
-                # Also override the resource manager's session factory
-                if hasattr(p, 'resource_manager'):
-                    p.resource_manager.session_factory = p.session_factory
+                # Get the resource manager and override its session factory
+                # This must be done before p.run() to ensure it uses cross-account credentials
+                resource_manager = p.load()
+                if resource_manager:
+                    logger.info(f"Overriding resource manager session factory for {p.resource_type}")
+                    resource_manager.session_factory = session_factory
+                    # Also override the session_factory method if it exists
+                    if hasattr(resource_manager, '_session_factory'):
+                        resource_manager._session_factory = session_factory
                 
                 # Set event context if available
                 if raw_event:
