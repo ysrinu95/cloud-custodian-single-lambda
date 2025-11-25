@@ -361,9 +361,6 @@ class CrossAccountExecutor:
             # Extract raw CloudTrail event data for policy context
             raw_event = event_info.get('raw_event', {})
             
-            # Create session factory for cross-account credentials
-            session_factory = CrossAccountSessionFactory(self.session)
-            
             # Create policy collection with cross-account session
             options = Config.empty(
                 region=self.region,
@@ -374,10 +371,7 @@ class CrossAccountExecutor:
                 dryrun=dryrun,
             )
             
-            # Monkey-patch the options to include session_factory for PolicyCollection
-            options.session_factory = session_factory
-            
-            # Load policies with the session factory
+            # Load policies (don't set session_factory on options - it causes serialization errors)
             collection = PolicyCollection.from_data(policy_config, options)
             
             # Execute policies with cross-account session and event context
@@ -386,25 +380,20 @@ class CrossAccountExecutor:
             for p in collection:
                 logger.info(f"Running policy: {p.name} in account {self.account_id}")
                 
-                # Ensure policy uses the cross-account session factory
-                p.session_factory = session_factory
-                
                 # Access the resource manager property (it's lazy-loaded)
-                # and override its session factory before it's used
+                # and override its get_client method to use our cross-account session
                 try:
                     # The resource_manager property triggers lazy loading
                     rm = p.resource_manager
                     if rm:
-                        logger.info(f"Overriding resource manager session factory for {p.resource_type}")
-                        rm.session_factory = session_factory
-                        # Also try to override get_client method to use our session
-                        original_get_client = rm.get_client
+                        logger.info(f"Overriding resource manager get_client for {p.resource_type}")
+                        # Override get_client method to use our cross-account session
                         def get_client_with_session(service_name):
-                            logger.debug(f"Getting {service_name} client with cross-account session")
+                            logger.info(f"Creating {service_name} client with cross-account credentials for account {self.account_id}")
                             return self.session.client(service_name, region_name=self.region)
                         rm.get_client = get_client_with_session
                 except Exception as e:
-                    logger.warning(f"Could not override resource manager: {e}")
+                    logger.warning(f"Could not override resource manager get_client: {e}")
                 
                 # Set event context if available
                 if raw_event:
