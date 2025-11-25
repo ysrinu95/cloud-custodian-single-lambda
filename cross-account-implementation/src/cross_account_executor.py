@@ -386,18 +386,6 @@ class CrossAccountExecutor:
                 
                 # Override the policy's session factory to use cross-account credentials
                 # This is critical - Cloud Custodian needs to use the assumed role session
-                original_session_factory = p.session_factory
-                
-                # Create session factory that returns cross-account session
-                class CrossAccountSessionFactory:
-                    def __init__(self, session):
-                        self._session = session
-                    
-                    def __call__(self, region=None, assume=None):
-                        # Return the cross-account session regardless of parameters
-                        logger.debug(f"Session factory called with region={region}, assume={assume}")
-                        return self._session
-                
                 p.session_factory = CrossAccountSessionFactory(self.session)
                 
                 # Also override the resource manager's session factory
