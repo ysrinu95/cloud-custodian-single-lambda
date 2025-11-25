@@ -387,10 +387,16 @@ class CrossAccountExecutor:
                     rm = p.resource_manager
                     if rm:
                         logger.info(f"Overriding resource manager get_client for {p.resource_type}")
+                        # Store reference to self.session in local variable to avoid closure issues
+                        cross_account_session = self.session
+                        cross_account_region = self.region
+                        cross_account_id = self.account_id
+                        
                         # Override get_client method to use our cross-account session
                         def get_client_with_session(service_name):
-                            logger.info(f"Creating {service_name} client with cross-account credentials for account {self.account_id}")
-                            return self.session.client(service_name, region_name=self.region)
+                            logger.info(f"Creating {service_name} client with cross-account credentials for account {cross_account_id}")
+                            return cross_account_session.client(service_name, region_name=cross_account_region)
+                        
                         rm.get_client = get_client_with_session
                 except Exception as e:
                     logger.warning(f"Could not override resource manager get_client: {e}")
