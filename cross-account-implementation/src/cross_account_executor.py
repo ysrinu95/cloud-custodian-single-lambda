@@ -393,7 +393,10 @@ class CrossAccountExecutor:
                         cross_account_id = self.account_id
                         
                         # Override get_client method to use our cross-account session
-                        def get_client_with_session(service_name):
+                        # Note: method might be called with self as first arg, so accept *args
+                        def get_client_with_session(*args):
+                            # args could be (service_name,) or (self, service_name) depending on how it's called
+                            service_name = args[-1] if args else 'ec2'
                             logger.info(f"Creating {service_name} client with cross-account credentials for account {cross_account_id}")
                             return cross_account_session.client(service_name, region_name=cross_account_region)
                         
