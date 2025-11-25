@@ -391,6 +391,18 @@ class CrossAccountExecutor:
             for p in collection:
                 logger.info(f"Running policy: {p.name} in account {self.account_id}")
                 
+                # Store reference to self.session in local variable to avoid closure issues
+                cross_account_session = self.session
+                cross_account_region = self.region
+                cross_account_id = self.account_id
+                
+                # Create a function that returns cross-account clients
+                def get_client_with_session(*args):
+                    # args could be (service_name,) or (self, service_name) depending on how it's called
+                    service_name = args[-1] if args else 'ec2'
+                    logger.info(f"Creating {service_name} client with cross-account credentials for account {cross_account_id}")
+                    return cross_account_session.client(service_name, region_name=cross_account_region)
+                
                 # Access the resource manager property (it's lazy-loaded)
                 # and override its get_client method to use our cross-account session
                 try:
@@ -398,22 +410,14 @@ class CrossAccountExecutor:
                     rm = p.resource_manager
                     if rm:
                         logger.info(f"Overriding resource manager get_client for {p.resource_type}")
-                        # Store reference to self.session in local variable to avoid closure issues
-                        cross_account_session = self.session
-                        cross_account_region = self.region
-                        cross_account_id = self.account_id
-                        
-                        # Override get_client method to use our cross-account session
-                        # Note: method might be called with self as first arg, so accept *args
-                        def get_client_with_session(*args):
-                            # args could be (service_name,) or (self, service_name) depending on how it's called
-                            service_name = args[-1] if args else 'ec2'
-                            logger.info(f"Creating {service_name} client with cross-account credentials for account {cross_account_id}")
-                            return cross_account_session.client(service_name, region_name=cross_account_region)
-                        
                         rm.get_client = get_client_with_session
+                        
+                        # Also override get_client for all actions - they create their own clients!
+                        for action in p.resource_manager.actions:
+                            logger.info(f"Overriding action '{action.type}' get_client method")
+                            action.manager.get_client = get_client_with_session
                 except Exception as e:
-                    logger.warning(f"Could not override resource manager get_client: {e}")
+                    logger.warning(f"Could not override resource manager/action get_client: {e}")
                 
                 # Set event context if available
                 if raw_event:
