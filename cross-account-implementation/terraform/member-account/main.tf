@@ -254,6 +254,16 @@ resource "aws_iam_policy" "custodian_remediation" {
           "logs:PutLogEvents"
         ]
         Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/cloud-custodian/*"
+      },
+      {
+        Sid    = "SQSMailerQueue"
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage",
+          "sqs:GetQueueUrl",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = "arn:aws:sqs:${var.aws_region}:${var.central_account_id}:custodian-mailer-queue"
       }
     ]
   })
