@@ -1,0 +1,50 @@
+policies:
+  - name: securityhub-failed-findings-remediation
+    resource: aws.security-hub-finding
+    description: |
+      Automatically remediate SecurityHub failed findings by updating their workflow status
+      and adding remediation notes. This policy demonstrates SecurityHub integration.
+    
+    filters:
+      # Only process findings with FAILED compliance status
+      - type: value
+        key: Compliance.Status
+        value: FAILED
+      
+      # Only process NEW or NOTIFIED findings (not already remediated)
+      - type: value
+        key: Workflow.Status
+        op: in
+        value: 
+          - NEW
+          - NOTIFIED
+      
+      # Focus on high and critical severity findings
+      - type: value
+        key: Severity.Label
+        op: in
+        value:
+          - HIGH
+          - CRITICAL
+    
+    actions:
+      # Update the finding workflow status to RESOLVED
+      - type: update
+        workflow:
+          Status: RESOLVED
+        note:
+          text: "Auto-remediated by Cloud Custodian cross-account executor"
+          updated_by: "cloud-custodian-lambda"
+      
+      # Send notification about the remediation
+      - type: notify
+        template: default.html
+        priority_header: 1
+        subject: "[SecurityHub] Auto-Remediation - {{ account }} - {{ region }}"
+        violation_desc: "SecurityHub finding auto-remediated"
+        action_desc: "Cloud Custodian has automatically updated the workflow status of failed SecurityHub findings"
+        to:
+          - secops@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue

@@ -23,7 +23,7 @@ provider "aws" {
 # Data source to get current AWS account ID
 data "aws_caller_identity" "current" {}
 
-# EventBridge Rule - Forward events to central account
+# EventBridge Rule - Forward EC2 events to central account
 resource "aws_cloudwatch_event_rule" "forward_to_central" {
   name        = "forward-security-events-to-central-${var.environment}"
   description = "Forward security events from this member account to central security account"
@@ -43,9 +43,40 @@ resource "aws_cloudwatch_event_rule" "forward_to_central" {
   }
 }
 
-# EventBridge Target - Central account event bus
+# EventBridge Rule - Forward SecurityHub findings to central account
+resource "aws_cloudwatch_event_rule" "forward_securityhub_to_central" {
+  name        = "forward-securityhub-to-central-${var.environment}"
+  description = "Forward SecurityHub findings from this member account to central security account"
+
+  event_pattern = jsonencode({
+    source      = ["aws.securityhub"]
+    detail-type = ["Security Hub Findings - Imported"]
+    detail = {
+      findings = {
+        Compliance = {
+          Status = ["FAILED"]
+        }
+      }
+    }
+  })
+
+  tags = {
+    Name        = "Forward SecurityHub Findings to Central Account"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+# EventBridge Target - Central account event bus for EC2 events
 resource "aws_cloudwatch_event_target" "central_bus" {
   rule     = aws_cloudwatch_event_rule.forward_to_central.name
+  arn      = var.central_event_bus_arn
+  role_arn = aws_iam_role.eventbridge_cross_account.arn
+}
+
+# EventBridge Target - Central account event bus for SecurityHub events
+resource "aws_cloudwatch_event_target" "central_bus_securityhub" {
+  rule     = aws_cloudwatch_event_rule.forward_securityhub_to_central.name
   arn      = var.central_event_bus_arn
   role_arn = aws_iam_role.eventbridge_cross_account.arn
 }

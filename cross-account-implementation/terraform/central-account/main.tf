@@ -49,7 +49,7 @@ resource "aws_cloudwatch_event_bus_policy" "allow_member_accounts" {
   })
 }
 
-# EventBridge Rule on default bus - Trigger Lambda for local central account events
+# EventBridge Rule on default bus - Trigger Lambda for local central account EC2 events
 resource "aws_cloudwatch_event_rule" "custodian_local_trigger" {
   name        = "cloud-custodian-local-trigger-${var.environment}"
   description = "Trigger Cloud Custodian Lambda for security events in central account"
@@ -69,6 +69,45 @@ resource "aws_cloudwatch_event_rule" "custodian_local_trigger" {
   }
 }
 
+# EventBridge Rule on default bus - Trigger Lambda for SecurityHub findings in central account
+resource "aws_cloudwatch_event_rule" "custodian_local_securityhub_trigger" {
+  name        = "cloud-custodian-local-securityhub-${var.environment}"
+  description = "Trigger Cloud Custodian Lambda for SecurityHub findings in central account"
+
+  event_pattern = jsonencode({
+    source      = ["aws.securityhub"]
+    detail-type = ["Security Hub Findings - Imported"]
+    detail = {
+      findings = {
+        Compliance = {
+          Status = ["FAILED"]
+        }
+      }
+    }
+  })
+
+  tags = {
+    Name        = "Cloud Custodian Local SecurityHub Trigger"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+# EventBridge Target - Lambda function for local SecurityHub events
+resource "aws_cloudwatch_event_target" "lambda_local_securityhub" {
+  rule = aws_cloudwatch_event_rule.custodian_local_securityhub_trigger.name
+  arn  = aws_lambda_function.custodian_cross_account_executor.arn
+}
+
+# Lambda Permission - Allow EventBridge to invoke for SecurityHub events
+resource "aws_lambda_permission" "allow_eventbridge_local_securityhub" {
+  statement_id  = "AllowExecutionFromEventBridgeLocalSecurityHub"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.custodian_cross_account_executor.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.custodian_local_securityhub_trigger.arn
+}
+
 # EventBridge Target - Lambda function for local events
 resource "aws_cloudwatch_event_target" "lambda_local" {
   rule = aws_cloudwatch_event_rule.custodian_local_trigger.name
@@ -84,7 +123,7 @@ resource "aws_lambda_permission" "allow_eventbridge_local" {
   source_arn    = aws_cloudwatch_event_rule.custodian_local_trigger.arn
 }
 
-# EventBridge Rule on custom bus - Trigger Lambda for all cross-account events
+# EventBridge Rule on custom bus - Trigger Lambda for cross-account EC2 events
 resource "aws_cloudwatch_event_rule" "custodian_cross_account_trigger" {
   name           = "cloud-custodian-cross-account-trigger-${var.environment}"
   description    = "Trigger Cloud Custodian Lambda for cross-account security events"
@@ -104,6 +143,48 @@ resource "aws_cloudwatch_event_rule" "custodian_cross_account_trigger" {
     Environment = var.environment
     ManagedBy   = "Terraform"
   }
+}
+
+# EventBridge Rule on custom bus - Trigger Lambda for cross-account SecurityHub findings
+resource "aws_cloudwatch_event_rule" "custodian_cross_account_securityhub_trigger" {
+  name           = "cloud-custodian-cross-account-securityhub-${var.environment}"
+  description    = "Trigger Cloud Custodian Lambda for cross-account SecurityHub findings"
+  event_bus_name = aws_cloudwatch_event_bus.centralized.name
+
+  event_pattern = jsonencode({
+    source      = ["aws.securityhub"]
+    account     = var.member_account_ids
+    detail-type = ["Security Hub Findings - Imported"]
+    detail = {
+      findings = {
+        Compliance = {
+          Status = ["FAILED"]
+        }
+      }
+    }
+  })
+
+  tags = {
+    Name        = "Cloud Custodian Cross-Account SecurityHub Trigger"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+# EventBridge Target - Lambda function for cross-account SecurityHub events
+resource "aws_cloudwatch_event_target" "lambda_cross_account_securityhub" {
+  rule           = aws_cloudwatch_event_rule.custodian_cross_account_securityhub_trigger.name
+  event_bus_name = aws_cloudwatch_event_bus.centralized.name
+  arn            = aws_lambda_function.custodian_cross_account_executor.arn
+}
+
+# Lambda Permission - Allow EventBridge to invoke for cross-account SecurityHub events
+resource "aws_lambda_permission" "allow_eventbridge_cross_account_securityhub" {
+  statement_id  = "AllowExecutionFromEventBridgeCrossAccountSecurityHub"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.custodian_cross_account_executor.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.custodian_cross_account_securityhub_trigger.arn
 }
 
 # EventBridge Target - Lambda function

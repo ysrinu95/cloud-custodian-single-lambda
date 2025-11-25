@@ -3,8 +3,8 @@
   "description": "Cloud Custodian Policy Event Mapping",
   "generated_at": "auto-generated",
   "statistics": {
-    "total_policies": 3,
-    "event_driven_policies": 3,
+    "total_policies": 4,
+    "event_driven_policies": 4,
     "unique_events": 3
   },
   "event_mapping": {
@@ -27,6 +27,11 @@
         "policy_name": "security-hub-findings-notification",
         "resource": "aws.security-hub-finding",
         "source_file": "security-hub-findings-notification.yml"
+      },
+      {
+        "policy_name": "securityhub-failed-findings-remediation",
+        "resource": "aws.security-hub-finding",
+        "source_file": "aws-securityhub-auto-remediate.yml"
       }
     ]
   },
@@ -48,6 +53,12 @@
       "source_file": "security-hub-findings-notification.yml",
       "mode_type": "cloudtrail",
       "description": "Monitor Security Hub findings in real-time and notify on HIGH and CRITICAL severity findings.\nTriggers when Security Hub imports new findings.\n"
+    },
+    "securityhub-failed-findings-remediation": {
+      "resource": "aws.security-hub-finding",
+      "source_file": "aws-securityhub-auto-remediate.yml",
+      "mode_type": "cloudtrail",
+      "description": "Automatically remediate SecurityHub failed findings by updating their workflow status and adding remediation notes.\n"
     }
   }
 }
