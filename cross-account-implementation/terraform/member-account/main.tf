@@ -178,6 +178,7 @@ resource "aws_iam_policy" "custodian_remediation" {
           "iam:ListRoles",
           "iam:ListPolicies",
           "iam:ListAccessKeys",
+          "iam:ListAccountAliases",
           "iam:GetUser",
           "iam:GetRole",
           "iam:GetPolicy",
