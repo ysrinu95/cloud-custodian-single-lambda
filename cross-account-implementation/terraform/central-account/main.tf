@@ -303,3 +303,26 @@ resource "aws_sqs_queue" "notifications_dlq" {
     ManagedBy   = "Terraform"
   }
 }
+
+# SQS Queue Policy - Allow member account roles to send messages
+resource "aws_sqs_queue_policy" "mailer_queue_policy" {
+  queue_url = var.mailer_queue_url
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowMemberAccountSendMessage"
+        Effect = "Allow"
+        Principal = {
+          AWS = [
+            for account_id in var.member_account_ids :
+            "arn:aws:iam::${account_id}:role/CloudCustodianExecutionRole"
+          ]
+        }
+        Action   = "sqs:SendMessage"
+        Resource = var.mailer_queue_arn != "" ? var.mailer_queue_arn : "arn:aws:sqs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:custodian-mailer-queue"
+      }
+    ]
+  })
+}
