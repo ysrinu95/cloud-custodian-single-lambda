@@ -211,7 +211,7 @@ class CrossAccountExecutor:
         Execute Cloud Custodian policy using assumed role credentials
         
         Args:
-            policy_config: Policy configuration containing S3 location and policy name
+            policy_config: Policy configuration (the actual policy YAML dict)
             event_info: Event information from EventBridge
             dryrun: Whether to run in dry-run mode
             
@@ -225,21 +225,11 @@ class CrossAccountExecutor:
         logger.info(f"Dry-run mode: {dryrun}")
         
         try:
-            # Download policy file from S3
-            s3_bucket = policy_config['s3_bucket']
-            s3_key = policy_config['s3_key']
-            policy_name = policy_config['policy_name']
+            # policy_config is already the parsed policy dict
+            policy = policy_config
+            policy_name = policy.get('name', 'unknown')
             
-            policy_content = self.download_policy_file(s3_bucket, s3_key)
-            
-            # Parse policy file
-            policy_data = self.parse_policy_file(policy_content)
-            
-            # Find specific policy
-            policy = self.find_policy(policy_data, policy_name)
-            
-            if not policy:
-                raise ValueError(f"Policy '{policy_name}' not found in file")
+            logger.info(f"Executing policy: {policy_name}")
             
             # Execute the policy using Cloud Custodian with cross-account session
             result = self._execute_custodian_policy(policy, event_info, dryrun)
@@ -252,7 +242,7 @@ class CrossAccountExecutor:
             return {
                 'success': False,
                 'account_id': self.account_id,
-                'policy_name': policy_config.get('policy_name'),
+                'policy_name': policy_config.get('name', 'unknown'),
                 'error': str(e),
                 'dryrun': dryrun
             }

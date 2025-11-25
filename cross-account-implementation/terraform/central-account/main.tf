@@ -123,6 +123,8 @@ resource "aws_lambda_function" "custodian_cross_account_executor" {
       CROSS_ACCOUNT_ROLE_NAME = "CloudCustodianExecutionRole"
       EXTERNAL_ID_PREFIX      = "cloud-custodian"
       LOG_LEVEL               = var.log_level
+      MAILER_QUEUE_URL        = var.mailer_queue_url
+      MAILER_ENABLED          = var.mailer_enabled
     }
   }
 
@@ -215,13 +217,14 @@ resource "aws_iam_role_policy" "lambda_execution_policy" {
         Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/*"
       },
       {
-        Sid    = "SQSNotifications"
+        Sid    = "SQSMailerQueue"
         Effect = "Allow"
         Action = [
           "sqs:SendMessage",
-          "sqs:GetQueueUrl"
+          "sqs:GetQueueUrl",
+          "sqs:GetQueueAttributes"
         ]
-        Resource = var.notification_queue_arn != "" ? var.notification_queue_arn : "*"
+        Resource = var.mailer_queue_arn != "" ? var.mailer_queue_arn : "*"
       }
     ]
   })

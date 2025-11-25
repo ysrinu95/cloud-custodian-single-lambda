@@ -105,3 +105,21 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "mailer_queue_url" {
+  description = "SQS queue URL for c7n-mailer notifications"
+  type        = string
+  default     = "https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue"
+}
+
+variable "mailer_queue_arn" {
+  description = "SQS queue ARN for c7n-mailer notifications"
+  type        = string
+  default     = "arn:aws:sqs:us-east-1:172327596604:custodian-mailer-queue"
+}
+
+variable "mailer_enabled" {
+  description = "Enable notifications via c7n-mailer"
+  type        = string
+  default     = "true"
+}
