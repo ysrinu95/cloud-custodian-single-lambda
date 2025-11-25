@@ -412,10 +412,18 @@ class CrossAccountExecutor:
                         logger.info(f"Overriding resource manager get_client for {p.resource_type}")
                         rm.get_client = get_client_with_session
                         
+                        # CRITICAL: Override the session property on the resource manager
+                        # This ensures all boto3 clients created by the manager use cross-account credentials
+                        rm.session_factory = lambda *args, **kwargs: cross_account_session
+                        rm._session = cross_account_session
+                        
                         # Also override get_client for all actions - they create their own clients!
                         for action in p.resource_manager.actions:
                             logger.info(f"Overriding action '{action.type}' get_client method")
                             action.manager.get_client = get_client_with_session
+                            # Override session on action manager too
+                            action.manager.session_factory = lambda *args, **kwargs: cross_account_session
+                            action.manager._session = cross_account_session
                 except Exception as e:
                     logger.warning(f"Could not override resource manager/action get_client: {e}")
                 
