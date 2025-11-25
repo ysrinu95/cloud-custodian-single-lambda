@@ -201,20 +201,29 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             region=region
         )
         
-        # Assume role in target account
-        try:
-            assume_result = executor.assume_role()
-            logger.info(f"Successfully assumed role, session expires at {assume_result['expiration']}")
-        except Exception as e:
-            logger.error(f"Failed to assume role in account {account_id}: {str(e)}")
-            return {
-                'statusCode': 500,
-                'body': json.dumps({
-                    'success': False,
-                    'error': f'Failed to assume role: {str(e)}',
-                    'account_id': account_id
-                })
-            }
+        # Check if this is the central account (Lambda's own account)
+        sts = boto3.client('sts')
+        central_account_id = sts.get_caller_identity()['Account']
+        
+        if account_id == central_account_id:
+            # Event is from central account - use default session (no role assumption needed)
+            logger.info(f"Event is from central account {account_id} - using default session")
+            executor.session = boto3.Session(region_name=region)
+        else:
+            # Event is from member account - assume cross-account role
+            try:
+                assume_result = executor.assume_role()
+                logger.info(f"Successfully assumed role in member account {account_id}, session expires at {assume_result['expiration']}")
+            except Exception as e:
+                logger.error(f"Failed to assume role in account {account_id}: {str(e)}")
+                return {
+                    'statusCode': 500,
+                    'body': json.dumps({
+                        'success': False,
+                        'error': f'Failed to assume role: {str(e)}',
+                        'account_id': account_id
+                    })
+                }
         
         # Execute each policy
         results = []

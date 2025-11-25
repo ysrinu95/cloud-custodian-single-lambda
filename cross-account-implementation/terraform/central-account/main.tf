@@ -49,6 +49,41 @@ resource "aws_cloudwatch_event_bus_policy" "allow_member_accounts" {
   })
 }
 
+# EventBridge Rule on default bus - Trigger Lambda for local central account events
+resource "aws_cloudwatch_event_rule" "custodian_local_trigger" {
+  name        = "cloud-custodian-local-trigger-${var.environment}"
+  description = "Trigger Cloud Custodian Lambda for security events in central account"
+
+  event_pattern = jsonencode({
+    source      = ["aws.ec2"]
+    detail-type = ["AWS API Call via CloudTrail"]
+    detail = {
+      eventName = ["RunInstances"]
+    }
+  })
+
+  tags = {
+    Name        = "Cloud Custodian Local Trigger"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+# EventBridge Target - Lambda function for local events
+resource "aws_cloudwatch_event_target" "lambda_local" {
+  rule = aws_cloudwatch_event_rule.custodian_local_trigger.name
+  arn  = aws_lambda_function.custodian_cross_account_executor.arn
+}
+
+# Lambda Permission - Allow EventBridge default bus to invoke
+resource "aws_lambda_permission" "allow_eventbridge_local" {
+  statement_id  = "AllowExecutionFromEventBridgeLocal"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.custodian_cross_account_executor.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.custodian_local_trigger.arn
+}
+
 # EventBridge Rule on custom bus - Trigger Lambda for all cross-account events
 resource "aws_cloudwatch_event_rule" "custodian_cross_account_trigger" {
   name           = "cloud-custodian-cross-account-trigger-${var.environment}"
@@ -237,6 +272,31 @@ resource "aws_iam_role_policy" "lambda_execution_policy" {
           "sqs:GetQueueAttributes"
         ]
         Resource = var.mailer_queue_arn != "" ? var.mailer_queue_arn : "*"
+      },
+      {
+        Sid    = "EC2LocalAccountRemediation"
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeInstances",
+          "ec2:DescribeInstanceAttribute",
+          "ec2:DescribeInstanceStatus",
+          "ec2:DescribeTags",
+          "ec2:TerminateInstances",
+          "ec2:StopInstances",
+          "ec2:ModifyInstanceAttribute",
+          "ec2:CreateTags"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "IAMReadOnly"
+        Effect = "Allow"
+        Action = [
+          "iam:ListAccountAliases",
+          "iam:GetRole",
+          "iam:GetRolePolicy"
+        ]
+        Resource = "*"
       }
     ]
   })
