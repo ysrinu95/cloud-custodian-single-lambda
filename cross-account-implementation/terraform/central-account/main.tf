@@ -77,13 +77,6 @@ resource "aws_cloudwatch_event_rule" "custodian_local_securityhub_trigger" {
   event_pattern = jsonencode({
     source      = ["aws.securityhub"]
     detail-type = ["Security Hub Findings - Imported"]
-    detail = {
-      findings = {
-        Compliance = {
-          Status = ["FAILED"]
-        }
-      }
-    }
   })
 
   tags = {
@@ -155,17 +148,29 @@ resource "aws_cloudwatch_event_rule" "custodian_cross_account_securityhub_trigge
     source      = ["aws.securityhub"]
     account     = var.member_account_ids
     detail-type = ["Security Hub Findings - Imported"]
-    detail = {
-      findings = {
-        Compliance = {
-          Status = ["FAILED"]
-        }
-      }
-    }
   })
 
   tags = {
     Name        = "Cloud Custodian Cross-Account SecurityHub Trigger"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+# EventBridge Rule on custom bus - Trigger Lambda for cross-account GuardDuty findings (real-time)
+resource "aws_cloudwatch_event_rule" "custodian_cross_account_guardduty_trigger" {
+  name           = "cloud-custodian-cross-account-guardduty-${var.environment}"
+  description    = "Trigger Cloud Custodian Lambda for cross-account GuardDuty findings (real-time detection)"
+  event_bus_name = aws_cloudwatch_event_bus.centralized.name
+
+  event_pattern = jsonencode({
+    source      = ["aws.guardduty"]
+    account     = var.member_account_ids
+    detail-type = ["GuardDuty Finding"]
+  })
+
+  tags = {
+    Name        = "Cloud Custodian Cross-Account GuardDuty Trigger"
     Environment = var.environment
     ManagedBy   = "Terraform"
   }
@@ -185,6 +190,22 @@ resource "aws_lambda_permission" "allow_eventbridge_cross_account_securityhub" {
   function_name = aws_lambda_function.custodian_cross_account_executor.function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.custodian_cross_account_securityhub_trigger.arn
+}
+
+# EventBridge Target - Lambda function for cross-account GuardDuty findings (real-time)
+resource "aws_cloudwatch_event_target" "lambda_cross_account_guardduty" {
+  rule           = aws_cloudwatch_event_rule.custodian_cross_account_guardduty_trigger.name
+  event_bus_name = aws_cloudwatch_event_bus.centralized.name
+  arn            = aws_lambda_function.custodian_cross_account_executor.arn
+}
+
+# Lambda Permission - Allow EventBridge to invoke for cross-account GuardDuty findings (real-time)
+resource "aws_lambda_permission" "allow_eventbridge_cross_account_guardduty" {
+  statement_id  = "AllowExecutionFromEventBridgeCrossAccountGuardDuty"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.custodian_cross_account_executor.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.custodian_cross_account_guardduty_trigger.arn
 }
 
 # EventBridge Target - Lambda function

@@ -1,0 +1,283 @@
+policies:
+  - name: guardduty-findings-remediation
+    resource: aws.guardduty-finding
+    description: |
+      Auto-remediate GuardDuty threat findings in real-time.
+      This policy is triggered directly by GuardDuty finding events (not SecurityHub imports)
+      for instant response to security threats.
+      
+      Supported GuardDuty Finding Types:
+      - Backdoor: C&C communication, backdoor installations
+      - CryptoCurrency: Crypto mining activity
+      - Trojan: Trojan malware detections
+      - UnauthorizedAccess: Unauthorized access attempts
+      - Recon: Reconnaissance activities
+      - Impact: Resource hijacking, data exfiltration
+      - Persistence: Persistence mechanisms
+      - PrivilegeEscalation: Privilege escalation attempts
+      - DefenseEvasion: Defense evasion techniques
+      - CredentialAccess: Compromised credentials usage
+    
+    # Filter for high and critical severity findings
+    filters:
+      - or:
+          - type: value
+            key: severity
+            value: 7
+            op: gte
+          - type: value
+            key: detail.severity
+            value: 7
+            op: gte
+    
+    actions:
+      # Archive the finding after remediation
+      - type: post-finding
+        state: ARCHIVED
+        note: "Threat automatically remediated by Cloud Custodian"
+        
+      # Send notification about the threat
+      - type: notify
+        template: default
+        priority_header: 1
+        subject: "[SECURITY ALERT] GuardDuty Finding - {{ account }} | {{ region }}"
+        violation_desc: |
+          GuardDuty detected a security threat in your account.
+          
+          Finding ID: {{ detail.id }}
+          Type: {{ detail.type }}
+          Severity: {{ detail.severity }}
+          Title: {{ detail.title }}
+          Description: {{ detail.description }}
+          
+          Affected Resource: {{ detail.resource.resourceType }} - {{ detail.resource.instanceDetails.instanceId | default(detail.resource.accessKeyDetails.userName | default('N/A')) }}
+          
+          First Seen: {{ detail.service.eventFirstSeen }}
+          Last Seen: {{ detail.service.eventLastSeen }}
+          Count: {{ detail.service.count }}
+          
+          Action Required: Please review the finding and affected resources.
+          
+        to:
+          - security-team@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+
+  - name: guardduty-backdoor-ec2-isolation
+    resource: ec2
+    description: |
+      Isolate EC2 instances involved in backdoor/C&C communication.
+      This policy is triggered when GuardDuty detects:
+      - Backdoor:EC2/* findings (C&C communication, backdoor installations)
+      - Trojan:EC2/* findings (trojan malware)
+    
+    mode:
+      type: event-pattern
+      events:
+        - source: aws.guardduty
+          detail-type: GuardDuty Finding
+          detail:
+            type:
+              - prefix: "Backdoor:EC2"
+              - prefix: "Trojan:EC2"
+    
+    filters:
+      - type: value
+        key: detail.severity
+        value: 7
+        op: gte
+    
+    actions:
+      # Tag instance as quarantined
+      - type: tag
+        key: SecurityStatus
+        value: QUARANTINED_BY_GUARDDUTY
+      
+      - type: tag
+        key: QuarantineReason
+        value: "{{ detail.type }}"
+      
+      - type: tag
+        key: QuarantineTimestamp
+        value: "{{ now }}"
+      
+      # Remove from security groups (isolate network)
+      - type: modify-security-groups
+        remove: matched
+        isolation-group: sg-isolated-quarantine
+        
+      # Stop the instance to prevent further damage
+      - type: stop
+      
+      # Send alert
+      - type: notify
+        template: default
+        priority_header: 1
+        subject: "[CRITICAL] EC2 Instance Quarantined - GuardDuty Backdoor Detection"
+        violation_desc: |
+          An EC2 instance has been automatically quarantined due to GuardDuty backdoor/trojan detection.
+          
+          Instance ID: {{ InstanceId }}
+          Finding Type: {{ detail.type }}
+          Severity: {{ detail.severity }}
+          Description: {{ detail.description }}
+          
+          Actions Taken:
+          - Instance tagged as QUARANTINED
+          - Security groups modified for network isolation
+          - Instance stopped to prevent further compromise
+          
+          Next Steps:
+          1. Review instance logs and snapshots
+          2. Analyze the malware/backdoor
+          3. Terminate instance if necessary
+          4. Launch clean replacement if needed
+          
+        to:
+          - security-team@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+
+  - name: guardduty-cryptocurrency-ec2-termination
+    resource: ec2
+    description: |
+      Terminate EC2 instances involved in cryptocurrency mining.
+      This policy is triggered when GuardDuty detects:
+      - CryptoCurrency:EC2/* findings (Bitcoin mining, crypto mining tools)
+    
+    mode:
+      type: event-pattern
+      events:
+        - source: aws.guardduty
+          detail-type: GuardDuty Finding
+          detail:
+            type:
+              - prefix: "CryptoCurrency:EC2"
+    
+    filters:
+      - type: value
+        key: detail.severity
+        value: 5
+        op: gte
+    
+    actions:
+      # Tag instance before termination
+      - type: tag
+        key: SecurityStatus
+        value: TERMINATED_CRYPTO_MINING
+      
+      - type: tag
+        key: TerminationReason
+        value: "{{ detail.type }}"
+      
+      - type: tag
+        key: TerminationTimestamp
+        value: "{{ now }}"
+      
+      # Terminate the instance immediately
+      - type: terminate
+        force: true
+      
+      # Send alert
+      - type: notify
+        template: default
+        priority_header: 1
+        subject: "[CRITICAL] EC2 Instance Terminated - GuardDuty Crypto Mining Detection"
+        violation_desc: |
+          An EC2 instance has been automatically terminated due to GuardDuty cryptocurrency mining detection.
+          
+          Instance ID: {{ InstanceId }}
+          Finding Type: {{ detail.type }}
+          Severity: {{ detail.severity }}
+          Description: {{ detail.description }}
+          
+          Actions Taken:
+          - Instance tagged before termination
+          - Instance terminated immediately
+          
+          Next Steps:
+          1. Review CloudTrail logs for instance launch details
+          2. Identify how the instance was compromised
+          3. Review IAM credentials and access keys
+          4. Implement additional security controls
+          
+        to:
+          - security-team@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+
+  - name: guardduty-unauthorized-iam-remediation
+    resource: iam-user
+    description: |
+      Disable IAM users and access keys involved in unauthorized access.
+      This policy is triggered when GuardDuty detects:
+      - UnauthorizedAccess:IAMUser/* findings
+      - CredentialAccess:IAMUser/* findings
+    
+    mode:
+      type: event-pattern
+      events:
+        - source: aws.guardduty
+          detail-type: GuardDuty Finding
+          detail:
+            type:
+              - prefix: "UnauthorizedAccess:IAMUser"
+              - prefix: "CredentialAccess:IAMUser"
+    
+    filters:
+      - type: value
+        key: detail.severity
+        value: 7
+        op: gte
+    
+    actions:
+      # Deactivate all access keys
+      - type: remove-keys
+        age: 0
+        disable: true
+      
+      # Tag user as compromised
+      - type: tag
+        key: SecurityStatus
+        value: COMPROMISED
+      
+      - type: tag
+        key: CompromiseType
+        value: "{{ detail.type }}"
+      
+      - type: tag
+        key: CompromiseTimestamp
+        value: "{{ now }}"
+      
+      # Send alert
+      - type: notify
+        template: default
+        priority_header: 1
+        subject: "[CRITICAL] IAM User Compromised - GuardDuty Detection"
+        violation_desc: |
+          An IAM user has been flagged as compromised by GuardDuty.
+          
+          User Name: {{ UserName }}
+          Finding Type: {{ detail.type }}
+          Severity: {{ detail.severity }}
+          Description: {{ detail.description }}
+          
+          Actions Taken:
+          - All access keys disabled
+          - User tagged as COMPROMISED
+          
+          Next Steps:
+          1. Review CloudTrail logs for suspicious activity
+          2. Rotate all credentials
+          3. Review user permissions
+          4. Consider deleting user if necessary
+          5. Investigate how credentials were compromised
+          
+        to:
+          - security-team@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue

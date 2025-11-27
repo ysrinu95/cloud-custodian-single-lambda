@@ -3,9 +3,9 @@
   "description": "Cloud Custodian Policy Event Mapping",
   "generated_at": "auto-generated",
   "statistics": {
-    "total_policies": 4,
-    "event_driven_policies": 4,
-    "unique_events": 3
+    "total_policies": 8,
+    "event_driven_policies": 8,
+    "unique_events": 4
   },
   "event_mapping": {
     "RunInstances": [
@@ -33,6 +33,28 @@
         "resource": "aws.security-hub-finding",
         "source_file": "aws-securityhub-auto-remediate.yml"
       }
+    ],
+    "GuardDuty Finding": [
+      {
+        "policy_name": "guardduty-findings-remediation",
+        "resource": "aws.guardduty-finding",
+        "source_file": "aws-guardduty-findings-remediate.yml"
+      },
+      {
+        "policy_name": "guardduty-backdoor-ec2-isolation",
+        "resource": "ec2",
+        "source_file": "aws-guardduty-findings-remediate.yml"
+      },
+      {
+        "policy_name": "guardduty-cryptocurrency-ec2-termination",
+        "resource": "ec2",
+        "source_file": "aws-guardduty-findings-remediate.yml"
+      },
+      {
+        "policy_name": "guardduty-unauthorized-iam-remediation",
+        "resource": "iam-user",
+        "source_file": "aws-guardduty-findings-remediate.yml"
+      }
     ]
   },
   "policies": {
@@ -59,6 +81,30 @@
       "source_file": "aws-securityhub-auto-remediate.yml",
       "mode_type": "cloudtrail",
       "description": "Automatically remediate SecurityHub failed findings by updating their workflow status and adding remediation notes.\n"
+    },
+    "guardduty-findings-remediation": {
+      "resource": "aws.guardduty-finding",
+      "source_file": "aws-guardduty-findings-remediate.yml",
+      "mode_type": "guardduty",
+      "description": "Auto-remediate GuardDuty threat findings in real-time for instant response to security threats."
+    },
+    "guardduty-backdoor-ec2-isolation": {
+      "resource": "ec2",
+      "source_file": "aws-guardduty-findings-remediate.yml",
+      "mode_type": "guardduty",
+      "description": "Isolate EC2 instances involved in backdoor/C&C communication detected by GuardDuty."
+    },
+    "guardduty-cryptocurrency-ec2-termination": {
+      "resource": "ec2",
+      "source_file": "aws-guardduty-findings-remediate.yml",
+      "mode_type": "guardduty",
+      "description": "Terminate EC2 instances involved in cryptocurrency mining detected by GuardDuty."
+    },
+    "guardduty-unauthorized-iam-remediation": {
+      "resource": "iam-user",
+      "source_file": "aws-guardduty-findings-remediate.yml",
+      "mode_type": "guardduty",
+      "description": "Disable IAM users and access keys involved in unauthorized access detected by GuardDuty."
     }
   }
 }

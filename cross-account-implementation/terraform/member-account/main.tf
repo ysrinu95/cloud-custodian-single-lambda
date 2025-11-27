@@ -51,17 +51,27 @@ resource "aws_cloudwatch_event_rule" "forward_securityhub_to_central" {
   event_pattern = jsonencode({
     source      = ["aws.securityhub"]
     detail-type = ["Security Hub Findings - Imported"]
-    detail = {
-      findings = {
-        Compliance = {
-          Status = ["FAILED"]
-        }
-      }
-    }
   })
 
   tags = {
     Name        = "Forward SecurityHub Findings to Central Account"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+# EventBridge Rule - Forward GuardDuty findings directly to central account (real-time)
+resource "aws_cloudwatch_event_rule" "forward_guardduty_to_central" {
+  name        = "forward-guardduty-to-central-${var.environment}"
+  description = "Forward GuardDuty findings directly to central account for real-time detection"
+
+  event_pattern = jsonencode({
+    source      = ["aws.guardduty"]
+    detail-type = ["GuardDuty Finding"]
+  })
+
+  tags = {
+    Name        = "Forward GuardDuty Findings to Central Account"
     Environment = var.environment
     ManagedBy   = "Terraform"
   }
@@ -77,6 +87,13 @@ resource "aws_cloudwatch_event_target" "central_bus" {
 # EventBridge Target - Central account event bus for SecurityHub events
 resource "aws_cloudwatch_event_target" "central_bus_securityhub" {
   rule     = aws_cloudwatch_event_rule.forward_securityhub_to_central.name
+  arn      = var.central_event_bus_arn
+  role_arn = aws_iam_role.eventbridge_cross_account.arn
+}
+
+# EventBridge Target - Central account event bus for GuardDuty findings (real-time)
+resource "aws_cloudwatch_event_target" "central_bus_guardduty" {
+  rule     = aws_cloudwatch_event_rule.forward_guardduty_to_central.name
   arn      = var.central_event_bus_arn
   role_arn = aws_iam_role.eventbridge_cross_account.arn
 }
