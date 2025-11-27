@@ -66,6 +66,9 @@ class EventValidator:
         elif detail_type == 'Security Hub Findings - Imported':
             # Security Hub event processing
             return self._validate_securityhub_event(event)
+        elif detail_type == 'GuardDuty Finding':
+            # GuardDuty event processing
+            return self._validate_guardduty_event(event)
         else:
             raise ValueError(f"Unsupported event type: {detail_type}")
     
@@ -175,6 +178,52 @@ class EventValidator:
         }
         
         logger.info(f"Security Hub event validated from account {source_account}: {event_info['event_name']}")
+        
+        return {
+            'valid': True,
+            'event_info': event_info
+        }
+    
+    def _validate_guardduty_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate GuardDuty Finding events (cross-account aware)"""
+        # Extract event details
+        detail = event.get('detail', {})
+        if not detail:
+            raise ValueError("Invalid event: missing 'detail' field")
+        
+        # Extract source account
+        source_account = event.get('account')
+        if not source_account:
+            # Fallback: extract from detail
+            source_account = detail.get('accountId')
+        
+        # GuardDuty events use 'detail-type' as the event name
+        detail_type = event.get('detail-type', '')
+        
+        # Extract finding details
+        finding_type = detail.get('type', '')
+        severity = detail.get('severity', 0)
+        finding_id = detail.get('id', '')
+        
+        # Extract key information
+        event_info = {
+            'event_name': detail_type,  # Use the detail-type as event name
+            'event_source': event.get('source', 'aws.guardduty'),
+            'event_time': event.get('time', ''),
+            'aws_region': detail.get('region', event.get('region', 'us-east-1')),
+            'source_account': source_account,  # Cross-account context
+            'source_ip': '',  # GuardDuty events don't have source IP in event metadata
+            'user_agent': '',  # GuardDuty events don't have user agent
+            'request_parameters': {},
+            'response_elements': detail,  # The finding details are in the detail
+            'user_identity': {},
+            'raw_event': event,  # Include the complete raw event for policy context
+            'finding_type': finding_type,  # GuardDuty finding type (e.g., CryptoCurrency:EC2/BitcoinTool.B!DNS)
+            'severity': severity,  # GuardDuty severity score (0-10)
+            'finding_id': finding_id  # GuardDuty finding ID
+        }
+        
+        logger.info(f"GuardDuty event validated from account {source_account}: {finding_type} (severity: {severity})")
         
         return {
             'valid': True,

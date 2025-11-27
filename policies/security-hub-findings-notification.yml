@@ -1,6 +1,6 @@
 policies:
   - name: security-hub-findings-notification
-    resource: aws.security-hub-finding
+    resource: aws.account
     description: Monitor Security Hub findings from all sources (GuardDuty, Macie, Security Hub, etc.) in real-time and notify on HIGH and CRITICAL severity findings.
     
     mode:
@@ -12,9 +12,9 @@ policies:
       timeout: 300
     
     filters:
-      # Filter for HIGH and CRITICAL severity findings
-      - type: value
-        key: Severity.Label
+      # Filter for HIGH and CRITICAL severity findings from event data
+      - type: event
+        key: "detail.findings[0].Severity.Label"
         op: in
         value: ["HIGH", "CRITICAL"]
     
