@@ -3,14 +3,6 @@ policies:
     resource: aws.account
     description: Monitor Security Hub findings from all sources (GuardDuty, Macie, Security Hub, etc.) in real-time and notify on HIGH and CRITICAL severity findings.
     
-    mode:
-      type: cloudtrail
-      events:
-        - source: aws.securityhub
-          event: Security Hub Findings - Imported
-      role: arn:aws:iam::172327596604:role/cloud-custodian-lambda-role-dev
-      timeout: 300
-    
     filters:
       # Filter for HIGH and CRITICAL severity findings from event data
       - type: event
