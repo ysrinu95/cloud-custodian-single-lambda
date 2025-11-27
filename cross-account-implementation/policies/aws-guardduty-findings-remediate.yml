@@ -72,16 +72,6 @@ policies:
       - Backdoor:EC2/* findings (C&C communication, backdoor installations)
       - Trojan:EC2/* findings (trojan malware)
     
-    mode:
-      type: event-pattern
-      events:
-        - source: aws.guardduty
-          detail-type: GuardDuty Finding
-          detail:
-            type:
-              - prefix: "Backdoor:EC2"
-              - prefix: "Trojan:EC2"
-    
     filters:
       - type: value
         key: detail.severity
@@ -147,15 +137,6 @@ policies:
       This policy is triggered when GuardDuty detects:
       - CryptoCurrency:EC2/* findings (Bitcoin mining, crypto mining tools)
     
-    mode:
-      type: event-pattern
-      events:
-        - source: aws.guardduty
-          detail-type: GuardDuty Finding
-          detail:
-            type:
-              - prefix: "CryptoCurrency:EC2"
-    
     filters:
       - type: value
         key: detail.severity
@@ -216,16 +197,6 @@ policies:
       This policy is triggered when GuardDuty detects:
       - UnauthorizedAccess:IAMUser/* findings
       - CredentialAccess:IAMUser/* findings
-    
-    mode:
-      type: event-pattern
-      events:
-        - source: aws.guardduty
-          detail-type: GuardDuty Finding
-          detail:
-            type:
-              - prefix: "UnauthorizedAccess:IAMUser"
-              - prefix: "CredentialAccess:IAMUser"
     
     filters:
       - type: value

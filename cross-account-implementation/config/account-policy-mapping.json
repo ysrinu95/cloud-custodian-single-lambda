@@ -3,9 +3,9 @@
   "description": "Multi-Account Cloud Custodian Policy Mapping with Global and Account-Specific Configurations",
   "generated_at": "2024-01-01T00:00:00Z",
   "statistics": {
-    "total_policies": 3,
-    "event_driven_policies": 3,
-    "unique_events": 3,
+    "total_policies": 7,
+    "event_driven_policies": 7,
+    "unique_events": 4,
     "managed_accounts": 2
   },
   "event_mapping": {
@@ -31,6 +31,32 @@
         "resource": "aws.security-hub-finding",
         "source_file": "security-hub-findings-notification.yml",
         "description": "Notifies on HIGH and CRITICAL Security Hub findings"
+      }
+    ],
+    "GuardDuty Finding": [
+      {
+        "policy_name": "guardduty-findings-remediation",
+        "resource": "aws.guardduty-finding",
+        "source_file": "aws-guardduty-findings-remediate.yml",
+        "description": "Real-time GuardDuty threat detection and notification"
+      },
+      {
+        "policy_name": "guardduty-backdoor-ec2-isolation",
+        "resource": "aws.ec2",
+        "source_file": "aws-guardduty-findings-remediate.yml",
+        "description": "Isolate EC2 instances with backdoor/trojan detections"
+      },
+      {
+        "policy_name": "guardduty-cryptocurrency-ec2-termination",
+        "resource": "aws.ec2",
+        "source_file": "aws-guardduty-findings-remediate.yml",
+        "description": "Terminate EC2 instances involved in cryptocurrency mining"
+      },
+      {
+        "policy_name": "guardduty-unauthorized-iam-remediation",
+        "resource": "aws.iam-user",
+        "source_file": "aws-guardduty-findings-remediate.yml",
+        "description": "Disable compromised IAM users and access keys"
       }
     ]
   },
@@ -66,6 +92,36 @@
             "enforcement_level": "auto-remediate",
             "notification_channels": ["ops-team", "security-team"],
             "description": "Central Account: Auto-remediate critical findings"
+          }
+        ],
+        "GuardDuty Finding": [
+          {
+            "policy_name": "guardduty-findings-remediation",
+            "resource": "aws.guardduty-finding",
+            "source_file": "aws-guardduty-findings-remediate.yml",
+            "enforcement_level": "auto-remediate",
+            "description": "Central Account: Real-time GuardDuty threat notification"
+          },
+          {
+            "policy_name": "guardduty-backdoor-ec2-isolation",
+            "resource": "aws.ec2",
+            "source_file": "aws-guardduty-findings-remediate.yml",
+            "enforcement_level": "strict",
+            "description": "Central Account: Immediately isolate backdoor/trojan infected instances"
+          },
+          {
+            "policy_name": "guardduty-cryptocurrency-ec2-termination",
+            "resource": "aws.ec2",
+            "source_file": "aws-guardduty-findings-remediate.yml",
+            "enforcement_level": "strict",
+            "description": "Central Account: Terminate crypto mining instances"
+          },
+          {
+            "policy_name": "guardduty-unauthorized-iam-remediation",
+            "resource": "aws.iam-user",
+            "source_file": "aws-guardduty-findings-remediate.yml",
+            "enforcement_level": "strict",
+            "description": "Central Account: Disable compromised IAM credentials"
           }
         ]
       },
@@ -104,6 +160,36 @@
             "notification_channels": ["dev-team"],
             "description": "Test Account: Notify on findings for validation"
           }
+        ],
+        "GuardDuty Finding": [
+          {
+            "policy_name": "guardduty-findings-remediation",
+            "resource": "aws.guardduty-finding",
+            "source_file": "aws-guardduty-findings-remediate.yml",
+            "enforcement_level": "notify",
+            "description": "Test Account: Real-time GuardDuty threat notification"
+          },
+          {
+            "policy_name": "guardduty-backdoor-ec2-isolation",
+            "resource": "aws.ec2",
+            "source_file": "aws-guardduty-findings-remediate.yml",
+            "enforcement_level": "notify",
+            "description": "Test Account: Notify on backdoor/trojan detections"
+          },
+          {
+            "policy_name": "guardduty-cryptocurrency-ec2-termination",
+            "resource": "aws.ec2",
+            "source_file": "aws-guardduty-findings-remediate.yml",
+            "enforcement_level": "notify",
+            "description": "Test Account: Notify on crypto mining detections"
+          },
+          {
+            "policy_name": "guardduty-unauthorized-iam-remediation",
+            "resource": "aws.iam-user",
+            "source_file": "aws-guardduty-findings-remediate.yml",
+            "enforcement_level": "notify",
+            "description": "Test Account: Notify on compromised IAM credentials"
+          }
         ]
       },
       "iam_role": "arn:aws:iam::813185901390:role/CloudCustodianExecutionRole",
@@ -135,6 +221,38 @@
       "description": "Monitor Security Hub findings in real-time and notify on HIGH and CRITICAL severity findings",
       "severity": "variable",
       "compliance_frameworks": ["CIS", "AWS-Foundational-Security"]
+    },
+    "guardduty-findings-remediation": {
+      "resource": "aws.guardduty-finding",
+      "source_file": "aws-guardduty-findings-remediate.yml",
+      "mode_type": "event-driven",
+      "description": "Real-time GuardDuty threat detection and automated remediation",
+      "severity": "high",
+      "compliance_frameworks": ["CIS", "AWS-Foundational-Security", "PCI-DSS"]
+    },
+    "guardduty-backdoor-ec2-isolation": {
+      "resource": "aws.ec2",
+      "source_file": "aws-guardduty-findings-remediate.yml",
+      "mode_type": "event-driven",
+      "description": "Isolate EC2 instances with backdoor/C&C communication",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "AWS-Foundational-Security", "PCI-DSS"]
+    },
+    "guardduty-cryptocurrency-ec2-termination": {
+      "resource": "aws.ec2",
+      "source_file": "aws-guardduty-findings-remediate.yml",
+      "mode_type": "event-driven",
+      "description": "Terminate EC2 instances involved in cryptocurrency mining",
+      "severity": "high",
+      "compliance_frameworks": ["CIS", "AWS-Foundational-Security"]
+    },
+    "guardduty-unauthorized-iam-remediation": {
+      "resource": "aws.iam-user",
+      "source_file": "aws-guardduty-findings-remediate.yml",
+      "mode_type": "event-driven",
+      "description": "Disable IAM users and access keys involved in unauthorized access",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "AWS-Foundational-Security", "PCI-DSS", "HIPAA"]
     }
   },
   "enforcement_levels": {
