@@ -3,9 +3,9 @@
   "description": "Multi-Account Cloud Custodian Policy Mapping with Global and Account-Specific Configurations",
   "generated_at": "2024-01-01T00:00:00Z",
   "statistics": {
-    "total_policies": 6,
-    "event_driven_policies": 6,
-    "unique_events": 3,
+    "total_policies": 5,
+    "event_driven_policies": 5,
+    "unique_events": 2,
     "managed_accounts": 2
   },
   "event_mapping": {
@@ -118,6 +118,14 @@
     }
   },
   "policies": {
+    "aws-ec2-stop-public-instances": {
+      "resource": "aws.ec2",
+      "source_file": "aws-ec2-stop-public-instances.yml",
+      "mode_type": "cloudtrail",
+      "description": "Notifies of and stops EC2 instances launched in a public subnet",
+      "severity": "high",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
     "s3-public-bucket-remediation-realtime": {
       "resource": "aws.s3",
       "source_file": "s3-public-bucket-remediation-realtime.yml",
