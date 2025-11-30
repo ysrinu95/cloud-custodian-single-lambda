@@ -1,10 +1,57 @@
 policies:
-  # ALB listening on port 80 without redirect to HTTPS - realtime/periodic
+  # ALB with HTTP listener but no HTTPS listener - notify only
+  - name: alb-missing-https-listener
+    resource: aws.app-elb
+    description: |
+      Detect ALBs with HTTP listener but no HTTPS listener configured.
+      Cannot auto-remediate because certificate is required for HTTPS.
+    
+    filters:
+      - type: listener
+        key: Protocol
+        value: HTTP
+      - not:
+        - type: listener
+          key: Protocol
+          value: HTTPS
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🔴 ALB Missing HTTPS Listener - Manual Action Required - {{ region }}"
+        violation_desc: |
+          **Application Load Balancer Has HTTP But No HTTPS Listener**
+          
+          **Load Balancer:** {{ resource.LoadBalancerName }}
+          **ARN:** {{ resource.LoadBalancerArn }}
+          **DNS:** {{ resource.DNSName }}
+          
+          **Risk:** All traffic is unencrypted. HTTPS listener with certificate required.
+          
+          **Manual Remediation Required:**
+          1. Request/import SSL certificate in ACM
+          2. Create HTTPS listener:
+          ```bash
+          aws elbv2 create-listener \
+            --load-balancer-arn {{ resource.LoadBalancerArn }} \
+            --protocol HTTPS --port 443 \
+            --certificates CertificateArn=arn:aws:acm:region:account:certificate/cert-id \
+            --default-actions Type=forward,TargetGroupArn=<target-group-arn>
+          ```
+          3. Then modify HTTP listener to redirect to HTTPS
+        to:
+          - security-team@company.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+  
+  # ALB listening on port 80 without redirect to HTTPS - auto-remediate if HTTPS exists
   - name: alb-http-no-redirect-to-https
     resource: aws.app-elb
     description: |
       Detect ALBs listening on port 80 without redirect to HTTPS (443).
-      Security risk: Unencrypted HTTP traffic vulnerable to interception.
+      Auto-remediates only if HTTPS listener already exists.
     
     filters:
       - type: listener
@@ -22,28 +69,36 @@ policies:
         - type: listener
           key: DefaultActions[0].RedirectConfig
           value: absent
+      # Only proceed if HTTPS listener exists (has certificate)
+      - type: listener
+        key: Protocol
+        value: HTTPS
     
     actions:
+      - type: modify-listener
+        default-actions:
+          - Type: redirect
+            RedirectConfig:
+              Protocol: HTTPS
+              Port: 443
+              StatusCode: HTTP_301
+      
       - type: notify
         template: default.html
         priority_header: "2"
-        subject: "⚠️ ALB HTTP Port 80 Without HTTPS Redirect - {{ region }}"
+        subject: "✅ ALB HTTP Listener Auto-Remediated - Redirect to HTTPS - {{ region }}"
         violation_desc: |
-          **Application Load Balancer Not Redirecting HTTP to HTTPS**
+          **Application Load Balancer HTTP Listener Automatically Configured to Redirect to HTTPS**
           
           **Load Balancer:** {{ resource.LoadBalancerName }}
           **ARN:** {{ resource.LoadBalancerArn }}
           **DNS:** {{ resource.DNSName }}
-          **Scheme:** {{ resource.Scheme }}
           
-          **Risk:** Allows unencrypted HTTP traffic, vulnerable to man-in-the-middle attacks.
+          **Action Taken:** HTTP listener on port 80 automatically configured to redirect to HTTPS port 443.
           
-          **Remediation:**
+          **Verification:**
           ```bash
-          # Add redirect rule from HTTP to HTTPS
-          aws elbv2 modify-listener \
-            --listener-arn <listener-arn> \
-            --default-actions Type=redirect,RedirectConfig='{Protocol=HTTPS,Port=443,StatusCode=HTTP_301}'
+          aws elbv2 describe-listeners --load-balancer-arn {{ resource.LoadBalancerArn }}
           ```
         to:
           - security-team@company.com
