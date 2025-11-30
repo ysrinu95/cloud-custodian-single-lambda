@@ -549,7 +549,6 @@ def validate_policy_mapping_config(config: Dict[str, Any]) -> bool:
     logger.info(f"Policy mapping configuration is valid with {len(event_mapping)} event types")
     return True
 
-
     def _extract_generic_resources(self, event_info: Dict[str, Any]) -> Dict[str, Any]:
         """
         Generic resource extraction from ANY CloudTrail event.
