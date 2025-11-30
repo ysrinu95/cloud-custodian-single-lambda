@@ -53,7 +53,46 @@ def load_account_policy_mapping() -> Dict[str, Any]:
         raise
 
 
-def load_policy_from_s3(policy_name: str) -> Dict[str, Any]:
+def should_execute_policy_for_event(policy_config: Dict[str, Any], event_name: str) -> bool:
+    """
+    Determine if a policy should be executed for a given event
+    
+    Args:
+        policy_config: The policy configuration dict
+        event_name: Name of the CloudTrail event
+        
+    Returns:
+        True if policy should be executed, False otherwise
+    """
+    # Check if policy has mode: cloudtrail (event-driven)
+    mode = policy_config.get('mode', {})
+    
+    # If mode is a dict with type: cloudtrail
+    if isinstance(mode, dict):
+        if mode.get('type') != 'cloudtrail':
+            return False
+        
+        # Check if events list contains this event
+        events = mode.get('events', [])
+        if event_name in events:
+            logger.info(f"Policy '{policy_config.get('name')}' matches event '{event_name}'")
+            return True
+        else:
+            logger.debug(f"Policy '{policy_config.get('name')}' does not match event '{event_name}' (expects: {events})")
+            return False
+    
+    # If mode is just the string "cloudtrail", we need to check events separately
+    # or accept it as matching all events (legacy format)
+    if mode == 'cloudtrail':
+        logger.info(f"Policy '{policy_config.get('name')}' is cloudtrail mode (legacy format)")
+        return True
+    
+    # No mode specified or not cloudtrail - skip for event-driven execution
+    logger.debug(f"Policy '{policy_config.get('name')}' is not event-driven (mode: {mode})")
+    return False
+
+
+def load_policy_from_s3(policy_name: str) -> list:
     """
     Load Cloud Custodian policy YAML from S3
     
@@ -61,7 +100,7 @@ def load_policy_from_s3(policy_name: str) -> Dict[str, Any]:
         policy_name: Name of the policy file (without .yml extension)
         
     Returns:
-        Dict containing policy configuration
+        List of policy configurations from the file
     """
     import yaml
     
@@ -79,11 +118,12 @@ def load_policy_from_s3(policy_name: str) -> Dict[str, Any]:
         policy_yaml = response['Body'].read().decode('utf-8')
         policy_config = yaml.safe_load(policy_yaml)
         
-        # Extract first policy if it's a list
+        # Return all policies from the file
         if 'policies' in policy_config:
-            return policy_config['policies'][0]
+            return policy_config['policies']
         
-        return policy_config
+        # If single policy format, wrap in list
+        return [policy_config]
         
     except Exception as e:
         logger.error(f"Failed to load policy {policy_name}: {str(e)}")
@@ -101,7 +141,7 @@ def get_policies_for_event(account_id: str, event_name: str, policy_mapping: Dic
         policy_mapping: Complete policy mapping configuration
         
     Returns:
-        List of policy file names to execute (without .yml extension)
+        List of unique policy file names to execute (without .yml extension)
     """
     # Check account-specific policies first
     account_mapping = policy_mapping.get('account_mapping', {})
@@ -115,7 +155,7 @@ def get_policies_for_event(account_id: str, event_name: str, policy_mapping: Dic
         
         if event_name in account_event_mapping:
             policy_configs = account_event_mapping[event_name]
-            policy_names = [p['source_file'].replace('.yml', '') for p in policy_configs]
+            policy_names = list(set([p['source_file'].replace('.yml', '') for p in policy_configs]))
             logger.info(f"Found {len(policy_names)} account-specific policy(ies) for event '{event_name}' in account {account_name}: {policy_names}")
             return policy_names
     
@@ -124,7 +164,8 @@ def get_policies_for_event(account_id: str, event_name: str, policy_mapping: Dic
     
     if event_name in global_event_mapping:
         policy_configs = global_event_mapping[event_name]
-        policy_names = [p['source_file'].replace('.yml', '') for p in policy_configs]
+        # Deduplicate policy file names (same file may contain multiple policies for same event)
+        policy_names = list(set([p['source_file'].replace('.yml', '') for p in policy_configs]))
         logger.info(f"Found {len(policy_names)} global policy(ies) for event '{event_name}': {policy_names}")
         return policy_names
     
@@ -225,25 +266,41 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     })
                 }
         
-        # Execute each policy
+        # Execute each policy file
         results = []
         for policy_name in policy_names:
             try:
-                # Load policy configuration
-                policy_config = load_policy_from_s3(policy_name)
+                # Load all policies from this file
+                policies = load_policy_from_s3(policy_name)
+                logger.info(f"Loaded {len(policies)} policy(ies) from {policy_name}")
                 
-                # Execute policy
-                result = executor.execute_policy(policy_config, event_info)
-                results.append(result)
-                
-                logger.info(f"Policy '{policy_name}' execution completed: {result}")
+                # Filter and execute only policies that match this event
+                for policy_config in policies:
+                    policy_display_name = policy_config.get('name', policy_name)
+                    
+                    # Check if this policy should be executed for this event
+                    if not should_execute_policy_for_event(policy_config, event_name):
+                        logger.info(f"Skipping policy '{policy_display_name}' - not configured for event '{event_name}'")
+                        continue
+                    
+                    try:
+                        result = executor.execute_policy(policy_config, event_info)
+                        results.append(result)
+                        logger.info(f"Policy '{policy_display_name}' execution completed: {result}")
+                    except Exception as e:
+                        logger.error(f"Failed to execute policy '{policy_display_name}': {str(e)}", exc_info=True)
+                        results.append({
+                            'policy_name': policy_display_name,
+                            'success': False,
+                            'error': str(e)
+                        })
                 
             except Exception as e:
-                logger.error(f"Failed to execute policy '{policy_name}': {str(e)}", exc_info=True)
+                logger.error(f"Failed to load policy file '{policy_name}': {str(e)}", exc_info=True)
                 results.append({
                     'policy_name': policy_name,
                     'success': False,
-                    'error': str(e)
+                    'error': f"Failed to load policy file: {str(e)}"
                 })
         
         # Summary
