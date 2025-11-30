@@ -77,6 +77,61 @@ resource "aws_cloudwatch_event_rule" "forward_guardduty_to_central" {
   }
 }
 
+# EventBridge Rule - Forward ALB CloudTrail events to central account
+resource "aws_cloudwatch_event_rule" "forward_alb_cloudtrail_to_central" {
+  name        = "forward-alb-cloudtrail-to-central-${var.environment}"
+  description = "Forward ALB CloudTrail events from this member account to central security account"
+
+  event_pattern = jsonencode({
+    source      = ["aws.elasticloadbalancing"]
+    detail-type = ["AWS API Call via CloudTrail"]
+    detail = {
+      eventName = [
+        "CreateLoadBalancer",
+        "CreateListener",
+        "ModifyListener",
+        "ModifyLoadBalancerAttributes",
+        "DeleteLoadBalancer",
+        "DeleteListener"
+      ]
+    }
+  })
+
+  tags = {
+    Name        = "Forward ALB CloudTrail Events to Central Account"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+# EventBridge Rule - Forward S3 CloudTrail events to central account
+resource "aws_cloudwatch_event_rule" "forward_s3_cloudtrail_to_central" {
+  name        = "forward-s3-cloudtrail-to-central-${var.environment}"
+  description = "Forward S3 CloudTrail events from this member account to central security account"
+
+  event_pattern = jsonencode({
+    source      = ["aws.s3"]
+    detail-type = ["AWS API Call via CloudTrail"]
+    detail = {
+      eventName = [
+        "CreateBucket",
+        "PutBucketPolicy",
+        "PutBucketAcl",
+        "PutBucketPublicAccessBlock",
+        "DeleteBucketPublicAccessBlock",
+        "PutBucketEncryption",
+        "DeleteBucketEncryption"
+      ]
+    }
+  })
+
+  tags = {
+    Name        = "Forward S3 CloudTrail Events to Central Account"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
 # EventBridge Target - Central account event bus for EC2 events
 resource "aws_cloudwatch_event_target" "central_bus" {
   rule     = aws_cloudwatch_event_rule.forward_to_central.name
@@ -94,6 +149,20 @@ resource "aws_cloudwatch_event_target" "central_bus_securityhub" {
 # EventBridge Target - Central account event bus for GuardDuty findings (real-time)
 resource "aws_cloudwatch_event_target" "central_bus_guardduty" {
   rule     = aws_cloudwatch_event_rule.forward_guardduty_to_central.name
+  arn      = var.central_event_bus_arn
+  role_arn = aws_iam_role.eventbridge_cross_account.arn
+}
+
+# EventBridge Target - Central account event bus for ALB CloudTrail events
+resource "aws_cloudwatch_event_target" "central_bus_alb" {
+  rule     = aws_cloudwatch_event_rule.forward_alb_cloudtrail_to_central.name
+  arn      = var.central_event_bus_arn
+  role_arn = aws_iam_role.eventbridge_cross_account.arn
+}
+
+# EventBridge Target - Central account event bus for S3 CloudTrail events
+resource "aws_cloudwatch_event_target" "central_bus_s3" {
+  rule     = aws_cloudwatch_event_rule.forward_s3_cloudtrail_to_central.name
   arn      = var.central_event_bus_arn
   role_arn = aws_iam_role.eventbridge_cross_account.arn
 }
@@ -197,6 +266,22 @@ resource "aws_iam_policy" "custodian_remediation" {
           "ec2:RevokeSecurityGroupIngress",
           "ec2:RevokeSecurityGroupEgress",
           "ec2:ModifySecurityGroupRules"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "ALBRemediation"
+        Effect = "Allow"
+        Action = [
+          "elasticloadbalancing:DescribeLoadBalancers",
+          "elasticloadbalancing:DescribeListeners",
+          "elasticloadbalancing:DescribeTargetGroups",
+          "elasticloadbalancing:DescribeLoadBalancerAttributes",
+          "elasticloadbalancing:DescribeTags",
+          "elasticloadbalancing:ModifyListener",
+          "elasticloadbalancing:ModifyLoadBalancerAttributes",
+          "elasticloadbalancing:SetSecurityGroups",
+          "elasticloadbalancing:AddTags"
         ]
         Resource = "*"
       },

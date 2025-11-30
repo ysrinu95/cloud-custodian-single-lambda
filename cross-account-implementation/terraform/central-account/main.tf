@@ -49,16 +49,45 @@ resource "aws_cloudwatch_event_bus_policy" "allow_member_accounts" {
   })
 }
 
-# EventBridge Rule on default bus - Trigger Lambda for local central account EC2 events
+# EventBridge Rule on default bus - Trigger Lambda for local central account events
 resource "aws_cloudwatch_event_rule" "custodian_local_trigger" {
   name        = "cloud-custodian-local-trigger-${var.environment}"
   description = "Trigger Cloud Custodian Lambda for security events in central account"
 
   event_pattern = jsonencode({
-    source      = ["aws.ec2"]
+    source      = ["aws.ec2", "aws.s3", "aws.elasticloadbalancing", "aws.rds", "aws.iam", "aws.elasticfilesystem"]
     detail-type = ["AWS API Call via CloudTrail"]
     detail = {
-      eventName = ["RunInstances"]
+      eventName = [
+        # EC2 events
+        "RunInstances",
+        # S3 events
+        "CreateBucket",
+        "PutBucketPolicy",
+        "PutBucketAcl",
+        "PutBucketPublicAccessBlock",
+        "DeleteBucketPublicAccessBlock",
+        "PutBucketEncryption",
+        "DeleteBucketEncryption",
+        # ALB events
+        "CreateLoadBalancer",
+        "CreateListener",
+        "ModifyListener",
+        "ModifyLoadBalancerAttributes",
+        # RDS events
+        "CreateDBInstance",
+        "ModifyDBInstance",
+        "CreateDBCluster",
+        "ModifyDBCluster",
+        # IAM events
+        "CreateUser",
+        "CreateAccessKey",
+        "AttachUserPolicy",
+        "PutUserPolicy",
+        # EFS events
+        "CreateFileSystem",
+        "PutFileSystemPolicy"
+      ]
     }
   })
 
@@ -176,6 +205,65 @@ resource "aws_cloudwatch_event_rule" "custodian_cross_account_guardduty_trigger"
   }
 }
 
+# EventBridge Rule on custom bus - Trigger Lambda for cross-account ALB CloudTrail events
+resource "aws_cloudwatch_event_rule" "custodian_alb_events_from_members" {
+  name           = "custodian-alb-events-from-members-${var.environment}"
+  description    = "Trigger Cloud Custodian Lambda for ALB CloudTrail events from member accounts"
+  event_bus_name = aws_cloudwatch_event_bus.centralized.name
+
+  event_pattern = jsonencode({
+    source      = ["aws.elasticloadbalancing"]
+    account     = var.member_account_ids
+    detail-type = ["AWS API Call via CloudTrail"]
+    detail = {
+      eventName = [
+        "CreateLoadBalancer",
+        "CreateListener",
+        "ModifyListener",
+        "ModifyLoadBalancerAttributes",
+        "DeleteLoadBalancer",
+        "DeleteListener"
+      ]
+    }
+  })
+
+  tags = {
+    Name        = "Cloud Custodian ALB Events from Members"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+# EventBridge Rule on custom bus - Trigger Lambda for cross-account S3 CloudTrail events
+resource "aws_cloudwatch_event_rule" "custodian_s3_events_from_members" {
+  name           = "custodian-s3-events-from-members-${var.environment}"
+  description    = "Trigger Cloud Custodian Lambda for S3 CloudTrail events from member accounts"
+  event_bus_name = aws_cloudwatch_event_bus.centralized.name
+
+  event_pattern = jsonencode({
+    source      = ["aws.s3"]
+    account     = var.member_account_ids
+    detail-type = ["AWS API Call via CloudTrail"]
+    detail = {
+      eventName = [
+        "CreateBucket",
+        "PutBucketPolicy",
+        "PutBucketAcl",
+        "PutBucketPublicAccessBlock",
+        "DeleteBucketPublicAccessBlock",
+        "PutBucketEncryption",
+        "DeleteBucketEncryption"
+      ]
+    }
+  })
+
+  tags = {
+    Name        = "Cloud Custodian S3 Events from Members"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
 # EventBridge Target - Lambda function for cross-account SecurityHub events
 resource "aws_cloudwatch_event_target" "lambda_cross_account_securityhub" {
   rule           = aws_cloudwatch_event_rule.custodian_cross_account_securityhub_trigger.name
@@ -206,6 +294,38 @@ resource "aws_lambda_permission" "allow_eventbridge_cross_account_guardduty" {
   function_name = aws_lambda_function.custodian_cross_account_executor.function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.custodian_cross_account_guardduty_trigger.arn
+}
+
+# EventBridge Target - Lambda function for cross-account ALB events
+resource "aws_cloudwatch_event_target" "lambda_alb_events_from_members" {
+  rule           = aws_cloudwatch_event_rule.custodian_alb_events_from_members.name
+  event_bus_name = aws_cloudwatch_event_bus.centralized.name
+  arn            = aws_lambda_function.custodian_cross_account_executor.arn
+}
+
+# Lambda Permission - Allow EventBridge to invoke for cross-account ALB events
+resource "aws_lambda_permission" "allow_eventbridge_alb_events" {
+  statement_id  = "AllowExecutionFromEventBridgeALBEvents"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.custodian_cross_account_executor.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.custodian_alb_events_from_members.arn
+}
+
+# EventBridge Target - Lambda function for cross-account S3 events
+resource "aws_cloudwatch_event_target" "lambda_s3_events_from_members" {
+  rule           = aws_cloudwatch_event_rule.custodian_s3_events_from_members.name
+  event_bus_name = aws_cloudwatch_event_bus.centralized.name
+  arn            = aws_lambda_function.custodian_cross_account_executor.arn
+}
+
+# Lambda Permission - Allow EventBridge to invoke for cross-account S3 events
+resource "aws_lambda_permission" "allow_eventbridge_s3_events" {
+  statement_id  = "AllowExecutionFromEventBridgeS3Events"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.custodian_cross_account_executor.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.custodian_s3_events_from_members.arn
 }
 
 # EventBridge Target - Lambda function
@@ -387,6 +507,18 @@ resource "aws_iam_role_policy" "lambda_execution_policy" {
           "ec2:StopInstances",
           "ec2:ModifyInstanceAttribute",
           "ec2:CreateTags"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "ALBLocalAccountRead"
+        Effect = "Allow"
+        Action = [
+          "elasticloadbalancing:DescribeLoadBalancers",
+          "elasticloadbalancing:DescribeListeners",
+          "elasticloadbalancing:DescribeTargetGroups",
+          "elasticloadbalancing:DescribeLoadBalancerAttributes",
+          "elasticloadbalancing:DescribeTags"
         ]
         Resource = "*"
       },

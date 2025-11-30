@@ -299,8 +299,125 @@ class CrossAccountExecutor:
         
         logger.info(f"Executing Cloud Custodian policy: {policy.get('name')} in account {self.account_id}")
         
-        # Add resource-specific filters based on event context
-        if 'resource' in policy:
+        # GENERIC RESOURCE FILTERING - works for ALL AWS services
+        generic_resources = event_info.get('generic_resources', {})
+        resource_type = policy.get('resource', '')
+        
+        if generic_resources and resource_type:
+            # Try to apply generic filters based on extracted resources
+            arns = generic_resources.get('arns', [])
+            ids = generic_resources.get('ids', [])
+            names = generic_resources.get('names', [])
+            
+            if 'filters' not in policy:
+                policy['filters'] = []
+            
+            # Strategy 1: Filter by ARN (most reliable, works for many services)
+            if arns:
+                arn_filter_applied = False
+                
+                # Try different ARN field names based on resource type
+                arn_field_mapping = {
+                    'aws.app-elb': 'LoadBalancerArn',
+                    'aws.elb': 'LoadBalancerArn',
+                    'aws.rds': 'DBInstanceArn',
+                    'aws.rds-cluster': 'DBClusterArn',
+                    'aws.efs': 'FileSystemArn',
+                    'aws.lambda': 'FunctionArn',
+                    'aws.sns': 'TopicArn',
+                    'aws.sqs': 'QueueArn',
+                    'aws.kinesis': 'StreamARN',
+                    'aws.elasticache': 'ARN',
+                    'aws.elasticsearch': 'ARN',
+                    'aws.cloudfront': 'ARN',
+                    'aws.ecr': 'repositoryArn',
+                    'aws.eks': 'arn'
+                }
+                
+                arn_field = arn_field_mapping.get(resource_type, 'Arn')
+                
+                for arn in arns:
+                    # Check if this ARN matches the resource type
+                    if self._arn_matches_resource(arn, resource_type):
+                        logger.info(f"Adding ARN filter for {resource_type}: field={arn_field}, value={arn}")
+                        
+                        policy['filters'].insert(0, {
+                            'type': 'value',
+                            'key': arn_field,
+                            'value': arn
+                        })
+                        arn_filter_applied = True
+                        break  # Use first matching ARN
+                
+                if arn_filter_applied:
+                    logger.info(f"Applied ARN-based filter for {resource_type}")
+            
+            # Strategy 2: Filter by ID (for resources that don't use ARNs in filters)
+            elif ids:
+                id_filter_applied = False
+                
+                # Map resource types to their ID field names
+                id_field_mapping = {
+                    'aws.ec2': 'InstanceId',
+                    'aws.security-group': 'GroupId',
+                    'aws.vpc': 'VpcId',
+                    'aws.subnet': 'SubnetId',
+                    'aws.ebs': 'VolumeId',
+                    'aws.ebs-snapshot': 'SnapshotId',
+                    'aws.ami': 'ImageId',
+                    'aws.rds': 'DBInstanceIdentifier',
+                    'aws.rds-cluster': 'DBClusterIdentifier',
+                    'aws.dynamodb-table': 'TableName',
+                    'aws.efs': 'FileSystemId'
+                }
+                
+                id_field = id_field_mapping.get(resource_type)
+                
+                if id_field and ids:
+                    logger.info(f"Adding ID filter for {resource_type}: field={id_field}, value={ids[0]}")
+                    
+                    policy['filters'].insert(0, {
+                        'type': 'value',
+                        'key': id_field,
+                        'value': ids[0]
+                    })
+                    id_filter_applied = True
+                
+                if id_filter_applied:
+                    logger.info(f"Applied ID-based filter for {resource_type}")
+            
+            # Strategy 3: Filter by name (for S3, IAM, etc.)
+            elif names:
+                name_filter_applied = False
+                
+                # Map resource types to their name field
+                name_field_mapping = {
+                    's3': 'Name',
+                    'aws.iam-user': 'UserName',
+                    'aws.iam-role': 'RoleName',
+                    'aws.iam-policy': 'PolicyName',
+                    'aws.lambda': 'FunctionName',
+                    'aws.dynamodb-table': 'TableName'
+                }
+                
+                name_field = name_field_mapping.get(resource_type)
+                
+                if name_field and names:
+                    logger.info(f"Adding name filter for {resource_type}: field={name_field}, value={names[0]}")
+                    
+                    policy['filters'].insert(0, {
+                        'type': 'value',
+                        'key': name_field,
+                        'value': names[0]
+                    })
+                    name_filter_applied = True
+                
+                if name_filter_applied:
+                    logger.info(f"Applied name-based filter for {resource_type}")
+        
+        # LEGACY SPECIFIC FILTERS (backward compatibility)
+        # These remain for explicit field extractions, but generic filtering takes precedence
+        if not generic_resources or not generic_resources.get('arns'):
             # Filter by specific bucket if it's an S3 policy
             bucket_name = event_info.get('bucket_name')
             if bucket_name and policy.get('resource') == 's3':
@@ -357,6 +474,61 @@ class CrossAccountExecutor:
                     'key': 'GroupId',
                     'value': group_id
                 })
+            
+            # For ALB/ELB resources, filter by load balancer ARN if available
+            load_balancer_arn = event_info.get('load_balancer_arn')
+            listener_arn = event_info.get('listener_arn')
+            
+            if policy.get('resource') == 'aws.app-elb':
+                if load_balancer_arn:
+                    logger.info(f"Adding ALB filter for load balancer: {load_balancer_arn}")
+                    
+                    if 'filters' not in policy:
+                        policy['filters'] = []
+                    
+                    # Filter by LoadBalancerArn
+                    policy['filters'].insert(0, {
+                        'type': 'value',
+                        'key': 'LoadBalancerArn',
+                        'value': load_balancer_arn
+                    })
+                elif listener_arn:
+                    # Extract load balancer ARN from listener ARN
+                    # Listener ARN format: arn:aws:elasticloadbalancing:region:account:listener/app/name/id/listener-id
+                    # Load balancer ARN format: arn:aws:elasticloadbalancing:region:account:loadbalancer/app/name/id
+                    try:
+                        parts = listener_arn.split(':')
+                        resource_part = parts[5]  # listener/app/name/id/listener-id
+                        resource_parts = resource_part.split('/')
+                        # Reconstruct load balancer ARN
+                        lb_arn = ':'.join(parts[:5]) + ':loadbalancer/' + '/'.join(resource_parts[1:4])
+                        
+                        logger.info(f"Extracted ALB ARN from listener: {lb_arn}")
+                        
+                        if 'filters' not in policy:
+                            policy['filters'] = []
+                        
+                        policy['filters'].insert(0, {
+                            'type': 'value',
+                            'key': 'LoadBalancerArn',
+                            'value': lb_arn
+                        })
+                    except Exception as e:
+                        logger.warning(f"Could not extract load balancer ARN from listener ARN: {e}")
+            
+            elif policy.get('resource') == 'aws.elb':
+                # Classic ELB handling
+                if load_balancer_arn:
+                    logger.info(f"Adding ELB filter for load balancer: {load_balancer_arn}")
+                    
+                    if 'filters' not in policy:
+                        policy['filters'] = []
+                    
+                    policy['filters'].insert(0, {
+                        'type': 'value',
+                        'key': 'LoadBalancerArn',
+                        'value': load_balancer_arn
+                    })
         
         # Prepare policy configuration
         policy_config = {
@@ -476,6 +648,70 @@ class CrossAccountExecutor:
             except:
                 pass
     
+    def _arn_matches_resource(self, arn: str, resource_type: str) -> bool:
+        """
+        Check if an ARN matches the expected resource type.
+        
+        Args:
+            arn: AWS ARN to check
+            resource_type: Cloud Custodian resource type (e.g., 'aws.app-elb')
+            
+        Returns:
+            True if ARN matches resource type, False otherwise
+        """
+        if not arn or not arn.startswith('arn:aws:'):
+            return False
+        
+        # Parse ARN: arn:aws:service:region:account:resource
+        parts = arn.split(':')
+        if len(parts) < 6:
+            return False
+        
+        service = parts[2]
+        
+        # Map Cloud Custodian resource types to AWS service names
+        resource_service_mapping = {
+            'aws.app-elb': 'elasticloadbalancing',
+            'aws.elb': 'elasticloadbalancing',
+            'aws.rds': 'rds',
+            'aws.rds-cluster': 'rds',
+            'aws.ec2': 'ec2',
+            'aws.s3': 's3',
+            'aws.efs': 'elasticfilesystem',
+            'aws.lambda': 'lambda',
+            'aws.sns': 'sns',
+            'aws.sqs': 'sqs',
+            'aws.kinesis': 'kinesis',
+            'aws.dynamodb-table': 'dynamodb',
+            'aws.elasticache': 'elasticache',
+            'aws.elasticsearch': 'es',
+            'aws.cloudfront': 'cloudfront',
+            'aws.ecr': 'ecr',
+            'aws.eks': 'eks',
+            'aws.iam-user': 'iam',
+            'aws.iam-role': 'iam',
+            'aws.iam-policy': 'iam',
+            'aws.security-group': 'ec2',
+            'aws.vpc': 'ec2',
+            'aws.subnet': 'ec2',
+            'aws.ebs': 'ec2',
+            'aws.ebs-snapshot': 'ec2',
+            'aws.ami': 'ec2'
+        }
+        
+        expected_service = resource_service_mapping.get(resource_type)
+        
+        if not expected_service:
+            logger.warning(f"Unknown resource type mapping for {resource_type}, accepting ARN")
+            return True  # Accept if we don't know the mapping
+        
+        matches = service == expected_service
+        
+        if not matches:
+            logger.debug(f"ARN service '{service}' does not match expected '{expected_service}' for resource type '{resource_type}'")
+        
+        return matches
+
     def test_connectivity(self) -> Dict[str, Any]:
         """
         Test connectivity and permissions in target account

@@ -136,6 +136,19 @@ class EventValidator:
             username = self._extract_username(event_info)
             if username:
                 event_info['username'] = username
+        elif event_source == 'elasticloadbalancing.amazonaws.com':
+            # Extract ALB/ELB resource identifiers
+            load_balancer_arn = self._extract_load_balancer_arn(event_info)
+            if load_balancer_arn:
+                event_info['load_balancer_arn'] = load_balancer_arn
+            listener_arn = self._extract_listener_arn(event_info)
+            if listener_arn:
+                event_info['listener_arn'] = listener_arn
+        
+        # Generic resource extraction for ALL AWS services
+        generic_resources = self._extract_generic_resources(event_info)
+        if generic_resources:
+            event_info['generic_resources'] = generic_resources
         
         logger.info(f"Event validated from account {source_account}: {event_info['event_name']}")
         
@@ -311,6 +324,44 @@ class EventValidator:
         username = request_params.get('user')
         if username:
             return username
+        
+        return None
+    
+    def _extract_load_balancer_arn(self, event_info: Dict[str, Any]) -> Optional[str]:
+        """Extract ALB/ELB load balancer ARN from event information"""
+        response_elements = event_info.get('response_elements', {})
+        request_params = event_info.get('request_parameters', {})
+        
+        # Try response elements first (for CreateLoadBalancer, ModifyLoadBalancerAttributes)
+        if isinstance(response_elements, dict):
+            # CreateLoadBalancer response
+            load_balancers = response_elements.get('loadBalancers', [])
+            if load_balancers and len(load_balancers) > 0:
+                return load_balancers[0].get('loadBalancerArn')
+        
+        # Try request parameters (for ModifyLoadBalancerAttributes, DeleteLoadBalancer)
+        load_balancer_arn = request_params.get('loadBalancerArn')
+        if load_balancer_arn:
+            return load_balancer_arn
+        
+        return None
+    
+    def _extract_listener_arn(self, event_info: Dict[str, Any]) -> Optional[str]:
+        """Extract ALB/ELB listener ARN from event information"""
+        response_elements = event_info.get('response_elements', {})
+        request_params = event_info.get('request_parameters', {})
+        
+        # Try response elements first (for CreateListener)
+        if isinstance(response_elements, dict):
+            # CreateListener response
+            listeners = response_elements.get('listeners', [])
+            if listeners and len(listeners) > 0:
+                return listeners[0].get('listenerArn')
+        
+        # Try request parameters (for ModifyListener, DeleteListener)
+        listener_arn = request_params.get('listenerArn')
+        if listener_arn:
+            return listener_arn
         
         return None
     
@@ -497,6 +548,92 @@ def validate_policy_mapping_config(config: Dict[str, Any]) -> bool:
     
     logger.info(f"Policy mapping configuration is valid with {len(event_mapping)} event types")
     return True
+
+
+    def _extract_generic_resources(self, event_info: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Generic resource extraction from ANY CloudTrail event.
+        Searches requestParameters and responseElements for ARNs, IDs, and names.
+        
+        Args:
+            event_info: Event information containing request_parameters and response_elements
+            
+        Returns:
+            Dict containing extracted resource identifiers
+        """
+        request_params = event_info.get('request_parameters', {})
+        response_elements = event_info.get('response_elements', {})
+        
+        resources = {
+            'arns': [],
+            'ids': [],
+            'names': []
+        }
+        
+        # Search both request and response for resource identifiers
+        self._recursive_extract(request_params, resources)
+        self._recursive_extract(response_elements, resources)
+        
+        # Remove duplicates
+        resources['arns'] = list(set(resources['arns']))
+        resources['ids'] = list(set(resources['ids']))
+        resources['names'] = list(set(resources['names']))
+        
+        logger.info(f"Generic extraction found: {len(resources['arns'])} ARNs, {len(resources['ids'])} IDs, {len(resources['names'])} names")
+        
+        return resources
+    
+    def _recursive_extract(self, obj: Any, resources: Dict[str, list], depth: int = 0, max_depth: int = 10):
+        """
+        Recursively search for ARNs, IDs, and names in nested structures.
+        
+        Args:
+            obj: Object to search (dict, list, or primitive)
+            resources: Dict to accumulate found resources
+            depth: Current recursion depth
+            max_depth: Maximum recursion depth to prevent infinite loops
+        """
+        if depth > max_depth:
+            return
+        
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                key_lower = key.lower()
+                
+                # Check if this is a resource identifier field
+                if isinstance(value, str):
+                    # ARN detection
+                    if 'arn' in key_lower or (value.startswith('arn:aws:') if value else False):
+                        if value and value not in resources['arns']:
+                            resources['arns'].append(value)
+                            logger.debug(f"Found ARN in field '{key}': {value}")
+                    
+                    # ID detection (common patterns)
+                    elif any(pattern in key_lower for pattern in [
+                        'id', 'identifier', 'resourceid', 'instanceid', 'volumeid',
+                        'snapshotid', 'imageid', 'groupid', 'vpcid', 'subnetid',
+                        'clusterid', 'dbinstanceidentifier', 'filesystemid',
+                        'streamname', 'topicarn', 'queueurl', 'functionname'
+                    ]):
+                        if value and value not in resources['ids']:
+                            resources['ids'].append(value)
+                            logger.debug(f"Found ID in field '{key}': {value}")
+                    
+                    # Name detection
+                    elif any(pattern in key_lower for pattern in [
+                        'name', 'bucketname', 'username', 'rolename', 'policyname',
+                        'tablename', 'clustername', 'loadbalancername'
+                    ]):
+                        if value and value not in resources['names']:
+                            resources['names'].append(value)
+                            logger.debug(f"Found name in field '{key}': {value}")
+                
+                # Recurse into nested structures
+                self._recursive_extract(value, resources, depth + 1, max_depth)
+        
+        elif isinstance(obj, list):
+            for item in obj:
+                self._recursive_extract(item, resources, depth + 1, max_depth)
 
 
 # Legacy functions for backward compatibility
