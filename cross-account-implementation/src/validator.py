@@ -501,54 +501,6 @@ class EventValidator:
         
         return result
 
-
-def validate_policy_mapping_config(config: Dict[str, Any]) -> bool:
-    """
-    Validate policy mapping configuration structure (cross-account aware)
-    
-    Args:
-        config: Policy mapping configuration dictionary
-        
-    Returns:
-        True if valid
-        
-    Raises:
-        ValueError: If configuration is invalid
-    """
-    required_fields = ['version', 'event_mapping']
-    for field in required_fields:
-        if field not in config:
-            raise ValueError(f"Missing required field: {field}")
-    
-    event_mapping = config.get('event_mapping', {})
-    if not isinstance(event_mapping, dict):
-        raise ValueError("'event_mapping' must be a dictionary")
-    
-    # Validate each event type has a list of policies
-    for event_type, policies in event_mapping.items():
-        if not isinstance(policies, list):
-            raise ValueError(f"Event '{event_type}': policies must be a list")
-        
-        for idx, policy in enumerate(policies):
-            required_policy_fields = ['policy_name', 'resource', 'source_file']
-            for field in required_policy_fields:
-                if field not in policy:
-                    raise ValueError(f"Event '{event_type}', policy {idx}: missing required field '{field}'")
-    
-    # Validate account_mapping (optional)
-    if 'account_mapping' in config:
-        account_mapping = config['account_mapping']
-        if not isinstance(account_mapping, dict):
-            raise ValueError("'account_mapping' must be a dictionary")
-        
-        for account_id, account_config in account_mapping.items():
-            if 'event_mapping' in account_config:
-                if not isinstance(account_config['event_mapping'], dict):
-                    raise ValueError(f"Account '{account_id}': event_mapping must be a dictionary")
-    
-    logger.info(f"Policy mapping configuration is valid with {len(event_mapping)} event types")
-    return True
-
     def _extract_generic_resources(self, event_info: Dict[str, Any]) -> Dict[str, Any]:
         """
         Generic resource extraction from ANY CloudTrail event.
@@ -633,6 +585,54 @@ def validate_policy_mapping_config(config: Dict[str, Any]) -> bool:
         elif isinstance(obj, list):
             for item in obj:
                 self._recursive_extract(item, resources, depth + 1, max_depth)
+
+
+def validate_policy_mapping_config(config: Dict[str, Any]) -> bool:
+    """
+    Validate policy mapping configuration structure (cross-account aware)
+    
+    Args:
+        config: Policy mapping configuration dictionary
+        
+    Returns:
+        True if valid
+        
+    Raises:
+        ValueError: If configuration is invalid
+    """
+    required_fields = ['version', 'event_mapping']
+    for field in required_fields:
+        if field not in config:
+            raise ValueError(f"Missing required field: {field}")
+    
+    event_mapping = config.get('event_mapping', {})
+    if not isinstance(event_mapping, dict):
+        raise ValueError("'event_mapping' must be a dictionary")
+    
+    # Validate each event type has a list of policies
+    for event_type, policies in event_mapping.items():
+        if not isinstance(policies, list):
+            raise ValueError(f"Event '{event_type}': policies must be a list")
+        
+        for idx, policy in enumerate(policies):
+            required_policy_fields = ['policy_name', 'resource', 'source_file']
+            for field in required_policy_fields:
+                if field not in policy:
+                    raise ValueError(f"Event '{event_type}', policy {idx}: missing required field '{field}'")
+    
+    # Validate account_mapping (optional)
+    if 'account_mapping' in config:
+        account_mapping = config['account_mapping']
+        if not isinstance(account_mapping, dict):
+            raise ValueError("'account_mapping' must be a dictionary")
+        
+        for account_id, account_config in account_mapping.items():
+            if 'event_mapping' in account_config:
+                if not isinstance(account_config['event_mapping'], dict):
+                    raise ValueError(f"Account '{account_id}': event_mapping must be a dictionary")
+    
+    logger.info(f"Policy mapping configuration is valid with {len(event_mapping)} event types")
+    return True
 
 
 # Legacy functions for backward compatibility
