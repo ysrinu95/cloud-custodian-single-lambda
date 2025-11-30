@@ -295,10 +295,12 @@ resource "aws_iam_policy" "custodian_remediation" {
           "s3:GetBucketPublicAccessBlock",
           "s3:GetBucketPolicy",
           "s3:GetBucketAcl",
+          "s3:GetBucketEncryption",
           "s3:PutBucketPublicAccessBlock",
           "s3:PutBucketPolicy",
           "s3:PutBucketAcl",
           "s3:PutBucketTagging",
+          "s3:PutEncryptionConfiguration",
           "s3:GetBucketTagging"
         ]
         Resource = "*"
