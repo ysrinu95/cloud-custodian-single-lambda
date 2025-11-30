@@ -605,8 +605,44 @@ class CrossAccountExecutor:
                     p.data['event'] = raw_event.get('detail', {})
                     logger.debug(f"Event context: {json.dumps(p.data.get('event', {}), default=str)}")
                 
+                # OPTIMIZATION: If we have extracted ARNs, try to build resources directly
+                # This bypasses Cloud Custodian's describe operations which can fail
+                provided_resources = None
+                generic_resources = event_info.get('generic_resources', {})
+                
+                if generic_resources and generic_resources.get('arns'):
+                    arns = generic_resources['arns']
+                    resource_type = p.resource_type
+                    
+                    # For app-elb, build resource objects from ARNs
+                    if resource_type == 'aws.app-elb':
+                        lb_arns = [arn for arn in arns if ':loadbalancer/' in arn]
+                        if lb_arns:
+                            logger.info(f"Building {len(lb_arns)} app-elb resources from extracted ARNs")
+                            try:
+                                # Call describe for ONLY these specific load balancers
+                                client = cross_account_session.client('elbv2', region_name=cross_account_region)
+                                response = client.describe_load_balancers(LoadBalancerArns=lb_arns)
+                                provided_resources = response.get('LoadBalancers', [])
+                                logger.info(f"Retrieved {len(provided_resources)} load balancers using extracted ARNs")
+                            except Exception as e:
+                                logger.warning(f"Could not describe specific load balancers: {e}")
+                
                 # Run the policy with cross-account credentials
-                resources_matched = p.run()
+                if provided_resources:
+                    logger.info(f"Evaluating policy against {len(provided_resources)} pre-fetched resources (bypassing enumerate)")
+                    # Override the resources method to return our pre-fetched resources
+                    original_resources = rm.resources
+                    rm.resources = lambda: provided_resources
+                    
+                    try:
+                        resources_matched = p.run()
+                    finally:
+                        # Restore original resources method
+                        rm.resources = original_resources
+                else:
+                    logger.info(f"Running policy with standard resource enumeration")
+                    resources_matched = p.run()
                 
                 result = {
                     'policy': p.name,
@@ -616,6 +652,7 @@ class CrossAccountExecutor:
                     'action_taken': not dryrun,
                     'dryrun': dryrun,
                     'event_context_provided': bool(raw_event),
+                    'provided_resources': len(provided_resources) if provided_resources else 0,
                 }
                 
                 logger.info(f"Policy {p.name} matched {result['resources_matched']} resources in account {self.account_id}")
