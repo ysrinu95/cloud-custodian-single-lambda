@@ -52,9 +52,10 @@ resource "aws_cloudwatch_event_bus_policy" "allow_member_accounts" {
 # EventBridge Rule on default bus - Trigger Lambda for local central account events
 resource "aws_cloudwatch_event_rule" "custodian_local_trigger" {
   name        = "cloud-custodian-local-trigger-${var.environment}"
-  description = "Trigger Cloud Custodian Lambda for security events in central account"
+  description = "Trigger Cloud Custodian Lambda for security events in central account (172327596604)"
 
   event_pattern = jsonencode({
+    account     = [data.aws_caller_identity.current.account_id]
     source      = ["aws.ec2", "aws.s3", "aws.elasticloadbalancing", "aws.rds", "aws.iam", "aws.elasticfilesystem"]
     detail-type = ["AWS API Call via CloudTrail"]
     detail = {
