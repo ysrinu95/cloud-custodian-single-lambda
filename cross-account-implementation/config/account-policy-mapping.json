@@ -48,6 +48,14 @@
         "description": "Detect spike in S3 API requests (exfiltration/DoS)"
       }
     ],
+    "CreateBucket": [
+      {
+        "policy_name": "s3-no-server-side-encryption",
+        "resource": "aws.s3",
+        "source_file": "aws-s3-security",
+        "description": "Auto-enable encryption on newly created buckets"
+      }
+    ],
     "PutBucketPolicy": [
       {
         "policy_name": "s3-bucket-policy-modification",
