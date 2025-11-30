@@ -678,3 +678,55 @@ def validate_policy_config(policy_config: Dict[str, Any]) -> Dict[str, bool]:
             return {'valid': False, 'error': 'Actions must be a list'}
     
     return {'valid': True}
+
+
+def extract_resource_identifiers(event_detail: Dict[str, Any]) -> List[str]:
+    """
+    Generic function to extract resource identifiers from CloudTrail event.
+    Searches requestParameters and responseElements for ARNs, IDs, Names.
+    
+    Args:
+        event_detail: CloudTrail event detail containing requestParameters and responseElements
+        
+    Returns:
+        List of extracted resource identifiers (ARNs, IDs, names)
+    """
+    identifiers = []
+    
+    def recursive_extract(obj, path=""):
+        """Recursively search for resource identifiers"""
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                # Check for ARN patterns
+                if 'arn' in key.lower() or 'Arn' in key:
+                    if isinstance(value, str) and value.startswith('arn:'):
+                        identifiers.append(value)
+                        logger.debug(f"Found ARN: {value}")
+                # Check for ID patterns
+                elif key.endswith('Id') or key.endswith('id'):
+                    if isinstance(value, str) and value:
+                        identifiers.append(value)
+                        logger.debug(f"Found ID: {value}")
+                # Check for Name patterns
+                elif key.endswith('Name') or key.endswith('name'):
+                    if isinstance(value, str) and value:
+                        identifiers.append(value)
+                        logger.debug(f"Found Name: {value}")
+                # Recurse into nested structures
+                if isinstance(value, (dict, list)):
+                    recursive_extract(value, f"{path}.{key}")
+        elif isinstance(obj, list):
+            for item in obj:
+                if isinstance(item, (dict, list)):
+                    recursive_extract(item, path)
+    
+    # Extract from both request and response
+    if 'requestParameters' in event_detail:
+        recursive_extract(event_detail['requestParameters'])
+    if 'responseElements' in event_detail:
+        recursive_extract(event_detail['responseElements'])
+    
+    # Remove duplicates and return
+    unique_identifiers = list(set(identifiers))
+    logger.info(f"Extracted {len(unique_identifiers)} unique resource identifiers from CloudTrail event")
+    return unique_identifiers
