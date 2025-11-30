@@ -164,13 +164,19 @@ def get_policies_for_event(account_id: str, event_name: str, policy_mapping: Dic
     
     if event_name in global_event_mapping:
         policy_configs = global_event_mapping[event_name]
-        # Deduplicate policy file names (same file may contain multiple policies for same event)
-        policy_names = list(set([p['source_file'].replace('.yml', '') for p in policy_configs]))
-        logger.info(f"Found {len(policy_names)} global policy(ies) for event '{event_name}': {policy_names}")
-        return policy_names
+        # Group by source file and collect policy names
+        policies_by_file = {}
+        for config in policy_configs:
+            file_name = config['source_file'].replace('.yml', '')
+            policy_name = config['policy_name']
+            if file_name not in policies_by_file:
+                policies_by_file[file_name] = []
+            policies_by_file[file_name].append(policy_name)
+        logger.info(f"Found {len(policy_configs)} global policy(ies) for event '{event_name}': {policies_by_file}")
+        return policies_by_file
     
     logger.info(f"No policies configured for event '{event_name}' in account {account_id}")
-    return []
+    return {}
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -222,9 +228,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         account_mapping = load_account_policy_mapping()
         
         # Get policies to execute
-        policy_names = get_policies_for_event(account_id, event_name, account_mapping)
+        policies_by_file = get_policies_for_event(account_id, event_name, account_mapping)
         
-        if not policy_names:
+        if not policies_by_file:
             logger.info("No policies to execute for this event")
             return {
                 'statusCode': 200,
@@ -268,15 +274,21 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         # Execute each policy file
         results = []
-        for policy_name in policy_names:
+        for policy_file, policy_names_to_execute in policies_by_file.items():
             try:
                 # Load all policies from this file
-                policies = load_policy_from_s3(policy_name)
-                logger.info(f"Loaded {len(policies)} policy(ies) from {policy_name}")
+                all_policies = load_policy_from_s3(policy_file)
+                logger.info(f"Loaded {len(all_policies)} policy(ies) from {policy_file}")
+                logger.info(f"Will execute only specific policies: {policy_names_to_execute}")
                 
-                # Execute all policies from this file
-                for policy_config in policies:
-                    policy_display_name = policy_config.get('name', policy_name)
+                # Execute only the specific policies listed in the mapping
+                for policy_config in all_policies:
+                    policy_display_name = policy_config.get('name', policy_file)
+                    
+                    # Skip policies not in the mapping for this event
+                    if policy_display_name not in policy_names_to_execute:
+                        logger.info(f"Skipping policy '{policy_display_name}' - not mapped to this event")
+                        continue
                     
                     try:
                         result = executor.execute_policy(policy_config, event_info)
@@ -291,9 +303,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         })
                 
             except Exception as e:
-                logger.error(f"Failed to load policy file '{policy_name}': {str(e)}", exc_info=True)
+                logger.error(f"Failed to load policy file '{policy_file}': {str(e)}", exc_info=True)
                 results.append({
-                    'policy_name': policy_name,
+                    'policy_name': policy_file,
                     'success': False,
                     'error': f"Failed to load policy file: {str(e)}"
                 })
