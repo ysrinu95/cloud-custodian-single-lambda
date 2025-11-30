@@ -605,17 +605,18 @@ class CrossAccountExecutor:
                     p.data['event'] = raw_event.get('detail', {})
                     logger.debug(f"Event context: {json.dumps(p.data.get('event', {}), default=str)}")
                 
-                # OPTIMIZATION: If we have extracted ARNs, try to build resources directly
+                # OPTIMIZATION: If we have extracted ARNs/names, try to build resources directly
                 # This bypasses Cloud Custodian's describe operations which can fail
                 provided_resources = None
                 generic_resources = event_info.get('generic_resources', {})
                 
-                if generic_resources and generic_resources.get('arns'):
-                    arns = generic_resources['arns']
+                if generic_resources:
+                    arns = generic_resources.get('arns', [])
+                    names = generic_resources.get('names', [])
                     resource_type = p.resource_type
                     
                     # For app-elb, build resource objects from ARNs
-                    if resource_type == 'aws.app-elb':
+                    if resource_type == 'aws.app-elb' and arns:
                         lb_arns = [arn for arn in arns if ':loadbalancer/' in arn]
                         if lb_arns:
                             logger.info(f"Building {len(lb_arns)} app-elb resources from extracted ARNs")
@@ -627,6 +628,33 @@ class CrossAccountExecutor:
                                 logger.info(f"Retrieved {len(provided_resources)} load balancers using extracted ARNs")
                             except Exception as e:
                                 logger.warning(f"Could not describe specific load balancers: {e}")
+                    
+                    # For S3 buckets, build resource objects from bucket names
+                    elif resource_type == 'aws.s3' and names:
+                        bucket_names = names
+                        logger.info(f"Building {len(bucket_names)} S3 bucket resources from extracted names")
+                        try:
+                            client = cross_account_session.client('s3', region_name=cross_account_region)
+                            provided_resources = []
+                            for bucket_name in bucket_names:
+                                try:
+                                    # Get bucket location
+                                    location_response = client.get_bucket_location(Bucket=bucket_name)
+                                    location = location_response.get('LocationConstraint') or 'us-east-1'
+                                    
+                                    # Build basic S3 resource object
+                                    bucket_resource = {
+                                        'Name': bucket_name,
+                                        'CreationDate': None,  # Will be populated if needed
+                                        'c7n:MatchedFilters': ['event-filter']  # Mark as matched by event
+                                    }
+                                    provided_resources.append(bucket_resource)
+                                except Exception as e:
+                                    logger.warning(f"Could not get bucket info for {bucket_name}: {e}")
+                            
+                            logger.info(f"Retrieved {len(provided_resources)} S3 buckets using extracted names")
+                        except Exception as e:
+                            logger.warning(f"Could not describe specific S3 buckets: {e}")
                 
                 # Run the policy with cross-account credentials
                 if provided_resources:
