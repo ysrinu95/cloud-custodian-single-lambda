@@ -638,23 +638,23 @@ class CrossAccountExecutor:
                             provided_resources = []
                             for bucket_name in bucket_names:
                                 try:
-                                    # Get bucket location
-                                    location_response = client.get_bucket_location(Bucket=bucket_name)
-                                    location = location_response.get('LocationConstraint') or 'us-east-1'
-                                    
-                                    # Build basic S3 resource object
+                                    # Build basic S3 resource object - minimal info needed
                                     bucket_resource = {
                                         'Name': bucket_name,
-                                        'CreationDate': None,  # Will be populated if needed
+                                        'CreationDate': None,  # Cloud Custodian will handle if needed
                                         'c7n:MatchedFilters': ['event-filter']  # Mark as matched by event
                                     }
                                     provided_resources.append(bucket_resource)
+                                    logger.info(f"Built S3 resource object for bucket: {bucket_name}")
                                 except Exception as e:
-                                    logger.warning(f"Could not get bucket info for {bucket_name}: {e}")
+                                    logger.error(f"Could not build bucket resource for {bucket_name}: {e}")
                             
-                            logger.info(f"Retrieved {len(provided_resources)} S3 buckets using extracted names")
+                            if provided_resources:
+                                logger.info(f"Retrieved {len(provided_resources)} S3 buckets using extracted names")
+                            else:
+                                logger.warning("No S3 bucket resources could be built")
                         except Exception as e:
-                            logger.warning(f"Could not describe specific S3 buckets: {e}")
+                            logger.error(f"Failed to build S3 bucket resources: {e}", exc_info=True)
                 
                 # Run the policy with cross-account credentials
                 if provided_resources:
