@@ -274,14 +274,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 policies = load_policy_from_s3(policy_name)
                 logger.info(f"Loaded {len(policies)} policy(ies) from {policy_name}")
                 
-                # Filter and execute only policies that match this event
+                # Execute all policies from this file
                 for policy_config in policies:
                     policy_display_name = policy_config.get('name', policy_name)
-                    
-                    # Check if this policy should be executed for this event
-                    if not should_execute_policy_for_event(policy_config, event_name):
-                        logger.info(f"Skipping policy '{policy_display_name}' - not configured for event '{event_name}'")
-                        continue
                     
                     try:
                         result = executor.execute_policy(policy_config, event_info)
