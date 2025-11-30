@@ -1,0 +1,135 @@
+policies:
+  # RDS DB cluster encryption disabled
+  - name: rds-cluster-encryption-disabled
+    resource: aws.rds-cluster
+    description: Detect RDS DB clusters without encryption at rest
+    
+    filters:
+      - type: value
+        key: StorageEncrypted
+        value: false
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "2"
+        subject: "⚠️ RDS Cluster Encryption Disabled - {{ region }}"
+        violation_desc: |
+          **RDS Database Cluster Without Encryption**
+          
+          **Cluster ID:** {{ resource.DBClusterIdentifier }}
+          **Engine:** {{ resource.Engine }}
+          **Engine Version:** {{ resource.EngineVersion }}
+          
+          **Risk:** Database data at rest is not encrypted.
+          
+          **Remediation:**
+          Note: Encryption cannot be enabled on existing RDS clusters. You must:
+          1. Create a snapshot of the cluster
+          2. Copy the snapshot with encryption enabled
+          3. Restore a new encrypted cluster from the encrypted snapshot
+          
+          ```bash
+          # Create snapshot
+          aws rds create-db-cluster-snapshot \
+            --db-cluster-snapshot-identifier {{ resource.DBClusterIdentifier }}-snapshot \
+            --db-cluster-identifier {{ resource.DBClusterIdentifier }}
+          
+          # Copy with encryption
+          aws rds copy-db-cluster-snapshot \
+            --source-db-cluster-snapshot-identifier {{ resource.DBClusterIdentifier }}-snapshot \
+            --target-db-cluster-snapshot-identifier {{ resource.DBClusterIdentifier }}-encrypted \
+            --kms-key-id <kms-key-id>
+          
+          # Restore encrypted cluster
+          aws rds restore-db-cluster-from-snapshot \
+            --db-cluster-identifier {{ resource.DBClusterIdentifier }}-encrypted \
+            --snapshot-identifier {{ resource.DBClusterIdentifier }}-encrypted \
+            --kms-key-id <kms-key-id>
+          ```
+        to:
+          - security-team@company.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+
+  # RDS database instance publicly accessible
+  - name: rds-instance-publicly-accessible
+    resource: aws.rds
+    description: Detect RDS database instances that are publicly accessible
+    
+    filters:
+      - type: value
+        key: PubliclyAccessible
+        value: true
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: RDS Instance Publicly Accessible - {{ region }}"
+        violation_desc: |
+          **RDS Database Instance Is Publicly Accessible**
+          
+          **Instance ID:** {{ resource.DBInstanceIdentifier }}
+          **Engine:** {{ resource.Engine }}
+          **Endpoint:** {{ resource.Endpoint.Address }}
+          **Port:** {{ resource.Endpoint.Port }}
+          
+          **Risk:** Database exposed to internet attacks and unauthorized access.
+          
+          **Remediation:**
+          ```bash
+          # Make instance private
+          aws rds modify-db-instance \
+            --db-instance-identifier {{ resource.DBInstanceIdentifier }} \
+            --no-publicly-accessible \
+            --apply-immediately
+          ```
+        to:
+          - security-team@company.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+      
+      - type: modify-db
+        publicly-accessible: false
+
+  # RDS snapshots accessible to public
+  - name: rds-snapshot-public
+    resource: aws.rds-snapshot
+    description: Detect RDS snapshots that are publicly accessible
+    
+    filters:
+      - type: cross-account
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: RDS Snapshot Publicly Accessible - {{ region }}"
+        violation_desc: |
+          **RDS Snapshot Is Publicly Accessible**
+          
+          **Snapshot ID:** {{ resource.DBSnapshotIdentifier }}
+          **DB Instance:** {{ resource.DBInstanceIdentifier }}
+          **Engine:** {{ resource.Engine }}
+          
+          **Risk:** Database backup exposed, may contain sensitive data.
+          
+          **Remediation:**
+          ```bash
+          # Remove public access
+          aws rds modify-db-snapshot-attribute \
+            --db-snapshot-identifier {{ resource.DBSnapshotIdentifier }} \
+            --attribute-name restore \
+            --values-to-remove all
+          ```
+        to:
+          - security-team@company.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+      
+      - type: set-permissions
+        remove-accounts: matched

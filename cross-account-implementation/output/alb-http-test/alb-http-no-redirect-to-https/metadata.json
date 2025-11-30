@@ -1,0 +1,119 @@
+{
+  "policy": {
+    "name": "alb-http-no-redirect-to-https",
+    "resource": "aws.app-elb",
+    "description": "Detect ALBs listening on port 80 without redirect to HTTPS (443).\nSecurity risk: Unencrypted HTTP traffic vulnerable to interception.\n",
+    "filters": [
+      {
+        "type": "listener",
+        "key": "Protocol",
+        "value": "HTTP"
+      },
+      {
+        "type": "listener",
+        "key": "DefaultActions[0].Type",
+        "value": "redirect",
+        "op": "ne"
+      },
+      {
+        "or": [
+          {
+            "type": "listener",
+            "key": "DefaultActions[0].RedirectConfig.Protocol",
+            "value": "HTTPS",
+            "op": "ne"
+          },
+          {
+            "type": "listener",
+            "key": "DefaultActions[0].RedirectConfig",
+            "value": "absent"
+          }
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "type": "notify",
+        "template": "default.html",
+        "priority_header": "2",
+        "subject": "\u26a0\ufe0f ALB HTTP Port 80 Without HTTPS Redirect - {{ region }}",
+        "violation_desc": "**Application Load Balancer Not Redirecting HTTP to HTTPS**\n\n**Load Balancer:** {{ resource.LoadBalancerName }}\n**ARN:** {{ resource.LoadBalancerArn }}\n**DNS:** {{ resource.DNSName }}\n**Scheme:** {{ resource.Scheme }}\n\n**Risk:** Allows unencrypted HTTP traffic, vulnerable to man-in-the-middle attacks.\n\n**Remediation:**\n```bash\n# Add redirect rule from HTTP to HTTPS\naws elbv2 modify-listener \\\n  --listener-arn <listener-arn> \\\n  --default-actions Type=redirect,RedirectConfig='{Protocol=HTTPS,Port=443,StatusCode=HTTP_301}'\n```\n",
+        "to": [
+          "security-team@company.com"
+        ],
+        "transport": {
+          "type": "sqs",
+          "queue": "https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue"
+        }
+      }
+    ]
+  },
+  "version": "0.9.47",
+  "execution": {
+    "id": "dcbcd745-e4b4-4d12-a689-191ffa51d3c4",
+    "start": 1764472959.537798,
+    "end_time": 1764472979.8176622,
+    "duration": 20.27986431121826
+  },
+  "config": {
+    "region": "us-east-1",
+    "regions": [
+      "us-east-1"
+    ],
+    "cache": "~/.cache/cloud-custodian.cache",
+    "profile": null,
+    "account_id": "813185901390",
+    "assume_role": null,
+    "session_policy": null,
+    "external_id": null,
+    "log_group": null,
+    "tracer": null,
+    "metrics_enabled": null,
+    "metrics": null,
+    "output_dir": "output/alb-http-test",
+    "cache_period": 15,
+    "dryrun": false,
+    "authorization_file": null,
+    "subparser": "run",
+    "config": null,
+    "configs": [
+      "policies/aws-alb-security.yml"
+    ],
+    "policy_filters": [],
+    "resource_types": [],
+    "verbose": null,
+    "quiet": null,
+    "debug": false,
+    "skip_validation": false,
+    "command": "c7n.commands.run",
+    "vars": null
+  },
+  "sys-stats": {},
+  "api-stats": {
+    "elasticloadbalancing.DescribeLoadBalancers": 1,
+    "elasticloadbalancing.DescribeTags": 1,
+    "elasticloadbalancing.DescribeListeners": 4,
+    "iam.ListAccountAliases": 1,
+    "sqs.SendMessage": 1
+  },
+  "metrics": [
+    {
+      "MetricName": "ResourceCount",
+      "Timestamp": "2025-11-30T03:22:53.344382",
+      "Value": 1,
+      "Unit": "Count"
+    },
+    {
+      "MetricName": "ResourceTime",
+      "Timestamp": "2025-11-30T03:22:53.344400",
+      "Value": 13.798288583755493,
+      "Unit": "Seconds"
+    },
+    {
+      "MetricName": "PolicyException",
+      "Timestamp": "2025-11-30T03:22:59.817646",
+      "Value": 1,
+      "Unit": "Count"
+    }
+  ]
+}

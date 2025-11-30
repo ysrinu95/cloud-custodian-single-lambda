@@ -1,0 +1,146 @@
+policies:
+  # IAM expired SSL/TLS certificates
+  - name: iam-expired-ssl-certificates
+    resource: aws.iam-certificate
+    description: Detect IAM SSL/TLS certificates that have expired
+    
+    filters:
+      - type: value
+        key: Expiration
+        value_type: expiration
+        value: 0
+        op: lte
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "2"
+        subject: "⚠️ IAM SSL/TLS Certificate Expired - Global"
+        violation_desc: |
+          **IAM SSL/TLS Certificate Has Expired**
+          
+          **Certificate Name:** {{ resource.ServerCertificateName }}
+          **Certificate ID:** {{ resource.ServerCertificateId }}
+          **Expiration Date:** {{ resource.Expiration }}
+          **Upload Date:** {{ resource.UploadDate }}
+          
+          **Risk:** Expired certificates can cause service disruptions.
+          
+          **Remediation:**
+          ```bash
+          # Upload new certificate
+          aws iam upload-server-certificate \
+            --server-certificate-name <new-cert-name> \
+            --certificate-body file://certificate.pem \
+            --private-key file://private-key.pem \
+            --certificate-chain file://certificate-chain.pem
+          
+          # Delete expired certificate (after updating services)
+          aws iam delete-server-certificate \
+            --server-certificate-name {{ resource.ServerCertificateName }}
+          ```
+        to:
+          - security-team@company.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+
+  # IAM user has both console and access keys
+  - name: iam-user-console-and-keys
+    resource: aws.iam-user
+    description: Detect IAM users with both console access and access keys (dual access)
+    
+    filters:
+      - type: credential
+        key: password_enabled
+        value: true
+      - type: credential
+        key: access_keys.active
+        value: true
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "3"
+        subject: "⚠️ IAM User Has Console and Access Keys - Global"
+        violation_desc: |
+          **IAM User Has Both Console Access and Access Keys**
+          
+          **User Name:** {{ resource.UserName }}
+          **User ARN:** {{ resource.Arn }}
+          **Created:** {{ resource.CreateDate }}
+          **Password Enabled:** Yes
+          **Active Access Keys:** {{ resource.c7n.AccessKeys | length }}
+          
+          **Risk:** Dual access increases attack surface. Consider separating human vs. programmatic access.
+          
+          **Recommendation:**
+          - Use SSO/Federation for console access
+          - Use service-specific IAM roles for applications
+          - Remove access keys if not needed
+          
+          ```bash
+          # List access keys
+          aws iam list-access-keys --user-name {{ resource.UserName }}
+          
+          # Deactivate access key if not needed
+          aws iam update-access-key \
+            --user-name {{ resource.UserName }} \
+            --access-key-id <key-id> \
+            --status Inactive
+          ```
+        to:
+          - security-team@company.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+
+  # IAM access keys not rotated for 365 days
+  - name: iam-access-keys-not-rotated
+    resource: aws.iam-user
+    description: Detect IAM users with access keys not rotated in 365 days
+    
+    filters:
+      - type: credential
+        key: access_keys.last_rotated
+        value_type: age
+        value: 365
+        op: gte
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "2"
+        subject: "⚠️ IAM Access Keys Not Rotated for 365 Days - Global"
+        violation_desc: |
+          **IAM Access Keys Not Rotated for 365+ Days**
+          
+          **User Name:** {{ resource.UserName }}
+          **User ARN:** {{ resource.Arn }}
+          **Access Key Age:** {{ resource.c7n.AccessKeys[0].c7n.age_days }} days
+          **Last Rotated:** {{ resource.c7n.AccessKeys[0].CreateDate }}
+          
+          **Risk:** Long-lived credentials increase risk of compromise.
+          
+          **Remediation:**
+          ```bash
+          # Create new access key
+          aws iam create-access-key --user-name {{ resource.UserName }}
+          
+          # Update applications with new key
+          # Then deactivate old key
+          aws iam update-access-key \
+            --user-name {{ resource.UserName }} \
+            --access-key-id <old-key-id> \
+            --status Inactive
+          
+          # After verification, delete old key
+          aws iam delete-access-key \
+            --user-name {{ resource.UserName }} \
+            --access-key-id <old-key-id>
+          ```
+        to:
+          - security-team@company.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue

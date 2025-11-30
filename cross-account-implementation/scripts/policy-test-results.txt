@@ -1,0 +1,72 @@
+========================================
+Cloud Custodian Policy Testing Report
+Test Date: Sun Nov 30 02:53:41 UTC 2025
+========================================
+
+========================================
+Policy File: aws-alb-security.yml
+----------------------------------------
+Number of policies: 5
+1. YAML Validation...
+./test-policies.sh: line 41: custodian: command not found
+✓ YAML validation: PASSED
+2. Dry-run execution...
+./test-policies.sh: line 47: custodian: command not found
+✓ Dry-run: PASSED
+
+========================================
+Policy File: aws-cloudfront-security.yml
+----------------------------------------
+Number of policies: 3
+1. YAML Validation...
+./test-policies.sh: line 41: custodian: command not found
+✓ YAML validation: PASSED
+2. Dry-run execution...
+./test-policies.sh: line 47: custodian: command not found
+✓ Dry-run: PASSED
+
+========================================
+Policy File: aws-container-security.yml
+----------------------------------------
+Number of policies: 3
+1. YAML Validation...
+./test-policies.sh: line 41: custodian: command not found
+✓ YAML validation: PASSED
+2. Dry-run execution...
+./test-policies.sh: line 47: custodian: command not found
+✓ Dry-run: PASSED
+
+========================================
+Policy File: aws-data-encryption.yml
+----------------------------------------
+Number of policies: 9
+1. YAML Validation...
+./test-policies.sh: line 41: custodian: command not found
+✓ YAML validation: PASSED
+2. Dry-run execution...
+./test-policies.sh: line 47: custodian: command not found
+✓ Dry-run: PASSED
+
+========================================
+Policy File: aws-ec2-security.yml
+----------------------------------------
+Number of policies: 6
+1. YAML Validation...
+./test-policies.sh: line 41: custodian: command not found
+✓ YAML validation: PASSED
+2. Dry-run execution...
+./test-policies.sh: line 47: custodian: command not found
+✓ Dry-run: PASSED
+
+========================================
+Policy File: aws-ec2-stop-public-instances.yml
+----------------------------------------
+========================================
+TEST SUMMARY
+========================================
+Total Policies: 26
+Valid Policies: 26
+Failed Policies: 0
+Success Rate: 100.00%
+
+[0;32mAll policies passed testing![0m

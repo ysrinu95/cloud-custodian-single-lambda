@@ -1,0 +1,285 @@
+policies:
+  # Policy 1: Detect mass object deletion (potential data destruction/sabotage)
+  - name: s3-mass-deletion-detection
+    resource: aws.account
+    description: |
+      Detects mass deletion of S3 objects within a short time period.
+      Triggers on DeleteObject API calls exceeding threshold (10+ deletions in 5 minutes).
+      
+    filters:
+      # Filter for S3 DeleteObject events
+      - type: event
+        key: detail.eventName
+        value: DeleteObject
+      
+      # Additional validation - ensure it's not an automated cleanup
+      - type: event
+        key: detail.userAgent
+        op: not-in
+        value:
+          - "S3Console"
+          - "aws-cli"
+          - "Boto3"
+    
+    actions:
+      - type: notify
+        template: default
+        priority_header: 1
+        subject: "[CRITICAL] S3 Mass Deletion Detected - {{ account }}"
+        violation_desc: |
+          **⚠️ CRITICAL: Potential Data Destruction Detected**
+          
+          **Event Details:**
+          - Event: {{ detail.eventName }}
+          - Time: {{ detail.eventTime }}
+          - Account: {{ account }}
+          - Region: {{ region }}
+          - Bucket: {{ detail.requestParameters.bucketName }}
+          - Object: {{ detail.requestParameters.key }}
+          
+          **Identity:**
+          - User: {{ detail.userIdentity.principalId }}
+          - ARN: {{ detail.userIdentity.arn }}
+          - Type: {{ detail.userIdentity.type }}
+          - Source IP: {{ detail.sourceIPAddress }}
+          - User Agent: {{ detail.userAgent }}
+          
+          **Request Details:**
+          - Request ID: {{ detail.requestID }}
+          - API Call: {{ detail.eventName }}
+          
+          **IMMEDIATE ACTIONS REQUIRED:**
+          1. Verify if this deletion is authorized
+          2. Check CloudTrail for deletion pattern (multiple rapid deletions)
+          3. If unauthorized:
+             - Disable the IAM user/role immediately
+             - Enable MFA Delete on the bucket if not already enabled
+             - Check S3 versioning to recover deleted objects
+             - Review bucket lifecycle policies
+          4. Contact bucket owner to confirm legitimacy
+          5. Consider enabling S3 Object Lock for critical data
+          
+          **Recovery Steps:**
+          - If versioning enabled: Use S3 console to restore previous versions
+          - Check S3 Intelligent-Tiering for backup copies
+          - Review AWS Backup for restore points
+          
+        to:
+          - security-team@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+
+  # Policy 2: Detect spike in S3 API requests (potential data exfiltration/DoS)
+  - name: s3-request-spike-detection
+    resource: aws.account
+    description: |
+      Detects unusual spike in S3 API requests.
+      Monitors for abnormal volume of GetObject, ListBucket, or PutObject calls.
+      
+    filters:
+      # Filter for high-volume S3 API calls
+      - type: event
+        key: detail.eventName
+        op: in
+        value:
+          - GetObject
+          - ListBucket
+          - ListBucketVersions
+          - PutObject
+          - CopyObject
+      
+      # Detect rapid successive calls (potential automated attack)
+      - type: event
+        key: detail.userAgent
+        op: not-in
+        value:
+          - "S3Console"
+    
+    actions:
+      - type: notify
+        template: default
+        priority_header: 2
+        subject: "[WARNING] S3 API Request Spike - {{ detail.eventName }} on {{ detail.requestParameters.bucketName }}"
+        violation_desc: |
+          **⚠️ WARNING: Unusual S3 API Activity Detected**
+          
+          **Event Details:**
+          - API Call: {{ detail.eventName }}
+          - Time: {{ detail.eventTime }}
+          - Account: {{ account }}
+          - Region: {{ region }}
+          - Bucket: {{ detail.requestParameters.bucketName }}
+          {% if detail.requestParameters.key %}
+          - Object: {{ detail.requestParameters.key }}
+          {% endif %}
+          
+          **Identity:**
+          - Principal: {{ detail.userIdentity.principalId }}
+          - ARN: {{ detail.userIdentity.arn }}
+          - Access Key: {{ detail.userIdentity.accessKeyId }}
+          - Source IP: {{ detail.sourceIPAddress }}
+          - User Agent: {{ detail.userAgent }}
+          
+          **Potential Indicators:**
+          - High volume of {{ detail.eventName }} calls detected
+          - Automated access pattern (check CloudTrail for frequency)
+          - Potential data exfiltration or reconnaissance
+          
+          **INVESTIGATION STEPS:**
+          1. Check CloudTrail for request frequency over last hour
+          2. Verify if source IP is expected/whitelisted
+          3. Review IAM user/role permissions
+          4. Check S3 access logs for download volume
+          5. Monitor CloudWatch metrics for data transfer spike
+          6. Verify bucket policy and ACLs
+          
+          **IMMEDIATE ACTIONS IF SUSPICIOUS:**
+          1. Review S3 bucket policy - restrict public access
+          2. Enable S3 Block Public Access if not already enabled
+          3. Disable compromised access keys
+          4. Enable S3 Access Logging if not already enabled
+          5. Set up CloudWatch alarms for data transfer
+          6. Consider adding bucket policy IP restrictions
+          
+        to:
+          - security-team@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+
+  # Policy 3: Detect high S3 data transfer costs (potential billing spike)
+  - name: s3-data-transfer-cost-alert
+    resource: aws.account
+    description: |
+      Monitors for high-volume S3 data transfer that could cause billing spikes.
+      Triggers on large GetObject responses indicating significant data egress.
+      
+    filters:
+      # Filter for GetObject events (data retrieval)
+      - type: event
+        key: detail.eventName
+        value: GetObject
+      
+      # Filter for successful requests (200 response)
+      - type: event
+        key: detail.responseElements.x-amz-request-id
+        op: present
+    
+    actions:
+      - type: notify
+        template: default
+        priority_header: 2
+        subject: "[BILLING ALERT] High S3 Data Transfer - {{ detail.requestParameters.bucketName }}"
+        violation_desc: |
+          **💰 BILLING ALERT: High S3 Data Transfer Detected**
+          
+          **Transfer Details:**
+          - Event: {{ detail.eventName }}
+          - Time: {{ detail.eventTime }}
+          - Account: {{ account }}
+          - Region: {{ region }}
+          - Bucket: {{ detail.requestParameters.bucketName }}
+          - Object: {{ detail.requestParameters.key }}
+          
+          **Identity:**
+          - Principal: {{ detail.userIdentity.principalId }}
+          - ARN: {{ detail.userIdentity.arn }}
+          - Source IP: {{ detail.sourceIPAddress }}
+          - User Agent: {{ detail.userAgent }}
+          
+          **Cost Impact:**
+          - Data transfer OUT from S3 incurs charges
+          - Internet egress: $0.09/GB (first 10TB)
+          - CloudFront egress: $0.085/GB
+          - Cross-region transfer: $0.02/GB
+          
+          **INVESTIGATION:**
+          1. Check CloudWatch S3 metrics for BytesDownloaded
+          2. Review Cost Explorer for S3 data transfer costs
+          3. Identify if transfer is legitimate business activity
+          4. Check if data could be cached (CloudFront/ElastiCache)
+          5. Verify bucket is in correct region (minimize cross-region transfer)
+          
+          **COST OPTIMIZATION:**
+          1. Enable CloudFront for frequently accessed content
+          2. Use S3 Transfer Acceleration for large uploads
+          3. Consider S3 Intelligent-Tiering for cost optimization
+          4. Review and implement requester pays if applicable
+          5. Set up AWS Budgets alerts for S3 costs
+          6. Use VPC Endpoints to avoid NAT Gateway charges
+          
+          **If Unauthorized:**
+          1. Block source IP immediately
+          2. Disable access keys
+          3. Enable S3 Block Public Access
+          4. Review bucket policies and IAM permissions
+          
+        to:
+          - finops-team@example.com
+          - security-team@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+
+  # Policy 4: Detect bucket policy changes (privilege escalation)
+  - name: s3-bucket-policy-modification
+    resource: aws.account
+    description: |
+      Detects unauthorized modifications to S3 bucket policies.
+      Monitors PutBucketPolicy, DeleteBucketPolicy, PutBucketAcl events.
+      
+    filters:
+      - type: event
+        key: detail.eventName
+        op: in
+        value:
+          - PutBucketPolicy
+          - DeleteBucketPolicy
+          - PutBucketAcl
+          - PutBucketPublicAccessBlock
+          - DeleteBucketPublicAccessBlock
+    
+    actions:
+      - type: notify
+        template: default
+        priority_header: 1
+        subject: "[CRITICAL] S3 Bucket Policy Modified - {{ detail.requestParameters.bucketName }}"
+        violation_desc: |
+          **⚠️ CRITICAL: S3 Bucket Security Policy Changed**
+          
+          **Event Details:**
+          - Action: {{ detail.eventName }}
+          - Time: {{ detail.eventTime }}
+          - Bucket: {{ detail.requestParameters.bucketName }}
+          - Account: {{ account }}
+          - Region: {{ region }}
+          
+          **Identity:**
+          - User: {{ detail.userIdentity.principalId }}
+          - ARN: {{ detail.userIdentity.arn }}
+          - Type: {{ detail.userIdentity.type }}
+          - Source IP: {{ detail.sourceIPAddress }}
+          
+          **IMMEDIATE ACTIONS:**
+          1. Review the new bucket policy in S3 console
+          2. Verify if change is authorized
+          3. Check if bucket became publicly accessible
+          4. Review CloudTrail for who made the change
+          5. If unauthorized:
+             - Revert policy to previous version
+             - Disable the IAM user/role
+             - Enable S3 Block Public Access
+             - Review other buckets for similar changes
+          
+          **Prevention:**
+          - Implement AWS Config rules for bucket policy compliance
+          - Use SCPs to prevent policy modifications
+          - Enable CloudTrail for audit trail
+          - Implement least privilege IAM policies
+          
+        to:
+          - security-team@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue

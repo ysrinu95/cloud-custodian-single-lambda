@@ -1,0 +1,33 @@
+[
+  {
+    "LoadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:813185901390:loadbalancer/app/test-alb-http-no-redirect/1792b8c2583dacf1",
+    "DNSName": "test-alb-http-no-redirect-2015349377.us-east-1.elb.amazonaws.com",
+    "CanonicalHostedZoneId": "Z35SXDOTRQ7X7K",
+    "CreatedTime": "2025-11-30T03:15:27.815000+00:00",
+    "LoadBalancerName": "test-alb-http-no-redirect",
+    "Scheme": "internet-facing",
+    "VpcId": "vpc-030f7ab8b8c30cba3",
+    "State": {
+      "Code": "active"
+    },
+    "Type": "application",
+    "AvailabilityZones": [
+      {
+        "ZoneName": "us-east-1a",
+        "SubnetId": "subnet-03e39fec89a61a086",
+        "LoadBalancerAddresses": []
+      },
+      {
+        "ZoneName": "us-east-1b",
+        "SubnetId": "subnet-0da92b2edcb4b0264",
+        "LoadBalancerAddresses": []
+      }
+    ],
+    "SecurityGroups": [
+      "sg-03ee44e18b2777491"
+    ],
+    "IpAddressType": "ipv4",
+    "EnablePrefixForIpv6SourceNat": "off",
+    "Tags": []
+  }
+]

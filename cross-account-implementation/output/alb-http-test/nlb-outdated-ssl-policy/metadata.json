@@ -1,0 +1,97 @@
+{
+  "policy": {
+    "name": "nlb-outdated-ssl-policy",
+    "resource": "aws.app-elb",
+    "description": "Detect Network Load Balancers not using the latest predefined security policy",
+    "filters": [
+      {
+        "type": "value",
+        "key": "Type",
+        "value": "network"
+      },
+      {
+        "type": "listener",
+        "key": "Protocol",
+        "value": "TLS"
+      },
+      {
+        "type": "listener",
+        "key": "SslPolicy",
+        "value": "ELBSecurityPolicy-TLS13-1-2-2021-06",
+        "op": "ne"
+      }
+    ],
+    "actions": [
+      {
+        "type": "notify",
+        "template": "default.html",
+        "priority_header": "2",
+        "subject": "\u26a0\ufe0f NLB Using Outdated SSL Policy - {{ region }}",
+        "violation_desc": "**Network Load Balancer Using Outdated SSL/TLS Policy**\n\n**Load Balancer:** { resource.LoadBalancerName }\n**Current SSL Policy:** { resource.Listeners[?Protocol=='TLS'].SslPolicy | [0] }\n**Recommended:** ELBSecurityPolicy-TLS13-1-2-2021-06\n\n**Remediation:**\n```bash\naws elbv2 modify-listener \\\n  --listener-arn <listener-arn> \\\n  --ssl-policy ELBSecurityPolicy-TLS13-1-2-2021-06\n```\n",
+        "to": [
+          "security-team@company.com"
+        ],
+        "transport": {
+          "type": "sqs",
+          "queue": "https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue"
+        }
+      }
+    ]
+  },
+  "version": "0.9.47",
+  "execution": {
+    "id": "c3bee03c-dca0-4905-9f34-4320001225ff",
+    "start": 1764472990.66402,
+    "end_time": 1764472990.6793902,
+    "duration": 0.01537013053894043
+  },
+  "config": {
+    "region": "us-east-1",
+    "regions": [
+      "us-east-1"
+    ],
+    "cache": "~/.cache/cloud-custodian.cache",
+    "profile": null,
+    "account_id": "813185901390",
+    "assume_role": null,
+    "session_policy": null,
+    "external_id": null,
+    "log_group": null,
+    "tracer": null,
+    "metrics_enabled": null,
+    "metrics": null,
+    "output_dir": "output/alb-http-test",
+    "cache_period": 15,
+    "dryrun": false,
+    "authorization_file": null,
+    "subparser": "run",
+    "config": null,
+    "configs": [
+      "policies/aws-alb-security.yml"
+    ],
+    "policy_filters": [],
+    "resource_types": [],
+    "verbose": null,
+    "quiet": null,
+    "debug": false,
+    "skip_validation": false,
+    "command": "c7n.commands.run",
+    "vars": null
+  },
+  "sys-stats": {},
+  "api-stats": {},
+  "metrics": [
+    {
+      "MetricName": "ResourceCount",
+      "Timestamp": "2025-11-30T03:23:10.674285",
+      "Value": 0,
+      "Unit": "Count"
+    },
+    {
+      "MetricName": "ResourceTime",
+      "Timestamp": "2025-11-30T03:23:10.674292",
+      "Value": 0.0006551742553710938,
+      "Unit": "Seconds"
+    }
+  ]
+}

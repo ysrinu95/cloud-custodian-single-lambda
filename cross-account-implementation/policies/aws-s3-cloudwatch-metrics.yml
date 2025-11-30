@@ -1,0 +1,454 @@
+policies:
+  - name: s3-delete-requests-spike-alarm
+    resource: aws.account
+    description: |
+      Detect spike in S3 DELETE requests across all buckets using CloudWatch metrics.
+      Triggers when DeleteObject requests exceed threshold (e.g., >100 requests in 5 minutes).
+      Indicates potential mass deletion attack or data destruction attempt.
+    
+    filters:
+      - type: event
+        key: detail.alarmName
+        op: regex
+        value: "^S3-Delete-Requests-High-.*"
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: S3 Delete Requests Spike Detected - Account {{ account_id }}"
+        violation_desc: |
+          **CRITICAL ALERT: Unusual S3 Delete Request Activity**
+          
+          **Alarm Details:**
+          - Alarm Name: {{ event.detail.alarmName }}
+          - State: {{ event.detail.state.value }}
+          - Reason: {{ event.detail.state.reason }}
+          - Timestamp: {{ event.detail.state.timestamp }}
+          - Region: {{ region }}
+          - Account: {{ account_id }}
+          
+          **Metric Information:**
+          - Namespace: AWS/S3
+          - Metric: NumberOfObjects (DELETE operations)
+          - Threshold Breached: {{ event.detail.configuration.metrics[0].metricStat.metric.dimensions }}
+          
+          **What This Means:**
+          An abnormally high number of S3 DELETE requests has been detected. This could indicate:
+          - Mass deletion attack by compromised credentials
+          - Malicious insider activity (data destruction)
+          - Ransomware attempting to delete backups
+          - Misconfigured automation script
+          - Account compromise with data sabotage intent
+          
+          **Immediate Actions Required:**
+          1. **Investigate Source:**
+             ```bash
+             # Check CloudTrail for DeleteObject events in last hour
+             aws cloudtrail lookup-events \
+               --lookup-attributes AttributeKey=EventName,AttributeValue=DeleteObject \
+               --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S) \
+               --max-results 50
+             
+             # Group by user identity
+             aws cloudtrail lookup-events \
+               --lookup-attributes AttributeKey=EventName,AttributeValue=DeleteObject \
+               --query 'Events[].{User:Username,Time:EventTime,Bucket:Resources[0].ResourceName}' \
+               --output table
+             ```
+          
+          2. **Review Deleted Objects:**
+             ```bash
+             # Check specific bucket for recent deletions (if versioning enabled)
+             aws s3api list-object-versions \
+               --bucket <bucket-name> \
+               --query 'DeleteMarkers[?LastModified>=`$(date -u -d "1 hour ago" +%Y-%m-%d)`]'
+             ```
+          
+          3. **Suspend Compromised Credentials:**
+             ```bash
+             # If suspicious user identified, disable access key
+             aws iam update-access-key \
+               --access-key-id <key-id> \
+               --status Inactive \
+               --user-name <username>
+             
+             # Attach deny-all policy to compromised role
+             aws iam attach-role-policy \
+               --role-name <role-name> \
+               --policy-arn arn:aws:iam::aws:policy/AWSDenyAll
+             ```
+          
+          4. **Enable Versioning & MFA Delete (Prevention):**
+             ```bash
+             # Enable versioning on critical buckets
+             aws s3api put-bucket-versioning \
+               --bucket <bucket-name> \
+               --versioning-configuration Status=Enabled,MFADelete=Enabled \
+               --mfa "<mfa-serial> <mfa-code>"
+             ```
+          
+          5. **Restore Deleted Objects (If Versioning Enabled):**
+             ```bash
+             # List delete markers
+             aws s3api list-object-versions \
+               --bucket <bucket-name> \
+               --query 'DeleteMarkers[].{Key:Key,VersionId:VersionId}'
+             
+             # Remove delete markers to restore objects
+             aws s3api delete-object \
+               --bucket <bucket-name> \
+               --key <object-key> \
+               --version-id <delete-marker-version-id>
+             ```
+          
+          **Prevention Measures:**
+          - Enable S3 Versioning on all critical buckets
+          - Enable MFA Delete for production buckets
+          - Implement S3 Object Lock (WORM protection)
+          - Use AWS Backup for point-in-time recovery
+          - Restrict DeleteObject permissions with SCPs
+          - Enable GuardDuty S3 Protection for anomaly detection
+          
+          **Contact:** Security Operations Team
+        action_desc: |
+          Automated Response: Alert sent to security team for investigation.
+          Manual review required to determine if deletions are authorized.
+        to:
+          - cloud-custodian-alerts@company.com
+          - security-team@company.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+
+  - name: s3-data-transfer-cost-spike-alarm
+    resource: aws.account
+    description: |
+      Detect spike in S3 data transfer costs using CloudWatch billing metrics.
+      Triggers when BytesDownloaded metric indicates excessive egress (potential exfiltration).
+      Monitors both internet data transfer and cross-region costs.
+    
+    filters:
+      - type: event
+        key: detail.alarmName
+        op: regex
+        value: "^S3-DataTransfer-Cost-High-.*"
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "2"
+        subject: "💰 HIGH: S3 Data Transfer Cost Spike - Account {{ account_id }}"
+        violation_desc: |
+          **HIGH PRIORITY: Unusual S3 Data Transfer Cost Activity**
+          
+          **Alarm Details:**
+          - Alarm Name: {{ event.detail.alarmName }}
+          - State: {{ event.detail.state.value }}
+          - Reason: {{ event.detail.state.reason }}
+          - Timestamp: {{ event.detail.state.timestamp }}
+          - Region: {{ region }}
+          - Account: {{ account_id }}
+          
+          **Cost Impact:**
+          - Metric: AWS/S3 BytesDownloaded
+          - Current Value: {{ event.detail.state.reasonData }}
+          - Data Transfer Pricing:
+            * Internet OUT: $0.09/GB (first 10TB), $0.085/GB (next 40TB)
+            * Cross-Region: $0.02/GB
+            * CloudFront: $0.085/GB (internet OUT)
+          
+          **What This Means:**
+          An abnormally high volume of S3 data transfer has been detected. This could indicate:
+          - Data exfiltration by compromised credentials
+          - Unauthorized data download by malicious actor
+          - Misconfigured application downloading excessive data
+          - Unexpected traffic spike (legitimate or not)
+          - Cost optimization issue (inefficient data access patterns)
+          
+          **Immediate Investigation Steps:**
+          1. **Identify Source of Data Transfer:**
+             ```bash
+             # Check S3 access logs for GetObject requests
+             aws s3api get-bucket-logging --bucket <bucket-name>
+             
+             # Analyze CloudTrail for GetObject events (last 2 hours)
+             aws cloudtrail lookup-events \
+               --lookup-attributes AttributeKey=EventName,AttributeValue=GetObject \
+               --start-time $(date -u -d '2 hours ago' +%Y-%m-%dT%H:%M:%S) \
+               --query 'Events[].{User:Username,Time:EventTime,IP:CloudTrailEvent}' \
+               --output table
+             ```
+          
+          2. **Check S3 Server Access Logs (if enabled):**
+             ```bash
+             # Download and analyze S3 access logs
+             aws s3 sync s3://<log-bucket>/<prefix>/ ./s3-logs/
+             
+             # Parse logs for high-volume transfers
+             grep "REST.GET.OBJECT" ./s3-logs/*.log | \
+               awk '{print $8, $NF}' | \
+               sort | uniq -c | sort -rn | head -20
+             ```
+          
+          3. **Review CloudWatch Metrics:**
+             ```bash
+             # Get BytesDownloaded metric for specific bucket
+             aws cloudwatch get-metric-statistics \
+               --namespace AWS/S3 \
+               --metric-name BytesDownloaded \
+               --dimensions Name=BucketName,Value=<bucket-name> \
+               --start-time $(date -u -d '6 hours ago' +%Y-%m-%dT%H:%M:%S) \
+               --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+               --period 3600 \
+               --statistics Sum \
+               --output table
+             ```
+          
+          4. **Check for Compromised Credentials:**
+             ```bash
+             # Review IAM credential usage
+             aws iam generate-credential-report
+             sleep 10
+             aws iam get-credential-report --output text | base64 -d > credential-report.csv
+             
+             # Check for unusual IP addresses in CloudTrail
+             aws cloudtrail lookup-events \
+               --lookup-attributes AttributeKey=ResourceType,AttributeValue=AWS::S3::Object \
+               --query 'Events[].CloudTrailEvent' | \
+               jq -r '.[] | fromjson | .sourceIPAddress' | sort | uniq -c
+             ```
+          
+          5. **Suspend Suspicious Activity:**
+             ```bash
+             # Block specific IP at bucket policy level
+             aws s3api put-bucket-policy --bucket <bucket-name> --policy '{
+               "Version": "2012-10-17",
+               "Statement": [{
+                 "Effect": "Deny",
+                 "Principal": "*",
+                 "Action": "s3:GetObject",
+                 "Resource": "arn:aws:s3:::<bucket-name>/*",
+                 "Condition": {
+                   "IpAddress": {"aws:SourceIp": ["<suspicious-ip>"]}
+                 }
+               }]
+             }'
+             
+             # Disable compromised access key
+             aws iam update-access-key \
+               --access-key-id <key-id> \
+               --status Inactive
+             ```
+          
+          **Cost Optimization Actions (If Legitimate Traffic):**
+          1. **Enable CloudFront for static content:**
+             - Reduces data transfer costs from $0.09/GB to $0.085/GB
+             - Improves performance with edge caching
+             - Reduces origin load on S3
+          
+          2. **Use VPC Endpoints for internal traffic:**
+             ```bash
+             # Create VPC endpoint for S3 (no data transfer charges)
+             aws ec2 create-vpc-endpoint \
+               --vpc-id <vpc-id> \
+               --service-name com.amazonaws.us-east-1.s3 \
+               --route-table-ids <route-table-id>
+             ```
+          
+          3. **Review S3 Intelligent-Tiering:**
+             - Move infrequently accessed data to cheaper storage classes
+             - Implement lifecycle policies
+          
+          4. **Enable S3 Request Metrics:**
+             ```bash
+             # Enable detailed request metrics
+             aws s3api put-bucket-metrics-configuration \
+               --bucket <bucket-name> \
+               --id EntireBucket \
+               --metrics-configuration Id=EntireBucket,Filter={}
+             ```
+          
+          **Prevention Measures:**
+          - Enable S3 Access Logging on all buckets
+          - Implement S3 bucket policies with IP restrictions
+          - Use VPC endpoints for internal AWS traffic
+          - Enable CloudWatch alarms on BytesDownloaded metric
+          - Implement AWS Budgets for cost anomaly detection
+          - Use GuardDuty for automated threat detection
+          
+          **Next Steps:**
+          1. Investigate root cause within 30 minutes
+          2. Document findings in incident ticket
+          3. If malicious activity confirmed, initiate IR protocol
+          4. Review and update access policies to prevent recurrence
+          
+          **Contact:** Billing Team & Security Operations
+        action_desc: |
+          Automated Response: Alert sent to billing and security teams.
+          Manual cost impact assessment required.
+        to:
+          - cloud-custodian-alerts@company.com
+          - billing-team@company.com
+          - security-team@company.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+
+  - name: s3-bucket-size-growth-alarm
+    resource: aws.account
+    description: |
+      Detect unusual S3 bucket size growth using CloudWatch metrics.
+      Triggers when BucketSizeBytes metric increases abnormally fast.
+      May indicate data staging for exfiltration or unauthorized uploads.
+    
+    filters:
+      - type: event
+        key: detail.alarmName
+        op: regex
+        value: "^S3-BucketSize-Growth-.*"
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "3"
+        subject: "⚠️ WARNING: S3 Bucket Size Growth Anomaly - Account {{ account_id }}"
+        violation_desc: |
+          **WARNING: Unusual S3 Bucket Size Growth Detected**
+          
+          **Alarm Details:**
+          - Alarm Name: {{ event.detail.alarmName }}
+          - State: {{ event.detail.state.value }}
+          - Reason: {{ event.detail.state.reason }}
+          - Timestamp: {{ event.detail.state.timestamp }}
+          - Region: {{ region }}
+          - Account: {{ account_id }}
+          
+          **Metric Information:**
+          - Namespace: AWS/S3
+          - Metric: BucketSizeBytes
+          - Storage Type: StandardStorage
+          
+          **What This Means:**
+          Rapid bucket size growth detected. Possible causes:
+          - Data staging for exfiltration (upload then download)
+          - Unauthorized file uploads by compromised credentials
+          - Legitimate business activity (data migration, backups)
+          - Application malfunction (log accumulation, temp files)
+          - Crypto-mining malware storing data
+          
+          **Investigation Steps:**
+          1. **Check Recent PutObject Activity:**
+             ```bash
+             # CloudTrail lookup for recent uploads
+             aws cloudtrail lookup-events \
+               --lookup-attributes AttributeKey=EventName,AttributeValue=PutObject \
+               --start-time $(date -u -d '4 hours ago' +%Y-%m-%dT%H:%M:%S) \
+               --max-results 100 \
+               --query 'Events[].{User:Username,Time:EventTime,Size:CloudTrailEvent}' \
+               --output table
+             ```
+          
+          2. **Review Bucket Inventory:**
+             ```bash
+             # List largest objects in bucket
+             aws s3api list-objects-v2 \
+               --bucket <bucket-name> \
+               --query 'reverse(sort_by(Contents,&Size))[:20].{Key:Key,Size:Size,Modified:LastModified}' \
+               --output table
+             
+             # Get total bucket size
+             aws s3 ls s3://<bucket-name> --recursive --human-readable --summarize
+             ```
+          
+          3. **Check for Unauthorized Access:**
+             ```bash
+             # Review bucket policy and ACLs
+             aws s3api get-bucket-policy --bucket <bucket-name>
+             aws s3api get-bucket-acl --bucket <bucket-name>
+             
+             # Check for public access
+             aws s3api get-public-access-block --bucket <bucket-name>
+             ```
+          
+          **Remediation Actions:**
+          - Review and restrict PutObject permissions
+          - Enable S3 Versioning to track changes
+          - Implement lifecycle policies to auto-delete old data
+          - Set up S3 Storage Lens for visibility
+          - Enable S3 Inventory for regular audits
+          
+          **Contact:** Operations Team & Security
+        action_desc: |
+          Automated Response: Monitoring alert sent to operations team.
+        to:
+          - cloud-custodian-alerts@company.com
+          - operations-team@company.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+
+  - name: s3-4xx-error-spike-alarm
+    resource: aws.account
+    description: |
+      Detect spike in S3 4xx errors (access denied, not found) using CloudWatch metrics.
+      High 4xx error rates may indicate reconnaissance activity or permission issues.
+    
+    filters:
+      - type: event
+        key: detail.alarmName
+        op: regex
+        value: "^S3-4xxErrors-High-.*"
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "3"
+        subject: "⚠️ WARNING: S3 4xx Errors Spike Detected - Account {{ account_id }}"
+        violation_desc: |
+          **WARNING: Elevated S3 4xx Error Rate**
+          
+          **Alarm Details:**
+          - Alarm Name: {{ event.detail.alarmName }}
+          - State: {{ event.detail.state.value }}
+          - Reason: {{ event.detail.state.reason }}
+          - Timestamp: {{ event.detail.state.timestamp }}
+          - Region: {{ region }}
+          - Account: {{ account_id }}
+          
+          **What This Means:**
+          High volume of S3 4xx errors detected. Common causes:
+          - **403 Forbidden**: Reconnaissance by attacker probing access
+          - **404 Not Found**: Attacker enumerating bucket contents
+          - **400 Bad Request**: Misconfigured application or API abuse
+          - Legitimate application permission issues
+          
+          **Investigation Steps:**
+          ```bash
+          # Check S3 access logs for 4xx errors
+          grep " 4[0-9][0-9] " ./s3-logs/*.log | \
+            awk '{print $3, $8, $9}' | \
+            sort | uniq -c | sort -rn
+          
+          # Review CloudTrail for denied API calls
+          aws cloudtrail lookup-events \
+            --lookup-attributes AttributeKey=ResourceType,AttributeValue=AWS::S3::Bucket \
+            --query 'Events[?ErrorCode!=`null`]' \
+            --output table
+          ```
+          
+          **Remediation:**
+          - Review and update IAM policies if legitimate access denied
+          - Block suspicious IPs in bucket policy if reconnaissance detected
+          - Enable GuardDuty for automated threat detection
+          - Review CloudTrail for access patterns
+          
+          **Contact:** Security Operations
+        action_desc: |
+          Automated Response: Security team alerted for investigation.
+        to:
+          - cloud-custodian-alerts@company.com
+          - security-team@company.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue

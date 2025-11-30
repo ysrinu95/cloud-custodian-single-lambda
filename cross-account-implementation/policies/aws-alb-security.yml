@@ -1,0 +1,215 @@
+policies:
+  # ALB listening on port 80 without redirect to HTTPS - realtime/periodic
+  - name: alb-http-no-redirect-to-https
+    resource: aws.app-elb
+    description: |
+      Detect ALBs listening on port 80 without redirect to HTTPS (443).
+      Security risk: Unencrypted HTTP traffic vulnerable to interception.
+    
+    filters:
+      - type: listener
+        key: Protocol
+        value: HTTP
+      - type: listener
+        key: DefaultActions[0].Type
+        value: redirect
+        op: ne
+      - or:
+        - type: listener
+          key: DefaultActions[0].RedirectConfig.Protocol
+          value: HTTPS
+          op: ne
+        - type: listener
+          key: DefaultActions[0].RedirectConfig
+          value: absent
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "2"
+        subject: "⚠️ ALB HTTP Port 80 Without HTTPS Redirect - {{ region }}"
+        violation_desc: |
+          **Application Load Balancer Not Redirecting HTTP to HTTPS**
+          
+          **Load Balancer:** {{ resource.LoadBalancerName }}
+          **ARN:** {{ resource.LoadBalancerArn }}
+          **DNS:** {{ resource.DNSName }}
+          **Scheme:** {{ resource.Scheme }}
+          
+          **Risk:** Allows unencrypted HTTP traffic, vulnerable to man-in-the-middle attacks.
+          
+          **Remediation:**
+          ```bash
+          # Add redirect rule from HTTP to HTTPS
+          aws elbv2 modify-listener \
+            --listener-arn <listener-arn> \
+            --default-actions Type=redirect,RedirectConfig='{Protocol=HTTPS,Port=443,StatusCode=HTTP_301}'
+          ```
+        to:
+          - security-team@company.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+
+  # ALB not using latest predefined security policy - realtime/periodic
+  - name: alb-outdated-ssl-policy
+    resource: aws.app-elb
+    description: Detect ALBs not using the latest predefined security policy (ELBSecurityPolicy-TLS13-1-2-2021-06)
+    
+    filters:
+      - type: listener
+        key: Protocol
+        value: HTTPS
+      - type: listener
+        key: SslPolicy
+        value: ELBSecurityPolicy-TLS13-1-2-2021-06
+        op: ne
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "2"
+        subject: "⚠️ ALB Using Outdated SSL Policy - {{ region }}"
+        violation_desc: |
+          **Application Load Balancer Using Outdated SSL/TLS Policy**
+          
+          **Load Balancer:** {{ resource.LoadBalancerName }}
+          **Current SSL Policy:** {{ resource.Listeners[?Protocol=='HTTPS'].SslPolicy | [0] }}
+          **Recommended:** ELBSecurityPolicy-TLS13-1-2-2021-06
+          
+          **Remediation:**
+          ```bash
+          aws elbv2 modify-listener \
+            --listener-arn <listener-arn> \
+            --ssl-policy ELBSecurityPolicy-TLS13-1-2-2021-06
+          ```
+        to:
+          - security-team@company.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+
+  # ELB access logging not to central bucket - cloudtrail/periodic
+  - name: elb-logging-not-central-bucket
+    resource: aws.elb
+    description: Detect Classic ELBs with access logging enabled but not to central logging bucket
+    
+    filters:
+      - type: value
+        key: Attributes.AccessLog.Enabled
+        value: true
+      - not:
+        - type: value
+          key: Attributes.AccessLog.S3BucketName
+          op: regex
+          value: "^lp-cl.*"
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "3"
+        subject: "⚠️ ELB Logging Not to Central Bucket - {{ region }}"
+        violation_desc: |
+          **Classic ELB Access Logging Not to Central Bucket**
+          
+          **Load Balancer:** {{ resource.LoadBalancerName }}
+          **Current Logging Bucket:** {{ resource.Attributes.AccessLog.S3BucketName }}
+          **Required Prefix:** lp-cl*
+          
+          **Remediation:**
+          ```bash
+          aws elb modify-load-balancer-attributes \
+            --load-balancer-name {{ resource.LoadBalancerName }} \
+            --load-balancer-attributes AccessLog={Enabled=true,S3BucketName=lp-cl-logging-bucket,S3BucketPrefix=service=elb}
+          ```
+        to:
+          - compliance-team@company.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+
+  # ELBv2 with listener TLS not configured - cloudtrail/periodic
+  - name: elbv2-no-tls-listener
+    resource: aws.app-elb
+    description: Detect Application/Network Load Balancers without TLS listener configured
+    
+    filters:
+      - not:
+        - type: listener
+          key: Protocol
+          value: HTTPS
+      - not:
+        - type: listener
+          key: Protocol
+          value: TLS
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "2"
+        subject: "⚠️ ELBv2 Missing TLS Listener - {{ region }}"
+        violation_desc: |
+          **Load Balancer Without TLS/HTTPS Listener**
+          
+          **Load Balancer:** {{ resource.LoadBalancerName }}
+          **Type:** {{ resource.Type }}
+          **Available Listeners:** {{ resource.Listeners[*].Protocol }}
+          
+          **Risk:** All traffic is unencrypted, vulnerable to interception.
+          
+          **Remediation:**
+          ```bash
+          aws elbv2 create-listener \
+            --load-balancer-arn {{ resource.LoadBalancerArn }} \
+            --protocol HTTPS \
+            --port 443 \
+            --certificates CertificateArn=<cert-arn> \
+            --ssl-policy ELBSecurityPolicy-TLS13-1-2-2021-06 \
+            --default-actions Type=forward,TargetGroupArn=<target-group-arn>
+          ```
+        to:
+          - security-team@company.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+
+  # NLB not using latest predefined security policy - periodic
+  - name: nlb-outdated-ssl-policy
+    resource: aws.app-elb
+    description: Detect Network Load Balancers not using the latest predefined security policy
+    
+    filters:
+      - type: value
+        key: Type
+        value: network
+      - type: listener
+        key: Protocol
+        value: TLS
+      - type: listener
+        key: SslPolicy
+        value: ELBSecurityPolicy-TLS13-1-2-2021-06
+        op: ne
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "2"
+        subject: "⚠️ NLB Using Outdated SSL Policy - {{ region }}"
+        violation_desc: |
+          **Network Load Balancer Using Outdated SSL/TLS Policy**
+          
+          **Load Balancer:** {{ resource.LoadBalancerName }}
+          **Current SSL Policy:** {{ resource.Listeners[?Protocol=='TLS'].SslPolicy | [0] }}
+          **Recommended:** ELBSecurityPolicy-TLS13-1-2-2021-06
+          
+          **Remediation:**
+          ```bash
+          aws elbv2 modify-listener \
+            --listener-arn <listener-arn> \
+            --ssl-policy ELBSecurityPolicy-TLS13-1-2-2021-06
+          ```
+        to:
+          - security-team@company.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
