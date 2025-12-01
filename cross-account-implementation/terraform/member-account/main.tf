@@ -73,7 +73,7 @@ resource "aws_cloudwatch_event_target" "central_bus_security_events" {
   target_id = "SendToCentralBus"
   arn       = var.central_event_bus_arn
   role_arn  = aws_iam_role.eventbridge_cross_account.arn
-  
+
   depends_on = [aws_cloudwatch_event_rule.forward_security_events_to_central]
 }
 
