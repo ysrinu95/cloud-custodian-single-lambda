@@ -23,17 +23,41 @@ provider "aws" {
 # Data source to get current AWS account ID
 data "aws_caller_identity" "current" {}
 
-# EventBridge Rule - Forward EC2 events to central account
-resource "aws_cloudwatch_event_rule" "forward_to_central" {
+# EventBridge Rule - Forward all security events to central account (consolidated)
+resource "aws_cloudwatch_event_rule" "forward_security_events_to_central" {
   name        = "forward-security-events-to-central-${var.environment}"
-  description = "Forward security events from this member account to central security account"
+  description = "Forward all security events (CloudTrail, SecurityHub, GuardDuty) to central account"
 
   event_pattern = jsonencode({
-    source      = ["aws.ec2"]
-    detail-type = ["AWS API Call via CloudTrail"]
-    detail = {
-      eventName = ["RunInstances"]
-    }
+    "$or" = [
+      {
+        detail-type = ["AWS API Call via CloudTrail"]
+        detail = {
+          "$or" = [
+            {
+              eventSource = ["ec2.amazonaws.com"]
+              eventName   = ["RunInstances", "ModifyImageAttribute", "CreateImage", "CopyImage"]
+            },
+            {
+              eventSource = ["elasticloadbalancing.amazonaws.com"]
+              eventName   = ["CreateLoadBalancer", "CreateListener", "ModifyListener", "ModifyLoadBalancerAttributes", "DeleteLoadBalancer", "DeleteListener"]
+            },
+            {
+              eventSource = ["s3.amazonaws.com"]
+              eventName   = ["CreateBucket", "PutBucketPolicy", "PutBucketAcl", "PutBucketPublicAccessBlock", "DeleteBucketPublicAccessBlock", "PutBucketEncryption", "DeleteBucketEncryption"]
+            }
+          ]
+        }
+      },
+      {
+        source      = ["aws.securityhub"]
+        detail-type = ["Security Hub Findings - Imported"]
+      },
+      {
+        source      = ["aws.guardduty"]
+        detail-type = ["GuardDuty Finding"]
+      }
+    ]
   })
 
   tags = {
@@ -43,157 +67,9 @@ resource "aws_cloudwatch_event_rule" "forward_to_central" {
   }
 }
 
-# EventBridge Rule - Forward SecurityHub findings to central account
-resource "aws_cloudwatch_event_rule" "forward_securityhub_to_central" {
-  name        = "forward-securityhub-to-central-${var.environment}"
-  description = "Forward SecurityHub findings from this member account to central security account"
-
-  event_pattern = jsonencode({
-    source      = ["aws.securityhub"]
-    detail-type = ["Security Hub Findings - Imported"]
-  })
-
-  tags = {
-    Name        = "Forward SecurityHub Findings to Central Account"
-    Environment = var.environment
-    ManagedBy   = "Terraform"
-  }
-}
-
-# EventBridge Rule - Forward GuardDuty findings directly to central account (real-time)
-resource "aws_cloudwatch_event_rule" "forward_guardduty_to_central" {
-  name        = "forward-guardduty-to-central-${var.environment}"
-  description = "Forward GuardDuty findings directly to central account for real-time detection"
-
-  event_pattern = jsonencode({
-    source      = ["aws.guardduty"]
-    detail-type = ["GuardDuty Finding"]
-  })
-
-  tags = {
-    Name        = "Forward GuardDuty Findings to Central Account"
-    Environment = var.environment
-    ManagedBy   = "Terraform"
-  }
-}
-
-# EventBridge Rule - Forward ALB CloudTrail events to central account
-resource "aws_cloudwatch_event_rule" "forward_alb_cloudtrail_to_central" {
-  name        = "forward-alb-cloudtrail-to-central-${var.environment}"
-  description = "Forward ALB CloudTrail events from this member account to central security account"
-
-  event_pattern = jsonencode({
-    source      = ["aws.elasticloadbalancing"]
-    detail-type = ["AWS API Call via CloudTrail"]
-    detail = {
-      eventName = [
-        "CreateLoadBalancer",
-        "CreateListener",
-        "ModifyListener",
-        "ModifyLoadBalancerAttributes",
-        "DeleteLoadBalancer",
-        "DeleteListener"
-      ]
-    }
-  })
-
-  tags = {
-    Name        = "Forward ALB CloudTrail Events to Central Account"
-    Environment = var.environment
-    ManagedBy   = "Terraform"
-  }
-}
-
-# EventBridge Rule - Forward EC2 AMI CloudTrail events to central account
-resource "aws_cloudwatch_event_rule" "forward_ec2_ami_cloudtrail_to_central" {
-  name        = "forward-ec2-ami-cloudtrail-to-central-${var.environment}"
-  description = "Forward EC2 AMI CloudTrail events from this member account to central security account"
-
-  event_pattern = jsonencode({
-    source      = ["aws.ec2"]
-    detail-type = ["AWS API Call via CloudTrail"]
-    detail = {
-      eventName = [
-        "ModifyImageAttribute",
-        "CreateImage",
-        "CopyImage"
-      ]
-    }
-  })
-
-  tags = {
-    Name        = "Forward EC2 AMI CloudTrail Events to Central Account"
-    Environment = var.environment
-    ManagedBy   = "Terraform"
-  }
-}
-
-# EventBridge Rule - Forward S3 CloudTrail events to central account
-resource "aws_cloudwatch_event_rule" "forward_s3_cloudtrail_to_central" {
-  name        = "forward-s3-cloudtrail-to-central-${var.environment}"
-  description = "Forward S3 CloudTrail events from this member account to central security account"
-
-  event_pattern = jsonencode({
-    source      = ["aws.s3"]
-    detail-type = ["AWS API Call via CloudTrail"]
-    detail = {
-      eventName = [
-        "CreateBucket",
-        "PutBucketPolicy",
-        "PutBucketAcl",
-        "PutBucketPublicAccessBlock",
-        "DeleteBucketPublicAccessBlock",
-        "PutBucketEncryption",
-        "DeleteBucketEncryption"
-      ]
-    }
-  })
-
-  tags = {
-    Name        = "Forward S3 CloudTrail Events to Central Account"
-    Environment = var.environment
-    ManagedBy   = "Terraform"
-  }
-}
-
-# EventBridge Target - Central account event bus for EC2 events
-resource "aws_cloudwatch_event_target" "central_bus" {
-  rule     = aws_cloudwatch_event_rule.forward_to_central.name
-  arn      = var.central_event_bus_arn
-  role_arn = aws_iam_role.eventbridge_cross_account.arn
-}
-
-# EventBridge Target - Central account event bus for SecurityHub events
-resource "aws_cloudwatch_event_target" "central_bus_securityhub" {
-  rule     = aws_cloudwatch_event_rule.forward_securityhub_to_central.name
-  arn      = var.central_event_bus_arn
-  role_arn = aws_iam_role.eventbridge_cross_account.arn
-}
-
-# EventBridge Target - Central account event bus for GuardDuty findings (real-time)
-resource "aws_cloudwatch_event_target" "central_bus_guardduty" {
-  rule     = aws_cloudwatch_event_rule.forward_guardduty_to_central.name
-  arn      = var.central_event_bus_arn
-  role_arn = aws_iam_role.eventbridge_cross_account.arn
-}
-
-# EventBridge Target - Central account event bus for ALB CloudTrail events
-resource "aws_cloudwatch_event_target" "central_bus_alb" {
-  rule     = aws_cloudwatch_event_rule.forward_alb_cloudtrail_to_central.name
-  arn      = var.central_event_bus_arn
-  role_arn = aws_iam_role.eventbridge_cross_account.arn
-}
-
-# EventBridge Target - Central account event bus for EC2 AMI CloudTrail events
-resource "aws_cloudwatch_event_target" "central_bus_ec2_ami" {
-  rule     = aws_cloudwatch_event_rule.forward_ec2_ami_cloudtrail_to_central.name
-  arn      = var.central_event_bus_arn
-  role_arn = aws_iam_role.eventbridge_cross_account.arn
-}
-
-# EventBridge Target - Central account event bus for S3 CloudTrail events
-resource "aws_cloudwatch_event_target" "central_bus_s3" {
-  rule     = aws_cloudwatch_event_rule.forward_s3_cloudtrail_to_central.name
+# EventBridge Target - Central account event bus for all security events
+resource "aws_cloudwatch_event_target" "central_bus_security_events" {
+  rule     = aws_cloudwatch_event_rule.forward_security_events_to_central.name
   arn      = var.central_event_bus_arn
   role_arn = aws_iam_role.eventbridge_cross_account.arn
 }

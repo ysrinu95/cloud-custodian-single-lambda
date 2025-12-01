@@ -168,207 +168,66 @@ resource "aws_cloudwatch_event_rule" "custodian_cross_account_trigger" {
   }
 }
 
-# EventBridge Rule on custom bus - Trigger Lambda for cross-account SecurityHub findings
-resource "aws_cloudwatch_event_rule" "custodian_cross_account_securityhub_trigger" {
-  name           = "cloud-custodian-cross-account-securityhub-${var.environment}"
-  description    = "Trigger Cloud Custodian Lambda for cross-account SecurityHub findings"
+# EventBridge Rule on custom bus - Trigger Lambda for all security events from member accounts (consolidated)
+resource "aws_cloudwatch_event_rule" "custodian_security_events_from_members" {
+  name           = "custodian-security-events-from-members-${var.environment}"
+  description    = "Trigger Cloud Custodian Lambda for all security events (CloudTrail, SecurityHub, GuardDuty) from member accounts"
   event_bus_name = aws_cloudwatch_event_bus.centralized.name
 
   event_pattern = jsonencode({
-    source      = ["aws.securityhub"]
-    account     = var.member_account_ids
-    detail-type = ["Security Hub Findings - Imported"]
+    account = var.member_account_ids
+    "$or" = [
+      {
+        detail-type = ["AWS API Call via CloudTrail"]
+        detail = {
+          "$or" = [
+            {
+              eventSource = ["ec2.amazonaws.com"]
+              eventName   = ["RunInstances", "ModifyImageAttribute", "CreateImage", "CopyImage"]
+            },
+            {
+              eventSource = ["elasticloadbalancing.amazonaws.com"]
+              eventName   = ["CreateLoadBalancer", "CreateListener", "ModifyListener", "ModifyLoadBalancerAttributes", "DeleteLoadBalancer", "DeleteListener"]
+            },
+            {
+              eventSource = ["s3.amazonaws.com"]
+              eventName   = ["CreateBucket", "PutBucketPolicy", "PutBucketAcl", "PutBucketPublicAccessBlock", "DeleteBucketPublicAccessBlock", "PutBucketEncryption", "DeleteBucketEncryption"]
+            }
+          ]
+        }
+      },
+      {
+        source      = ["aws.securityhub"]
+        detail-type = ["Security Hub Findings - Imported"]
+      },
+      {
+        source      = ["aws.guardduty"]
+        detail-type = ["GuardDuty Finding"]
+      }
+    ]
   })
 
   tags = {
-    Name        = "Cloud Custodian Cross-Account SecurityHub Trigger"
+    Name        = "Cloud Custodian Security Events from Members"
     Environment = var.environment
     ManagedBy   = "Terraform"
   }
 }
 
-# EventBridge Rule on custom bus - Trigger Lambda for cross-account GuardDuty findings (real-time)
-resource "aws_cloudwatch_event_rule" "custodian_cross_account_guardduty_trigger" {
-  name           = "cloud-custodian-cross-account-guardduty-${var.environment}"
-  description    = "Trigger Cloud Custodian Lambda for cross-account GuardDuty findings (real-time detection)"
-  event_bus_name = aws_cloudwatch_event_bus.centralized.name
-
-  event_pattern = jsonencode({
-    source      = ["aws.guardduty"]
-    account     = var.member_account_ids
-    detail-type = ["GuardDuty Finding"]
-  })
-
-  tags = {
-    Name        = "Cloud Custodian Cross-Account GuardDuty Trigger"
-    Environment = var.environment
-    ManagedBy   = "Terraform"
-  }
-}
-
-# EventBridge Rule on custom bus - Trigger Lambda for cross-account ALB CloudTrail events
-resource "aws_cloudwatch_event_rule" "custodian_alb_events_from_members" {
-  name           = "custodian-alb-events-from-members-${var.environment}"
-  description    = "Trigger Cloud Custodian Lambda for ALB CloudTrail events from member accounts"
-  event_bus_name = aws_cloudwatch_event_bus.centralized.name
-
-  event_pattern = jsonencode({
-    source      = ["aws.elasticloadbalancing"]
-    account     = var.member_account_ids
-    detail-type = ["AWS API Call via CloudTrail"]
-    detail = {
-      eventName = [
-        "CreateLoadBalancer",
-        "CreateListener",
-        "ModifyListener",
-        "ModifyLoadBalancerAttributes",
-        "DeleteLoadBalancer",
-        "DeleteListener"
-      ]
-    }
-  })
-
-  tags = {
-    Name        = "Cloud Custodian ALB Events from Members"
-    Environment = var.environment
-    ManagedBy   = "Terraform"
-  }
-}
-
-# EventBridge Rule on custom bus - Trigger Lambda for cross-account EC2 AMI CloudTrail events
-resource "aws_cloudwatch_event_rule" "custodian_ec2_ami_events_from_members" {
-  name           = "custodian-ec2-ami-events-from-members-${var.environment}"
-  description    = "Trigger Cloud Custodian Lambda for EC2 AMI CloudTrail events from member accounts"
-  event_bus_name = aws_cloudwatch_event_bus.centralized.name
-
-  event_pattern = jsonencode({
-    source      = ["aws.ec2"]
-    account     = var.member_account_ids
-    detail-type = ["AWS API Call via CloudTrail"]
-    detail = {
-      eventName = [
-        "ModifyImageAttribute",
-        "CreateImage",
-        "CopyImage"
-      ]
-    }
-  })
-
-  tags = {
-    Name        = "Cloud Custodian EC2 AMI Events from Members"
-    Environment = var.environment
-    ManagedBy   = "Terraform"
-  }
-}
-
-# EventBridge Rule on custom bus - Trigger Lambda for cross-account S3 CloudTrail events
-resource "aws_cloudwatch_event_rule" "custodian_s3_events_from_members" {
-  name           = "custodian-s3-events-from-members-${var.environment}"
-  description    = "Trigger Cloud Custodian Lambda for S3 CloudTrail events from member accounts"
-  event_bus_name = aws_cloudwatch_event_bus.centralized.name
-
-  event_pattern = jsonencode({
-    source      = ["aws.s3"]
-    account     = var.member_account_ids
-    detail-type = ["AWS API Call via CloudTrail"]
-    detail = {
-      eventName = [
-        "CreateBucket",
-        "PutBucketPolicy",
-        "PutBucketAcl",
-        "PutBucketPublicAccessBlock",
-        "DeleteBucketPublicAccessBlock",
-        "PutBucketEncryption",
-        "DeleteBucketEncryption"
-      ]
-    }
-  })
-
-  tags = {
-    Name        = "Cloud Custodian S3 Events from Members"
-    Environment = var.environment
-    ManagedBy   = "Terraform"
-  }
-}
-
-# EventBridge Target - Lambda function for cross-account SecurityHub events
-resource "aws_cloudwatch_event_target" "lambda_cross_account_securityhub" {
-  rule           = aws_cloudwatch_event_rule.custodian_cross_account_securityhub_trigger.name
+# EventBridge Target - Lambda function for all security events from member accounts
+resource "aws_cloudwatch_event_target" "lambda_security_events_from_members" {
+  rule           = aws_cloudwatch_event_rule.custodian_security_events_from_members.name
   event_bus_name = aws_cloudwatch_event_bus.centralized.name
   arn            = aws_lambda_function.custodian_cross_account_executor.arn
 }
 
-# Lambda Permission - Allow EventBridge to invoke for cross-account SecurityHub events
-resource "aws_lambda_permission" "allow_eventbridge_cross_account_securityhub" {
-  statement_id  = "AllowExecutionFromEventBridgeCrossAccountSecurityHub"
+# Lambda Permission - Allow EventBridge to invoke for all security events
+resource "aws_lambda_permission" "allow_eventbridge_security_events" {
+  statement_id  = "AllowExecutionFromEventBridgeSecurityEvents"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.custodian_cross_account_executor.function_name
   principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.custodian_cross_account_securityhub_trigger.arn
-}
-
-# EventBridge Target - Lambda function for cross-account GuardDuty findings (real-time)
-resource "aws_cloudwatch_event_target" "lambda_cross_account_guardduty" {
-  rule           = aws_cloudwatch_event_rule.custodian_cross_account_guardduty_trigger.name
-  event_bus_name = aws_cloudwatch_event_bus.centralized.name
-  arn            = aws_lambda_function.custodian_cross_account_executor.arn
-}
-
-# Lambda Permission - Allow EventBridge to invoke for cross-account GuardDuty findings (real-time)
-resource "aws_lambda_permission" "allow_eventbridge_cross_account_guardduty" {
-  statement_id  = "AllowExecutionFromEventBridgeCrossAccountGuardDuty"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.custodian_cross_account_executor.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.custodian_cross_account_guardduty_trigger.arn
-}
-
-# EventBridge Target - Lambda function for cross-account ALB events
-resource "aws_cloudwatch_event_target" "lambda_alb_events_from_members" {
-  rule           = aws_cloudwatch_event_rule.custodian_alb_events_from_members.name
-  event_bus_name = aws_cloudwatch_event_bus.centralized.name
-  arn            = aws_lambda_function.custodian_cross_account_executor.arn
-}
-
-# Lambda Permission - Allow EventBridge to invoke for cross-account ALB events
-resource "aws_lambda_permission" "allow_eventbridge_alb_events" {
-  statement_id  = "AllowExecutionFromEventBridgeALBEvents"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.custodian_cross_account_executor.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.custodian_alb_events_from_members.arn
-}
-
-# EventBridge Target - Lambda function for cross-account EC2 AMI events
-resource "aws_cloudwatch_event_target" "lambda_ec2_ami_events_from_members" {
-  rule           = aws_cloudwatch_event_rule.custodian_ec2_ami_events_from_members.name
-  event_bus_name = aws_cloudwatch_event_bus.centralized.name
-  arn            = aws_lambda_function.custodian_cross_account_executor.arn
-}
-
-# Lambda Permission - Allow EventBridge to invoke for cross-account EC2 AMI events
-resource "aws_lambda_permission" "allow_eventbridge_ec2_ami_events" {
-  statement_id  = "AllowExecutionFromEventBridgeEC2AMIEvents"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.custodian_cross_account_executor.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.custodian_ec2_ami_events_from_members.arn
-}
-
-# EventBridge Target - Lambda function for cross-account S3 events
-resource "aws_cloudwatch_event_target" "lambda_s3_events_from_members" {
-  rule           = aws_cloudwatch_event_rule.custodian_s3_events_from_members.name
-  event_bus_name = aws_cloudwatch_event_bus.centralized.name
-  arn            = aws_lambda_function.custodian_cross_account_executor.arn
-}
-
-# Lambda Permission - Allow EventBridge to invoke for cross-account S3 events
-resource "aws_lambda_permission" "allow_eventbridge_s3_events" {
-  statement_id  = "AllowExecutionFromEventBridgeS3Events"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.custodian_cross_account_executor.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.custodian_s3_events_from_members.arn
+  source_arn    = aws_cloudwatch_event_rule.custodian_security_events_from_members.arn
 }
 
 # EventBridge Target - Lambda function
