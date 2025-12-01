@@ -5,12 +5,12 @@ output "account_id" {
 
 output "eventbridge_rule_arn" {
   description = "ARN of the EventBridge rule forwarding events to central account"
-  value       = aws_cloudwatch_event_rule.forward_to_central.arn
+  value       = aws_cloudwatch_event_rule.forward_security_events_to_central.arn
 }
 
 output "eventbridge_rule_name" {
   description = "Name of the EventBridge rule"
-  value       = aws_cloudwatch_event_rule.forward_to_central.name
+  value       = aws_cloudwatch_event_rule.forward_security_events_to_central.name
 }
 
 output "eventbridge_role_arn" {
@@ -44,7 +44,7 @@ output "deployment_summary" {
     Member account setup complete for account: ${data.aws_caller_identity.current.account_id}
     
     Configuration:
-    - EventBridge Rule: ${aws_cloudwatch_event_rule.forward_to_central.name}
+    - EventBridge Rule: ${aws_cloudwatch_event_rule.forward_security_events_to_central.name}
     - Events forwarded to: ${var.central_event_bus_arn}
     - Execution Role: ${aws_iam_role.custodian_execution.arn}
     - External ID: cloud-custodian-${data.aws_caller_identity.current.account_id}
