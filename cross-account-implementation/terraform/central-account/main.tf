@@ -235,6 +235,32 @@ resource "aws_cloudwatch_event_rule" "custodian_alb_events_from_members" {
   }
 }
 
+# EventBridge Rule on custom bus - Trigger Lambda for cross-account EC2 AMI CloudTrail events
+resource "aws_cloudwatch_event_rule" "custodian_ec2_ami_events_from_members" {
+  name           = "custodian-ec2-ami-events-from-members-${var.environment}"
+  description    = "Trigger Cloud Custodian Lambda for EC2 AMI CloudTrail events from member accounts"
+  event_bus_name = aws_cloudwatch_event_bus.centralized.name
+
+  event_pattern = jsonencode({
+    source      = ["aws.ec2"]
+    account     = var.member_account_ids
+    detail-type = ["AWS API Call via CloudTrail"]
+    detail = {
+      eventName = [
+        "ModifyImageAttribute",
+        "CreateImage",
+        "CopyImage"
+      ]
+    }
+  })
+
+  tags = {
+    Name        = "Cloud Custodian EC2 AMI Events from Members"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
 # EventBridge Rule on custom bus - Trigger Lambda for cross-account S3 CloudTrail events
 resource "aws_cloudwatch_event_rule" "custodian_s3_events_from_members" {
   name           = "custodian-s3-events-from-members-${var.environment}"
@@ -311,6 +337,22 @@ resource "aws_lambda_permission" "allow_eventbridge_alb_events" {
   function_name = aws_lambda_function.custodian_cross_account_executor.function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.custodian_alb_events_from_members.arn
+}
+
+# EventBridge Target - Lambda function for cross-account EC2 AMI events
+resource "aws_cloudwatch_event_target" "lambda_ec2_ami_events_from_members" {
+  rule           = aws_cloudwatch_event_rule.custodian_ec2_ami_events_from_members.name
+  event_bus_name = aws_cloudwatch_event_bus.centralized.name
+  arn            = aws_lambda_function.custodian_cross_account_executor.arn
+}
+
+# Lambda Permission - Allow EventBridge to invoke for cross-account EC2 AMI events
+resource "aws_lambda_permission" "allow_eventbridge_ec2_ami_events" {
+  statement_id  = "AllowExecutionFromEventBridgeEC2AMIEvents"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.custodian_cross_account_executor.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.custodian_ec2_ami_events_from_members.arn
 }
 
 # EventBridge Target - Lambda function for cross-account S3 events

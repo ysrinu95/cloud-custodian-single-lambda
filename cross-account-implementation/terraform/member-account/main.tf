@@ -104,6 +104,30 @@ resource "aws_cloudwatch_event_rule" "forward_alb_cloudtrail_to_central" {
   }
 }
 
+# EventBridge Rule - Forward EC2 AMI CloudTrail events to central account
+resource "aws_cloudwatch_event_rule" "forward_ec2_ami_cloudtrail_to_central" {
+  name        = "forward-ec2-ami-cloudtrail-to-central-${var.environment}"
+  description = "Forward EC2 AMI CloudTrail events from this member account to central security account"
+
+  event_pattern = jsonencode({
+    source      = ["aws.ec2"]
+    detail-type = ["AWS API Call via CloudTrail"]
+    detail = {
+      eventName = [
+        "ModifyImageAttribute",
+        "CreateImage",
+        "CopyImage"
+      ]
+    }
+  })
+
+  tags = {
+    Name        = "Forward EC2 AMI CloudTrail Events to Central Account"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
 # EventBridge Rule - Forward S3 CloudTrail events to central account
 resource "aws_cloudwatch_event_rule" "forward_s3_cloudtrail_to_central" {
   name        = "forward-s3-cloudtrail-to-central-${var.environment}"
@@ -156,6 +180,13 @@ resource "aws_cloudwatch_event_target" "central_bus_guardduty" {
 # EventBridge Target - Central account event bus for ALB CloudTrail events
 resource "aws_cloudwatch_event_target" "central_bus_alb" {
   rule     = aws_cloudwatch_event_rule.forward_alb_cloudtrail_to_central.name
+  arn      = var.central_event_bus_arn
+  role_arn = aws_iam_role.eventbridge_cross_account.arn
+}
+
+# EventBridge Target - Central account event bus for EC2 AMI CloudTrail events
+resource "aws_cloudwatch_event_target" "central_bus_ec2_ami" {
+  rule     = aws_cloudwatch_event_rule.forward_ec2_ami_cloudtrail_to_central.name
   arn      = var.central_event_bus_arn
   role_arn = aws_iam_role.eventbridge_cross_account.arn
 }

@@ -655,6 +655,34 @@ class CrossAccountExecutor:
                                 logger.warning("No S3 bucket resources could be built")
                         except Exception as e:
                             logger.error(f"Failed to build S3 bucket resources: {e}", exc_info=True)
+                    
+                    # For AMI images, build resource objects from image IDs
+                    elif resource_type == 'aws.ami' and ids:
+                        image_ids = ids
+                        logger.info(f"Building {len(image_ids)} AMI resources from extracted IDs")
+                        try:
+                            client = cross_account_session.client('ec2', region_name=cross_account_region)
+                            provided_resources = []
+                            for image_id in image_ids:
+                                try:
+                                    # Describe the specific AMI
+                                    response = client.describe_images(ImageIds=[image_id])
+                                    if response.get('Images'):
+                                        ami = response['Images'][0]
+                                        ami['c7n:MatchedFilters'] = ['event-filter']
+                                        provided_resources.append(ami)
+                                        logger.info(f"Built AMI resource object for: {image_id}")
+                                    else:
+                                        logger.warning(f"AMI {image_id} not found")
+                                except Exception as e:
+                                    logger.error(f"Could not describe AMI {image_id}: {e}")
+                            
+                            if provided_resources:
+                                logger.info(f"Retrieved {len(provided_resources)} AMIs using extracted IDs")
+                            else:
+                                logger.warning("No AMI resources could be built")
+                        except Exception as e:
+                            logger.error(f"Failed to build AMI resources: {e}", exc_info=True)
                 
                 # Run the policy with cross-account credentials
                 if provided_resources:

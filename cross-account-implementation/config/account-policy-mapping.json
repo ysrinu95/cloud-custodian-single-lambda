@@ -171,6 +171,14 @@
         "source_file": "aws-alb-security",
         "description": "Real-time detection of ELB logging configuration changes"
       }
+    ],
+    "ModifyImageAttribute": [
+      {
+        "policy_name": "ami-publicly-accessible",
+        "resource": "aws.ami",
+        "source_file": "aws-ec2-security",
+        "description": "Real-time detection of AMI being made publicly accessible"
+      }
     ]
   },
   "account_mapping": {
