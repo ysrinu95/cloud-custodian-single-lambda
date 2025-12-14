@@ -578,6 +578,7 @@ resource "aws_sns_topic_policy" "custodian_notifications_policy" {
 
 # Lambda Function - Mailer (SQS to SNS)
 resource "aws_lambda_function" "custodian_mailer" {
+  count            = var.create_mailer_lambda ? 1 : 0
   filename         = var.mailer_lambda_package_path
   function_name    = "cloud-custodian-mailer-${var.environment}"
   role             = aws_iam_role.mailer_execution.arn
@@ -603,7 +604,8 @@ resource "aws_lambda_function" "custodian_mailer" {
 
 # CloudWatch Log Group for Mailer Lambda
 resource "aws_cloudwatch_log_group" "mailer_logs" {
-  name              = "/aws/lambda/${aws_lambda_function.custodian_mailer.function_name}"
+  count             = var.create_mailer_lambda ? 1 : 0
+  name              = "/aws/lambda/${aws_lambda_function.custodian_mailer[0].function_name}"
   retention_in_days = var.log_retention_days
 
   tags = {
@@ -664,9 +666,9 @@ resource "aws_iam_role_policy" "mailer_execution_policy" {
         Resource = aws_sqs_queue.custodian_mailer.arn
       },
       {
-        Sid    = "SNSPublish"
-        Effect = "Allow"
-        Action = "sns:Publish"
+        Sid      = "SNSPublish"
+        Effect   = "Allow"
+        Action   = "sns:Publish"
         Resource = aws_sns_topic.custodian_notifications.arn
       }
     ]
@@ -675,8 +677,9 @@ resource "aws_iam_role_policy" "mailer_execution_policy" {
 
 # Lambda Event Source Mapping - SQS to Lambda
 resource "aws_lambda_event_source_mapping" "sqs_to_mailer" {
+  count            = var.create_mailer_lambda ? 1 : 0
   event_source_arn = aws_sqs_queue.custodian_mailer.arn
-  function_name    = aws_lambda_function.custodian_mailer.function_name
+  function_name    = aws_lambda_function.custodian_mailer[0].function_name
   batch_size       = 10
   enabled          = true
 }

@@ -100,6 +100,12 @@ variable "create_notification_queue" {
   default     = false
 }
 
+variable "create_mailer_lambda" {
+  description = "Whether to create the mailer Lambda function (requires mailer-function.zip)"
+  type        = bool
+  default     = false
+}
+
 variable "notification_email" {
   description = "Email address for SNS notification subscriptions"
   type        = string

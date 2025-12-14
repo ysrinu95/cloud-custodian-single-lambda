@@ -70,7 +70,7 @@ output "sns_topic_name" {
 
 output "mailer_lambda_function_name" {
   description = "Name of the mailer Lambda function"
-  value       = aws_lambda_function.custodian_mailer.function_name
+  value       = var.create_mailer_lambda ? aws_lambda_function.custodian_mailer[0].function_name : ""
 }
 
 output "notification_email" {
@@ -100,11 +100,11 @@ output "deployment_instructions" {
     
     Lambda Functions:
     - Executor: ${aws_lambda_function.custodian_cross_account_executor.function_name}
-    - Mailer: ${aws_lambda_function.custodian_mailer.function_name}
+    - Mailer: ${var.create_mailer_lambda ? aws_lambda_function.custodian_mailer[0].function_name : "Not created (set create_mailer_lambda=true)"}
     
     CloudWatch Logs:
     - Executor: ${aws_cloudwatch_log_group.lambda_logs.name}
-    - Mailer: ${aws_cloudwatch_log_group.mailer_logs.name}
+    - Mailer: ${var.create_mailer_lambda ? aws_cloudwatch_log_group.mailer_logs[0].name : "Not created"}
     
     Notification Flow:
     Policy Execution → SQS Queue → Mailer Lambda → SNS Topic → Email (${var.notification_email})
