@@ -117,21 +117,3 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
-
-variable "notification_email" {
-  description = "Email address for SNS notification subscriptions"
-  type        = string
-  default     = "ysrinu95@gmail.com"
-}
-
-variable "notification_queue_arn" {
-  description = "ARN of existing SQS queue for notifications (if not creating new one)"
-  type        = string
-  default     = ""
-}
-
-variable "tags" {
-  description = "Additional tags to apply to all resources"
-  type        = map(string)
-  default     = {}
-}
