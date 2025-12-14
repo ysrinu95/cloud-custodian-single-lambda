@@ -282,8 +282,8 @@ resource "aws_lambda_function" "custodian_cross_account_executor" {
       CROSS_ACCOUNT_ROLE_NAME = "CloudCustodianExecutionRole"
       EXTERNAL_ID_PREFIX      = "cloud-custodian"
       LOG_LEVEL               = var.log_level
-      MAILER_QUEUE_URL        = var.mailer_queue_url
-      MAILER_ENABLED          = var.mailer_enabled
+      MAILER_QUEUE_URL        = aws_sqs_queue.custodian_mailer.url
+      MAILER_ENABLED          = "true"
     }
   }
 
@@ -395,7 +395,7 @@ resource "aws_iam_role_policy" "lambda_execution_policy" {
           "sqs:GetQueueUrl",
           "sqs:GetQueueAttributes"
         ]
-        Resource = var.mailer_queue_arn != "" ? var.mailer_queue_arn : "*"
+        Resource = aws_sqs_queue.custodian_mailer.arn
       },
       {
         Sid    = "EC2LocalAccountRemediation"
@@ -473,36 +473,34 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "policies" {
   }
 }
 
-# SQS Queue for Notifications (optional)
-resource "aws_sqs_queue" "notifications" {
-  count                      = var.create_notification_queue ? 1 : 0
-  name                       = "cloud-custodian-notifications-${var.environment}"
+# SQS Queue for Cloud Custodian Notifications
+resource "aws_sqs_queue" "custodian_mailer" {
+  name                       = "cloud-custodian-mailer-queue-${var.environment}"
   visibility_timeout_seconds = 300
   message_retention_seconds  = 1209600 # 14 days
 
   tags = {
-    Name        = "Cloud Custodian Notifications"
+    Name        = "Cloud Custodian Mailer Queue"
     Environment = var.environment
     ManagedBy   = "Terraform"
   }
 }
 
 # SQS Dead Letter Queue
-resource "aws_sqs_queue" "notifications_dlq" {
-  count                     = var.create_notification_queue ? 1 : 0
-  name                      = "cloud-custodian-notifications-dlq-${var.environment}"
+resource "aws_sqs_queue" "custodian_mailer_dlq" {
+  name                      = "cloud-custodian-mailer-dlq-${var.environment}"
   message_retention_seconds = 1209600 # 14 days
 
   tags = {
-    Name        = "Cloud Custodian Notifications DLQ"
+    Name        = "Cloud Custodian Mailer DLQ"
     Environment = var.environment
     ManagedBy   = "Terraform"
   }
 }
 
 # SQS Queue Policy - Allow member account roles to send messages
-resource "aws_sqs_queue_policy" "mailer_queue_policy" {
-  queue_url = var.mailer_queue_url
+resource "aws_sqs_queue_policy" "custodian_mailer_policy" {
+  queue_url = aws_sqs_queue.custodian_mailer.url
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -517,8 +515,169 @@ resource "aws_sqs_queue_policy" "mailer_queue_policy" {
           ]
         }
         Action   = "sqs:SendMessage"
-        Resource = var.mailer_queue_arn != "" ? var.mailer_queue_arn : "arn:aws:sqs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:custodian-mailer-queue"
+        Resource = aws_sqs_queue.custodian_mailer.arn
+      },
+      {
+        Sid    = "AllowCentralAccountLambda"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/cloud-custodian-cross-account-executor-role-${var.environment}"
+        }
+        Action = [
+          "sqs:SendMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = aws_sqs_queue.custodian_mailer.arn
       }
     ]
   })
 }
+
+# SNS Topic for Email Notifications
+resource "aws_sns_topic" "custodian_notifications" {
+  name = "cloud-custodian-notifications-${var.environment}"
+
+  tags = {
+    Name        = "Cloud Custodian Notifications"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+# SNS Topic Subscription - Email
+resource "aws_sns_topic_subscription" "email_subscription" {
+  topic_arn = aws_sns_topic.custodian_notifications.arn
+  protocol  = "email"
+  endpoint  = var.notification_email
+}
+
+# SNS Topic Policy - Allow mailer Lambda to publish
+resource "aws_sns_topic_policy" "custodian_notifications_policy" {
+  arn = aws_sns_topic.custodian_notifications.arn
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowMailerLambdaPublish"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+        Action   = "SNS:Publish"
+        Resource = aws_sns_topic.custodian_notifications.arn
+        Condition = {
+          StringEquals = {
+            "AWS:SourceAccount" = data.aws_caller_identity.current.account_id
+          }
+        }
+      }
+    ]
+  })
+}
+
+# Lambda Function - Mailer (SQS to SNS)
+resource "aws_lambda_function" "custodian_mailer" {
+  filename         = var.mailer_lambda_package_path
+  function_name    = "cloud-custodian-mailer-${var.environment}"
+  role             = aws_iam_role.mailer_execution.arn
+  handler          = "mailer.handler"
+  runtime          = "python3.11"
+  timeout          = 300
+  memory_size      = 256
+  source_code_hash = filebase64sha256(var.mailer_lambda_package_path)
+
+  environment {
+    variables = {
+      SNS_TOPIC_ARN = aws_sns_topic.custodian_notifications.arn
+      LOG_LEVEL     = var.log_level
+    }
+  }
+
+  tags = {
+    Name        = "Cloud Custodian Mailer"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+# CloudWatch Log Group for Mailer Lambda
+resource "aws_cloudwatch_log_group" "mailer_logs" {
+  name              = "/aws/lambda/${aws_lambda_function.custodian_mailer.function_name}"
+  retention_in_days = var.log_retention_days
+
+  tags = {
+    Name        = "Cloud Custodian Mailer Logs"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+# IAM Role for Mailer Lambda
+resource "aws_iam_role" "mailer_execution" {
+  name = "cloud-custodian-mailer-role-${var.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "lambda.amazonaws.com"
+      }
+      Action = "sts:AssumeRole"
+    }]
+  })
+
+  tags = {
+    Name        = "Cloud Custodian Mailer Role"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+# IAM Policy for Mailer Lambda
+resource "aws_iam_role_policy" "mailer_execution_policy" {
+  name = "mailer-execution-policy"
+  role = aws_iam_role.mailer_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "CloudWatchLogs"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/*"
+      },
+      {
+        Sid    = "SQSReceiveDelete"
+        Effect = "Allow"
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = aws_sqs_queue.custodian_mailer.arn
+      },
+      {
+        Sid    = "SNSPublish"
+        Effect = "Allow"
+        Action = "sns:Publish"
+        Resource = aws_sns_topic.custodian_notifications.arn
+      }
+    ]
+  })
+}
+
+# Lambda Event Source Mapping - SQS to Lambda
+resource "aws_lambda_event_source_mapping" "sqs_to_mailer" {
+  event_source_arn = aws_sqs_queue.custodian_mailer.arn
+  function_name    = aws_lambda_function.custodian_mailer.function_name
+  batch_size       = 10
+  enabled          = true
+}
+

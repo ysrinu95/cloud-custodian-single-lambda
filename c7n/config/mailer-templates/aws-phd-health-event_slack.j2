@@ -1,0 +1,32 @@
+{
+   "attachments":[
+      {
+         "fallback":"Cloud Custodian Policy Alert",
+         "title":"{{ action['title'] }}",
+         "color":"{{ action['slack_msg_color']|default("danger") }}",
+         "fields":[
+            {
+               "title":"Account",
+               "value":"{{ account }}"
+            },
+            {
+               "title":"Notifications",
+               "value":"{%- for resource in resources -%}
+                        Service: {{ resource['service'] }}
+                        Region: {{ resource['region'] }}
+                        Description: {{ resource['Description'] }}
+                        Start Time: {{ resource['startTime'] }} (Last Updated: {{ resource['lastUpdatedTime'] }}) \n
+                        {%- endfor -%}"
+            },
+            {
+               "title":"Action Description",
+               "value":"{{ action['action_desc'] }}"
+            }
+         ]
+      }
+   ],
+   {%- if not recipient.startswith('https://') %}
+   "channel":"{{ recipient }}",
+   {%- endif -%}
+   "username":"Cloud Custodian"
+}

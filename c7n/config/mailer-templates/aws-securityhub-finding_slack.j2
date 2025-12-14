@@ -1,0 +1,25 @@
+{
+   "attachments":[
+      {
+         "fallback":"Cloud Custodian Security Hub Alert",
+         "title":"Cloud Custodian Security Hub Alert",
+         "color":"{{ action['slack_msg_color']|default("danger") }}",
+         "fields":[
+            {
+               "title":"Findings",
+               "value":"{%- for resource in resources -%}
+                        Account / Region: {{ resource['AwsAccountId'] }} / {{ resource['Region'] }}
+                        Severity: {{ resource['Severity']['Label'] }}
+                        Description: {{ resource['Title'] }}
+                        First Observed: {{ resource['FirstObservedAt'] }} (Last Observed: {{ resource['LastObservedAt'] }}) \n
+                        Remediation: {{ resource['Remediation']['Recommendation']['Url'] }}
+                        {%- endfor -%}"
+            }
+         ]
+      }
+   ],
+   {%- if not recipient.startswith('https://') %}
+   "channel":"{{ recipient }}",
+   {%- endif -%}
+   "username":"Cloud Custodian"
+}

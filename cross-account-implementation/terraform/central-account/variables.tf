@@ -42,6 +42,12 @@ variable "lambda_layer_path" {
   default     = ""
 }
 
+variable "mailer_lambda_package_path" {
+  description = "Path to the mailer Lambda deployment package (zip file)"
+  type        = string
+  default     = "mailer-function.zip"
+}
+
 variable "custodian_version" {
   description = "Cloud Custodian version for layer description"
   type        = string
@@ -94,6 +100,12 @@ variable "create_notification_queue" {
   default     = false
 }
 
+variable "notification_email" {
+  description = "Email address for SNS notification subscriptions"
+  type        = string
+  default     = "ysrinu95@gmail.com"
+}
+
 variable "notification_queue_arn" {
   description = "ARN of existing SQS queue for notifications (if not creating new one)"
   type        = string
@@ -106,20 +118,20 @@ variable "tags" {
   default     = {}
 }
 
-variable "mailer_queue_url" {
-  description = "SQS queue URL for c7n-mailer notifications"
+variable "notification_email" {
+  description = "Email address for SNS notification subscriptions"
   type        = string
-  default     = "https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue"
+  default     = "ysrinu95@gmail.com"
 }
 
-variable "mailer_queue_arn" {
-  description = "SQS queue ARN for c7n-mailer notifications"
+variable "notification_queue_arn" {
+  description = "ARN of existing SQS queue for notifications (if not creating new one)"
   type        = string
-  default     = "arn:aws:sqs:us-east-1:172327596604:custodian-mailer-queue"
+  default     = ""
 }
 
-variable "mailer_enabled" {
-  description = "Enable notifications via c7n-mailer"
-  type        = string
-  default     = "true"
+variable "tags" {
+  description = "Additional tags to apply to all resources"
+  type        = map(string)
+  default     = {}
 }
