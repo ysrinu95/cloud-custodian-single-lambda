@@ -1,0 +1,394 @@
+policies:
+  # ============================================================================
+  # S3 RANSOMWARE PROTECTION POLICIES
+  # Detect and prevent data exfiltration and unauthorized encryption attacks
+  # ============================================================================
+
+  # -------------------------------------------------------------------------
+  # DATA EXFILTRATION DETECTION
+  # -------------------------------------------------------------------------
+  
+  # Policy 1: Detect S3 buckets with cross-account access to untrusted accounts
+  - name: s3-cross-account-access-unauthorized
+    resource: s3
+    description: |
+      Detect S3 buckets allowing access from unauthorized AWS accounts.
+      Prevents data exfiltration through cross-account bucket policies.
+    mode:
+      type: cloudtrail
+      events:
+        - source: s3.amazonaws.com
+          event: PutBucketPolicy
+          ids: "requestParameters.bucketName"
+    filters:
+      - type: cross-account
+        whitelist:
+          - "172327596604"  # Central account
+          - "813185901390"  # Member account
+          # Add other trusted account IDs here
+    actions:
+      - type: remove-statements
+        statement_ids:
+          - CrossAccountAllow
+      - type: notify
+        template: default
+        priority_header: "1"
+        subject: "CRITICAL: S3 Cross-Account Access to Untrusted Account Detected"
+        violation_desc: "S3 bucket policy allows access from unauthorized AWS account"
+        action_desc: "Unauthorized statements removed from bucket policy"
+        to:
+          - security@example.com
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/cloud-custodian-mailer-queue-prod
+
+  # Policy 2: Detect S3 buckets with public access (potential exfiltration)
+  - name: s3-public-access-ransomware
+    resource: s3
+    description: |
+      Detect and block S3 buckets made publicly accessible.
+      Public access can be used by attackers to exfiltrate data.
+    mode:
+      type: cloudtrail
+      events:
+        - source: s3.amazonaws.com
+          event: PutBucketAcl
+          ids: "requestParameters.bucketName"
+        - source: s3.amazonaws.com
+          event: PutBucketPolicy
+          ids: "requestParameters.bucketName"
+    filters:
+      - or:
+          - type: has-statement
+            statement_ids:
+              - PublicRead
+              - PublicReadWrite
+          - type: check-public-block
+            BlockPublicAcls: false
+          - type: check-public-block
+            IgnorePublicAcls: false
+          - type: check-public-block
+            BlockPublicPolicy: false
+          - type: check-public-block
+            RestrictPublicBuckets: false
+    actions:
+      - type: set-public-block
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      - type: delete-bucket-policy
+        condition:
+          type: has-statement
+          statement_ids:
+            - PublicRead
+            - PublicReadWrite
+      - type: notify
+        template: default
+        priority_header: "1"
+        subject: "CRITICAL: S3 Bucket Made Public - Ransomware Attack Indicator"
+        violation_desc: "S3 bucket public access enabled (potential data exfiltration)"
+        action_desc: "Public access blocked, bucket policy removed"
+        to:
+          - security@example.com
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/cloud-custodian-mailer-queue-prod
+
+  # Policy 3: Monitor for bucket replication to untrusted accounts
+  - name: s3-replication-to-untrusted-account
+    resource: s3
+    description: |
+      Detect S3 bucket replication configuration to unauthorized accounts.
+      Attackers may replicate data to their own accounts for exfiltration.
+    mode:
+      type: cloudtrail
+      events:
+        - source: s3.amazonaws.com
+          event: PutBucketReplication
+          ids: "requestParameters.bucketName"
+    filters:
+      - type: bucket-replication
+        op: ne
+        destination_account:
+          - "172327596604"
+          - "813185901390"
+    actions:
+      - type: delete-bucket-replication
+      - type: notify
+        template: default
+        priority_header: "1"
+        subject: "CRITICAL: S3 Replication to Untrusted Account Detected"
+        violation_desc: "S3 bucket configured to replicate to unauthorized AWS account"
+        action_desc: "Replication configuration removed"
+        to:
+          - security@example.com
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/cloud-custodian-mailer-queue-prod
+
+  # -------------------------------------------------------------------------
+  # UNAUTHORIZED ENCRYPTION DETECTION
+  # -------------------------------------------------------------------------
+
+  # Policy 4: Detect encryption with external/unknown KMS keys
+  - name: s3-encryption-unknown-kms-key
+    resource: s3
+    description: |
+      Detect S3 buckets encrypted with KMS keys not owned by trusted accounts.
+      Ransomware attackers may encrypt data with their own KMS keys.
+    mode:
+      type: cloudtrail
+      events:
+        - source: s3.amazonaws.com
+          event: PutBucketEncryption
+          ids: "requestParameters.bucketName"
+    filters:
+      - type: bucket-encryption
+        state: true
+        crypto: aws:kms
+      - type: kms-key
+        key: c7n:AliasName
+        op: not-in
+        value:
+          - alias/aws/s3
+          - alias/custodian-encryption
+          - alias/data-encryption
+          # Add your trusted KMS key aliases here
+    actions:
+      - type: set-bucket-encryption
+        enabled: true
+        crypto: AES256  # Fallback to AWS-managed encryption
+      - type: notify
+        template: default
+        priority_header: "1"
+        subject: "CRITICAL: S3 Encrypted with Unknown KMS Key - Ransomware Indicator"
+        violation_desc: "S3 bucket encrypted with KMS key from untrusted source"
+        action_desc: "Encryption reset to AWS-managed AES256"
+        to:
+          - security@example.com
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/cloud-custodian-mailer-queue-prod
+
+  # Policy 5: Detect objects encrypted with customer-provided keys (SSE-C)
+  - name: s3-object-encryption-customer-key
+    resource: s3
+    description: |
+      Alert on S3 objects encrypted with customer-provided keys (SSE-C).
+      Attackers may use SSE-C to encrypt objects with keys not available in AWS.
+    mode:
+      type: cloudtrail
+      events:
+        - source: s3.amazonaws.com
+          event: PutObject
+          ids: "requestParameters.bucketName"
+    filters:
+      - type: cloudtrail-event
+        op: regex
+        key: "requestParameters.x-amz-server-side-encryption-customer-algorithm"
+        value: "AES256"
+    actions:
+      - type: notify
+        template: default
+        priority_header: "1"
+        subject: "CRITICAL: S3 Object Encrypted with Customer Key (SSE-C)"
+        violation_desc: "S3 object encrypted with customer-provided key (potential ransomware)"
+        action_desc: "Manual intervention required - object may be inaccessible"
+        to:
+          - security@example.com
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/cloud-custodian-mailer-queue-prod
+
+  # Policy 6: Detect encryption configuration changes
+  - name: s3-encryption-configuration-change
+    resource: s3
+    description: |
+      Monitor for any changes to S3 bucket encryption configuration.
+      Unauthorized changes may indicate ransomware attack preparation.
+    mode:
+      type: cloudtrail
+      events:
+        - source: s3.amazonaws.com
+          event: PutBucketEncryption
+          ids: "requestParameters.bucketName"
+        - source: s3.amazonaws.com
+          event: DeleteBucketEncryption
+          ids: "requestParameters.bucketName"
+    filters:
+      - type: event
+        key: "userIdentity.arn"
+        op: not-in
+        value:
+          - "arn:aws:iam::172327596604:role/CloudCustodian-ExecutionRole"
+          - "arn:aws:iam::172327596604:role/AdminRole"
+          # Add authorized IAM roles/users here
+    actions:
+      - type: notify
+        template: default
+        priority_header: "2"
+        subject: "WARNING: S3 Bucket Encryption Configuration Changed"
+        violation_desc: "S3 bucket encryption settings modified by unauthorized principal"
+        action_desc: "Review and verify encryption configuration"
+        to:
+          - security@example.com
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/cloud-custodian-mailer-queue-prod
+
+  # -------------------------------------------------------------------------
+  # COMPREHENSIVE PROTECTION - PERIODIC SCANS
+  # -------------------------------------------------------------------------
+
+  # Policy 7: Daily scan for buckets with external KMS keys
+  - name: s3-scan-external-kms-encryption
+    resource: s3
+    description: |
+      Daily scan to identify buckets encrypted with KMS keys from external accounts.
+      Helps detect stealthy ransomware attacks.
+    mode:
+      type: periodic
+      schedule: "rate(24 hours)"
+    filters:
+      - type: bucket-encryption
+        state: true
+        crypto: aws:kms
+      - type: kms-key
+        key: c7n:KeyManager
+        op: ne
+        value: AWS
+      - type: kms-key
+        key: c7n:KeyAccount
+        op: not-in
+        value:
+          - "172327596604"
+          - "813185901390"
+    actions:
+      - type: notify
+        template: default
+        priority_header: "1"
+        subject: "Daily Scan: S3 Buckets with External KMS Keys Detected"
+        violation_desc: "S3 buckets found with KMS keys from external accounts"
+        action_desc: "Review and remediate encryption configuration"
+        to:
+          - security@example.com
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/cloud-custodian-mailer-queue-prod
+
+  # Policy 8: Monitor bucket policy for suspicious principals
+  - name: s3-bucket-policy-suspicious-principals
+    resource: s3
+    description: |
+      Detect bucket policies granting access to suspicious principals.
+      Includes wildcards, anonymous access, or specific attack patterns.
+    mode:
+      type: periodic
+      schedule: "rate(6 hours)"
+    filters:
+      - or:
+          - type: has-statement
+            statement_ids:
+              - "*"
+          - type: has-statement
+            statements:
+              - Effect: Allow
+                Principal: "*"
+          - type: has-statement
+            statements:
+              - Effect: Allow
+                Principal:
+                  AWS: "*"
+    actions:
+      - type: remove-statements
+        statement_ids:
+          - matched
+      - type: notify
+        template: default
+        priority_header: "1"
+        subject: "S3 Bucket Policy with Suspicious Principals Detected"
+        violation_desc: "S3 bucket policy contains wildcard or anonymous principals"
+        action_desc: "Suspicious policy statements removed"
+        to:
+          - security@example.com
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/cloud-custodian-mailer-queue-prod
+
+  # Policy 9: Detect versioning disabled (ransomware preparation)
+  - name: s3-versioning-disabled
+    resource: s3
+    description: |
+      Detect S3 buckets with versioning disabled or suspended.
+      Attackers often disable versioning before encrypting data to prevent recovery.
+    mode:
+      type: cloudtrail
+      events:
+        - source: s3.amazonaws.com
+          event: PutBucketVersioning
+          ids: "requestParameters.bucketName"
+    filters:
+      - or:
+          - type: value
+            key: Versioning.Status
+            value: absent
+          - type: value
+            key: Versioning.Status
+            value: Suspended
+    actions:
+      - type: toggle-versioning
+        enabled: true
+      - type: notify
+        template: default
+        priority_header: "1"
+        subject: "CRITICAL: S3 Bucket Versioning Disabled - Ransomware Indicator"
+        violation_desc: "S3 bucket versioning disabled (ransomware attack preparation)"
+        action_desc: "Versioning re-enabled automatically"
+        to:
+          - security@example.com
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/cloud-custodian-mailer-queue-prod
+
+  # Policy 10: Monitor object lock configuration changes
+  - name: s3-object-lock-configuration-change
+    resource: s3
+    description: |
+      Monitor S3 Object Lock configuration changes.
+      Attackers may modify object lock to make encrypted data immutable.
+    mode:
+      type: cloudtrail
+      events:
+        - source: s3.amazonaws.com
+          event: PutObjectLockConfiguration
+          ids: "requestParameters.bucketName"
+    filters:
+      - type: event
+        key: "userIdentity.arn"
+        op: not-in
+        value:
+          - "arn:aws:iam::172327596604:role/CloudCustodian-ExecutionRole"
+          - "arn:aws:iam::172327596604:role/AdminRole"
+    actions:
+      - type: notify
+        template: default
+        priority_header: "1"
+        subject: "WARNING: S3 Object Lock Configuration Modified"
+        violation_desc: "S3 Object Lock settings changed by unauthorized principal"
+        action_desc: "Immediate review required"
+        to:
+          - security@example.com
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/cloud-custodian-mailer-queue-prod
