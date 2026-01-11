@@ -185,6 +185,42 @@ jobs:
             -backend-config="key=member/${{ needs.terraform-plan.outputs.member_account }}/cloud-custodian/terraform.tfstate" \
             -backend-config="region=${{ env.AWS_REGION }}"
 
+      - name: Cleanup conflicting resources
+        run: |
+          echo "🧹 Checking for conflicting IAM role..."
+          ROLE_NAME="CloudCustodianExecutionRole"
+          
+          if aws iam get-role --role-name $ROLE_NAME 2>/dev/null; then
+            echo "⚠️ Found existing role $ROLE_NAME - cleaning up..."
+            
+            # Detach managed policies
+            echo "Detaching managed policies..."
+            MANAGED_POLICIES=$(aws iam list-attached-role-policies --role-name $ROLE_NAME --query 'AttachedPolicies[].PolicyArn' --output text 2>/dev/null || echo "")
+            if [ -n "$MANAGED_POLICIES" ]; then
+              for policy_arn in $MANAGED_POLICIES; do
+                echo "  Detaching: $policy_arn"
+                aws iam detach-role-policy --role-name $ROLE_NAME --policy-arn $policy_arn
+              done
+            fi
+            
+            # Delete inline policies
+            echo "Deleting inline policies..."
+            INLINE_POLICIES=$(aws iam list-role-policies --role-name $ROLE_NAME --query 'PolicyNames' --output text 2>/dev/null || echo "")
+            if [ -n "$INLINE_POLICIES" ]; then
+              for policy_name in $INLINE_POLICIES; do
+                echo "  Deleting: $policy_name"
+                aws iam delete-role-policy --role-name $ROLE_NAME --policy-name $policy_name
+              done
+            fi
+            
+            # Delete the role
+            echo "Deleting role..."
+            aws iam delete-role --role-name $ROLE_NAME
+            echo "✅ Cleanup complete"
+          else
+            echo "✅ No conflicting resources found"
+          fi
+
       - name: Terraform Apply
         working-directory: terraform/member
         run: |
