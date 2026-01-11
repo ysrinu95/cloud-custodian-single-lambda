@@ -190,7 +190,7 @@ variable "mailer_enabled" {
 variable "create_mailer_lambda" {
   description = "Whether to create the cloud-custodian-mailer Lambda function via Terraform"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "mailer_layer_path" {
