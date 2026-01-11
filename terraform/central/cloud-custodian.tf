@@ -90,7 +90,7 @@ variable "member_account_ids" {
 variable "policy_bucket" {
   description = "S3 bucket name for storing Cloud Custodian policies"
   type        = string
-  default     = "aikyam-cloud-custodian-data"
+  default     = "ysr95-cloud-custodian-policies"
 }
 
 variable "create_policy_bucket" {
@@ -747,7 +747,7 @@ resource "null_resource" "lambda_function_build" {
       echo "📦 Building Lambda function package..."
       
       # Resolve absolute paths
-      SOURCE_DIR="$(cd ../../lambda_functions/cloud-custodian 2>/dev/null && pwd)" || SOURCE_DIR="${local.lambda_source_dir}"
+      SOURCE_DIR="$(cd ../../lambda-functions/cloud-custodian 2>/dev/null && pwd)" || SOURCE_DIR="${local.lambda_source_dir}"
       BUILD_DIR="${local.lambda_build_dir}"
       ZIP_NAME="${local.lambda_zip_name}"
       
@@ -1142,17 +1142,12 @@ resource "aws_iam_role" "custodian_execution" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Sid    = "AllowServiceUserAssume"
+      Sid    = "AllowLambdaAssume"
       Effect = "Allow"
       Principal = {
-        AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/AWS_${data.aws_caller_identity.current.account_id}_service_user"
+        Service = "lambda.amazonaws.com"
       }
       Action = "sts:AssumeRole"
-      Condition = {
-        StringEquals = {
-          "sts:ExternalId" = "cloud-custodian-execution"
-        }
-      }
     }]
   })
 
