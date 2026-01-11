@@ -309,11 +309,18 @@ jobs:
       - name: Terraform Init
         working-directory: terraform/central
         run: |
-          terraform init \
-            -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
-            -backend-config="key=central/cloud-custodian/terraform.tfstate" \
-            -backend-config="region=${{ env.AWS_REGION }}" \
-            -backend-config="dynamodb_table=terraform-state-lock"
+          if aws dynamodb describe-table --table-name terraform-state-lock --region ${{ env.AWS_REGION }} 2>/dev/null; then
+            terraform init \
+              -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
+              -backend-config="key=central/cloud-custodian/terraform.tfstate" \
+              -backend-config="region=${{ env.AWS_REGION }}" \
+              -backend-config="dynamodb_table=terraform-state-lock"
+          else
+            terraform init \
+              -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
+              -backend-config="key=central/cloud-custodian/terraform.tfstate" \
+              -backend-config="region=${{ env.AWS_REGION }}"
+          fi
 
       - name: Terraform Apply
         working-directory: terraform/central
@@ -383,11 +390,18 @@ jobs:
       - name: Terraform Init
         working-directory: terraform/central
         run: |
-          terraform init \
-            -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
-            -backend-config="key=central/cloud-custodian/terraform.tfstate" \
-            -backend-config="region=${{ env.AWS_REGION }}" \
-            -backend-config="dynamodb_table=terraform-state-lock"
+          if aws dynamodb describe-table --table-name terraform-state-lock --region ${{ env.AWS_REGION }} 2>/dev/null; then
+            terraform init \
+              -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
+              -backend-config="key=central/cloud-custodian/terraform.tfstate" \
+              -backend-config="region=${{ env.AWS_REGION }}" \
+              -backend-config="dynamodb_table=terraform-state-lock"
+          else
+            terraform init \
+              -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
+              -backend-config="key=central/cloud-custodian/terraform.tfstate" \
+              -backend-config="region=${{ env.AWS_REGION }}"
+          fi
 
       - name: Create dummy files for destroy
         working-directory: terraform/central
