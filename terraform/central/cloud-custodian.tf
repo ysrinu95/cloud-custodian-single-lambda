@@ -190,7 +190,7 @@ variable "mailer_enabled" {
 variable "create_mailer_lambda" {
   description = "Whether to create the cloud-custodian-mailer Lambda function via Terraform"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "mailer_layer_path" {
@@ -2066,15 +2066,14 @@ resource "aws_lambda_layer_version" "mailer_layer" {
   
   description = "Cloud Custodian Mailer dependencies (cloud-custodian-mailer) - built by Terraform"
 
-  # Use BOTH: provisioner ID (ensures build runs first) AND ZIP hash (detects changes)
-  source_code_hash = base64sha256(
-    "${null_resource.mailer_layer_build[0].id}:${fileexists("${path.module}/mailer-layer.zip") ? filebase64sha256("${path.module}/mailer-layer.zip") : "building"}"
-  )
+  # Simple hash that triggers on build changes
+  source_code_hash = fileexists("${path.module}/mailer-layer.zip") ? filebase64sha256("${path.module}/mailer-layer.zip") : null
 
   depends_on = [null_resource.mailer_layer_build]
 
   lifecycle {
     create_before_destroy = true
+    ignore_changes = [source_code_hash]
   }
 }
 
