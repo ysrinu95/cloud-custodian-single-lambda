@@ -1,0 +1,182 @@
+name: Run Cloud Custodian Periodic Policies
+
+on:
+  schedule:
+    # Run daily at 6 AM UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      account_id:
+        description: 'Member Account ID to scan'
+        required: false
+        type: string
+        default: '813185901390'
+      policy_file:
+        description: 'Specific policy file to run (optional, runs all if empty)'
+        required: false
+        type: string
+      dry_run:
+        description: 'Dry run mode (skip actions)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: us-east-1
+  CENTRAL_ACCOUNT_ID: "172327596604"
+  MEMBER_ACCOUNT_ID: "813185901390"
+  PYTHON_VERSION: "3.12"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  run-periodic-policies:
+    name: Run Periodic Policies
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Cloud Custodian
+        run: |
+          python -m pip install --upgrade pip
+          pip install c7n c7n-mailer
+
+      - name: Configure AWS credentials (Central Account)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.CENTRAL_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Determine target account
+        id: account
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ github.event.inputs.account_id }}" ]; then
+            echo "account_id=${{ github.event.inputs.account_id }}" >> $GITHUB_OUTPUT
+          else
+            echo "account_id=${{ env.MEMBER_ACCOUNT_ID }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Assume member account role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ steps.account.outputs.account_id }}:role/CloudCustodianExecutionRole
+          role-chaining: true
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS credentials
+        run: |
+          echo "Current AWS identity:"
+          aws sts get-caller-identity
+          echo "Account ID: ${{ steps.account.outputs.account_id }}"
+
+      - name: Run periodic policies
+        run: |
+          ACCOUNT_ID="${{ steps.account.outputs.account_id }}"
+          POLICY_FILE="${{ github.event.inputs.policy_file }}"
+          DRY_RUN="${{ github.event.inputs.dry_run }}"
+          
+          cd c7n
+          mkdir -p output/periodic
+          
+          echo "📋 Running Cloud Custodian periodic policies..."
+          echo "Account: $ACCOUNT_ID"
+          echo "Region: ${{ env.AWS_REGION }}"
+          
+          # Determine which policies to run
+          if [ -n "$POLICY_FILE" ]; then
+            POLICY_FILES="policies/periodic/$POLICY_FILE"
+            echo "Running specific policy: $POLICY_FILE"
+          else
+            POLICY_FILES="policies/periodic/*.yml"
+            echo "Running all periodic policies"
+          fi
+          
+          # Build custodian command
+          CUSTODIAN_CMD="custodian run"
+          
+          if [ "$DRY_RUN" == "true" ]; then
+            CUSTODIAN_CMD="$CUSTODIAN_CMD --dryrun"
+            echo "🔍 DRY RUN MODE - No actions will be taken"
+          fi
+          
+          # Run policies
+          for policy in $POLICY_FILES; do
+            if [ -f "$policy" ]; then
+              POLICY_NAME=$(basename "$policy" .yml)
+              echo ""
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "📄 Running policy: $POLICY_NAME"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              
+              $CUSTODIAN_CMD \
+                -s "output/periodic/$POLICY_NAME" \
+                -v \
+                --region ${{ env.AWS_REGION }} \
+                "$policy" || {
+                  echo "⚠️  Failed to run $POLICY_NAME"
+                  continue
+                }
+              
+              echo "✅ Completed: $POLICY_NAME"
+            fi
+          done
+          
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📊 Policy Execution Summary"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          # Count resources found
+          for policy_output in output/periodic/*/resources.json; do
+            if [ -f "$policy_output" ]; then
+              POLICY_DIR=$(dirname "$policy_output")
+              POLICY_NAME=$(basename "$POLICY_DIR")
+              RESOURCE_COUNT=$(jq '. | length' "$policy_output" 2>/dev/null || echo "0")
+              echo "$POLICY_NAME: $RESOURCE_COUNT resources found"
+            fi
+          done
+
+      - name: Upload policy results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: periodic-policy-results-${{ steps.account.outputs.account_id }}
+          path: c7n/output/periodic/
+          retention-days: 30
+
+      - name: Generate summary
+        if: always()
+        run: |
+          echo "## Cloud Custodian Periodic Policies Execution" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Account:** ${{ steps.account.outputs.account_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Region:** ${{ env.AWS_REGION }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Dry Run:** ${{ github.event.inputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -d "c7n/output/periodic" ]; then
+            echo "### Results by Policy" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Policy | Resources Found |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|----------------|" >> $GITHUB_STEP_SUMMARY
+            
+            for policy_output in c7n/output/periodic/*/resources.json; do
+              if [ -f "$policy_output" ]; then
+                POLICY_DIR=$(dirname "$policy_output")
+                POLICY_NAME=$(basename "$POLICY_DIR")
+                RESOURCE_COUNT=$(jq '. | length' "$policy_output" 2>/dev/null || echo "0")
+                echo "| $POLICY_NAME | $RESOURCE_COUNT |" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+          else
+            echo "No results generated" >> $GITHUB_STEP_SUMMARY
+          fi
