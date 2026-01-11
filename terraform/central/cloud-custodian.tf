@@ -1667,7 +1667,7 @@ resource "aws_sqs_queue" "custodian_mailer_dlq" {
   )
 }
 
-# SQS Queue Policy - Allow member account roles to send messages
+# SQS Queue Policy - Allow member accounts and central Lambda to access queue
 resource "aws_sqs_queue_policy" "mailer_queue_policy" {
   count     = var.create_notification_queue ? 1 : 0
   queue_url = aws_sqs_queue.custodian_mailer[0].url
@@ -1681,7 +1681,7 @@ resource "aws_sqs_queue_policy" "mailer_queue_policy" {
         Principal = {
           AWS = [
             for account_id in var.member_account_ids :
-            "arn:aws:iam::${account_id}:role/CloudCustodianExecutionRole"
+            "arn:aws:iam::${account_id}:root"
           ]
         }
         Action = [
@@ -1690,6 +1690,24 @@ resource "aws_sqs_queue_policy" "mailer_queue_policy" {
           "sqs:GetQueueAttributes"
         ]
         Resource = aws_sqs_queue.custodian_mailer[0].arn
+      },
+      {
+        Sid    = "AllowMailerLambdaReceive"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = aws_sqs_queue.custodian_mailer[0].arn
+        Condition = {
+          StringEquals = {
+            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+          }
+        }
       }
     ]
   })
