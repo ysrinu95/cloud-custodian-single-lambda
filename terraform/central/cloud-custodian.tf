@@ -1568,6 +1568,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "policies" {
     id     = "archive-old-versions"
     status = "Enabled"
 
+    filter {}
+
     noncurrent_version_transition {
       noncurrent_days = 30
       storage_class   = "STANDARD_IA"
@@ -1586,6 +1588,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "policies" {
   rule {
     id     = "abort-incomplete-multipart-uploads"
     status = "Enabled"
+
+    filter {}
 
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
@@ -2529,12 +2533,12 @@ output "lambda_log_group_name" {
 
 output "lambda_layer_arn" {
   description = "ARN of the Cloud Custodian Lambda layer (if created)"
-  value       = var.lambda_layer_path != "" ? aws_lambda_layer_version.custodian_layer[0].arn : "N/A - Layer not created"
+  value       = var.lambda_layer_path != "" ? (length(aws_lambda_layer_version.custodian_layer_external) > 0 ? aws_lambda_layer_version.custodian_layer_external[0].arn : "N/A") : (length(aws_lambda_layer_version.custodian_layer) > 0 ? aws_lambda_layer_version.custodian_layer[0].arn : "N/A")
 }
 
 output "lambda_layer_version" {
   description = "Version of the Cloud Custodian Lambda layer (if created)"
-  value       = var.lambda_layer_path != "" ? aws_lambda_layer_version.custodian_layer[0].version : "N/A"
+  value       = var.lambda_layer_path != "" ? (length(aws_lambda_layer_version.custodian_layer_external) > 0 ? aws_lambda_layer_version.custodian_layer_external[0].version : "N/A") : (length(aws_lambda_layer_version.custodian_layer) > 0 ? aws_lambda_layer_version.custodian_layer[0].version : "N/A")
 }
 
 output "policy_bucket_name" {
