@@ -1,0 +1,199 @@
+vars:
+  email-notify: &email-notify
+    template: default.html
+    priority_header: "1"
+    from: c7n@central.ctkube.com
+    to:
+      - srinivasula.yallala@optum.com
+    transport:
+      type: sqs
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications
+
+policies:
+  - name: aws-iam-user-inactive-access-keys
+    conditions:
+      - region: us-east-1 # global resource
+    resource: aws.iam-user
+    description: |
+      Notifies of and disables IAM access keys found to be unused
+    filters:
+      - type: credential
+        key: access_keys.active
+        value: true
+        op: eq
+      - type: credential
+        key: access_keys.last_used_date
+        value_type: age
+        value: 90
+        op: gt
+      # https://github.com/cloud-custodian/cloud-custodian/issues/7833#issuecomment-1602019650
+      - type: value
+        key: length("c7n:matched-keys")
+        value: 1
+        op: gte
+      # Exclude data squad - https://greenst.atlassian.net/browse/DEVOPSENG-879
+      - type: value
+        key: tag:squad
+        value: data
+        op: ne
+    actions:
+      #- type: remove-keys
+      #  matched: true
+      #  disable: true
+      - type: notify
+        <<: *email-notify
+        subject: "⚠️ IAM Access Keys Inactive - {{ account }} - {{ region }}"
+        violation_desc: |
+          **IAM Access Keys Not Recently Used**
+          
+          IAM user access keys not used in the last 90 days have been disabled.
+          
+          **Actions Taken:**
+          - Unused IAM access keys have been disabled
+          
+          **Recommendation:**
+          If the user is still needed, consider switching to an IAM role instead.
+
+  - name: aws-iam-policy-allow-all-report
+    conditions:
+      - region: us-east-1 # global resource
+    resource: aws.iam-policy
+    description: |
+      Notifies of IAM policies which allow all permissions
+    filters:
+      - type: check-permissions
+        match: allowed
+        actions:
+          - '*:*'
+      - tag:c7n-exception:iam-admin: absent
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "[c7n] [{{ account }}] IAM Policies Which Allow All Permissions"
+        violation_desc: IAM policy not following a least-privilege model
+        action_desc: |
+          Please update the resources to follow a least-privilege model.<br>
+          <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege">Documentation</a>
+
+  - name: aws-iam-role-admin-access-report
+    conditions:
+      - region: us-east-1 # global resource
+    resource: aws.iam-role
+    description: |
+      Notifies of IAM roles with administrator permissions
+    filters:
+      - or:
+        - type: has-specific-managed-policy
+          value: AdministratorAccess
+        - type: check-permissions
+          match: allowed
+          actions:
+            - '*:*'
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "[c7n] [{{ account }}] IAM Roles With Administrator Permissions"
+        violation_desc: IAM principal not following a least-privilege model
+        action_desc: |
+          Please update the resources to follow a least-privilege model.<br>
+          <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege">Documentation</a>
+
+  - name: aws-iam-user-admin-access-report
+    conditions:
+      - region: us-east-1 # global resource
+    resource: aws.iam-user
+    description: |
+      Notifies of IAM users with administrator permissions
+    filters:
+      - or:
+        - type: policy
+          key: PolicyName
+          value: AdministratorAccess
+          include-via: true
+        - type: check-permissions
+          match: allowed
+          actions:
+            - '*:*'
+      - tag:c7n-exception:iam-admin: absent
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "[c7n] [{{ account }}] IAM Users With Administrator Permissions"
+        violation_desc: IAM principal not following a least-privilege model
+        action_desc: |
+          Please update the resources to follow a least-privilege model.<br>
+          <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege">Documentation</a>
+
+  - name: aws-iam-group-admin-access-report
+    conditions:
+      - region: us-east-1 # global resource
+    resource: aws.iam-group
+    description: |
+      Notifies of IAM groups with administrator permissions
+    filters:
+      - or:
+        - type: has-specific-managed-policy
+          value: AdministratorAccess
+        - type: check-permissions
+          match: allowed
+          actions:
+            - '*:*'
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "[c7n] [{{ account }}] IAM Groups With Administrator Permissions"
+        violation_desc: IAM principal not following a least-privilege model
+        action_desc: |
+          Please update the resources to follow a least-privilege model.<br>
+          <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege">Documentation</a>
+
+  - name: aws-iam-policy-allow-all-created
+    conditions:
+      - region: us-east-1 # global resource
+    resource: aws.iam-policy
+    description: |
+      Notifies of IAM policy created which allows all permissions
+    filters:
+      - type: usage
+        match-operator: all
+        LastAuthenticated: null
+      # exclude roles created in the past year
+      - type: value
+        key: CreateDate
+        op: gt
+        value: 365
+        value_type: age
+      - tag:c7n-exception:unused: absent
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "[c7n] [{{ account }}] IAM Roles Are Unused"
+        violation_desc: IAM Roles that appear to be unused
+        action_desc: |
+          No action taken.<br>
+          As a best practice, delete roles that are no longer in use.<br>
+
+  - name: aws-iam-unused-policies-report
+    conditions:
+      - region: us-east-1 # global resource
+    resource: aws.iam-policy
+    description: |
+      Notifies of IAM policies found to be unused
+    filters:
+      - type: unused
+      - tag:c7n-exception:unused: absent
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "[c7n] [{{ account }}] IAM Policies Are Unused"
+        violation_desc: IAM policies that appear to be unused
+        action_desc: |
+          No action taken.<br>
+          If the policy is still needed, please attach to the required IAM role.
+
+  - name: aws-iam-new-user-created
+    conditions:
+      - region: us-east-1 # global resource
+    resource: aws.iam-user
+    description: |
+      Notifies of new IAM user creation

@@ -1,0 +1,933 @@
+"""
+Real-time SQS Message Processing for Cloud Custodian
+
+Handles custom formatting and email delivery for event-driven/real-time policy executions.
+Supports both SNS publishing and direct SES email sending.
+Periodic policies continue to use the native c7n-mailer Lambda.
+
+Architecture:
+- Single Lambda handles all resource types
+- Class-based resource handlers for extensibility
+- Each resource type has its own filtering and formatting logic
+- Configurable notification method: SNS, SES, or both
+"""
+
+import json
+import logging
+import os
+import boto3
+import base64
+import zlib
+import time
+from datetime import datetime
+from typing import Dict, Any, List, Optional
+from abc import ABC, abstractmethod
+from botocore.exceptions import ClientError
+from jinja2 import Template, Environment, FileSystemLoader
+
+logger = logging.getLogger()
+
+# AWS clients
+sqs = boto3.client('sqs')
+sns = boto3.client('sns')
+ses = boto3.client('ses')
+s3 = boto3.client('s3')
+
+# Environment variables
+REALTIME_QUEUE_URL = os.getenv('REALTIME_QUEUE_URL', '')
+SNS_TOPIC_ARN = os.getenv('SNS_TOPIC_ARN', 'arn:aws:sns:us-east-1:172327596604:custodian-mailer-notifications')
+NOTIFICATION_METHOD = os.getenv('NOTIFICATION_METHOD', 'sns')  # Options: 'sns', 'ses', 'both'
+FROM_ADDRESS = os.getenv('FROM_ADDRESS', 'c7n@central.ctkube.com')
+TO_ADDRESSES = os.getenv('TO_ADDRESSES', 'srinivasula.yallala@optum.com').split(',')
+TEMPLATES_BUCKET = os.getenv('TEMPLATES_BUCKET', '')
+SES_REGION = os.getenv('REGION', 'us-east-1')
+
+
+# ============================================================================
+# Resource Handler Base Class
+# ============================================================================
+
+class ResourceHandler(ABC):
+    """
+    Base class for resource-specific filtering and formatting logic.
+    Each resource type (EC2, S3, Security Hub, etc.) should implement this.
+    """
+    
+    def __init__(self, policy_name: str, resources: List[Dict], custodian_data: Dict):
+        self.policy_name = policy_name
+        self.resources = resources
+        self.custodian_data = custodian_data
+        self.logger = logging.getLogger(self.__class__.__name__)
+    
+    @abstractmethod
+    def filter_resources(self) -> List[Dict]:
+        """
+        Filter resources based on policy-specific criteria.
+        Returns filtered list of resources to notify on.
+        """
+        pass
+    
+    @abstractmethod
+    def format_resource_summary(self, resource: Dict) -> str:
+        """
+        Format a single resource for display in notification.
+        Returns human-readable string describing the resource.
+        """
+        pass
+    
+    def extract_user_info(self, resource: Dict) -> Optional[str]:
+        """
+        Extract user/creator information from resource.
+        Common implementation for all resource types.
+        """
+        # Check c7n metadata
+        if 'c7n:CreatorName' in resource:
+            return resource['c7n:CreatorName']
+        
+        # Check tags
+        if 'Tags' in resource:
+            for tag in resource.get('Tags', []):
+                tag_key = tag.get('Key', '').lower()
+                if tag_key in ['created-by', 'createdby', 'creator', 'owner', 'user']:
+                    return tag.get('Value')
+        
+        return None
+
+
+# ============================================================================
+# EC2 Resource Handler
+# ============================================================================
+
+class EC2Handler(ResourceHandler):
+    """Handler for EC2 instances with public IP filtering."""
+    
+    def filter_resources(self) -> List[Dict]:
+        """Only include EC2 instances with public IP addresses."""
+        if self.policy_name == 'ec2-stop-instances-on-launch':
+            original_count = len(self.resources)
+            filtered = [r for r in self.resources if r.get('PublicIpAddress')]
+            
+            filtered_count = original_count - len(filtered)
+            if filtered_count > 0:
+                self.logger.info(f"🔍 Filtered {filtered_count} private EC2 instance(s) from notification")
+            
+            return filtered
+        
+        # For other EC2 policies, include all resources
+        return self.resources
+    
+    def format_resource_summary(self, resource: Dict) -> str:
+        """Format EC2 instance details."""
+        instance_id = resource.get('InstanceId', resource.get('id', 'N/A'))
+        instance_type = resource.get('InstanceType', 'N/A')
+        state = resource.get('State', {}).get('Name', 'N/A')
+        user_info = self.extract_user_info(resource)
+        
+        user_suffix = f", user: {user_info}" if user_info else ""
+        return f"{instance_id} ({instance_type}, {state}{user_suffix})"
+
+
+# ============================================================================
+# Security Group Handler
+# ============================================================================
+
+class SecurityGroupHandler(ResourceHandler):
+    """Handler for security groups."""
+    
+    def filter_resources(self) -> List[Dict]:
+        """Include all security groups (filtering done in policy YAML)."""
+        return self.resources
+    
+    def format_resource_summary(self, resource: Dict) -> str:
+        """Format security group details."""
+        group_id = resource.get('GroupId', resource.get('id', 'N/A'))
+        group_name = resource.get('GroupName', 'N/A')
+        user_info = self.extract_user_info(resource)
+        
+        user_suffix = f", user: {user_info}" if user_info else ""
+        return f"{group_id} ({group_name}{user_suffix})"
+
+
+# ============================================================================
+# AMI Handler
+# ============================================================================
+
+class AMIHandler(ResourceHandler):
+    """Handler for Amazon Machine Images."""
+    
+    def filter_resources(self) -> List[Dict]:
+        """Include all AMIs (filtering done in policy YAML)."""
+        return self.resources
+    
+    def format_resource_summary(self, resource: Dict) -> str:
+        """Format AMI details."""
+        image_id = resource.get('ImageId', resource.get('id', 'N/A'))
+        image_name = resource.get('Name', 'N/A')
+        user_info = self.extract_user_info(resource)
+        
+        user_suffix = f", user: {user_info}" if user_info else ""
+        return f"{image_id} ({image_name}{user_suffix})"
+
+
+# ============================================================================
+# Security Hub Handler
+# ============================================================================
+
+class SecurityHubHandler(ResourceHandler):
+    """Handler for Security Hub findings (event-driven)."""
+    
+    def filter_resources(self) -> List[Dict]:
+        """
+        Security Hub is event-driven - no resource filtering needed.
+        Event filters in policy YAML determine if notification is sent.
+        """
+        return self.resources
+    
+    def format_resource_summary(self, resource: Dict) -> str:
+        """Format Security Hub account resource."""
+        account_id = resource.get('account_id', 'N/A')
+        account_name = resource.get('account_name', 'N/A')
+        return f"{account_id} ({account_name})"
+
+
+# ============================================================================
+# Generic/Default Handler
+# ============================================================================
+
+class GenericHandler(ResourceHandler):
+    """Default handler for resource types without specific implementation."""
+    
+    def filter_resources(self) -> List[Dict]:
+        """Include all resources (filtering done in policy YAML)."""
+        return self.resources
+    
+    def format_resource_summary(self, resource: Dict) -> str:
+        """Generic resource formatting."""
+        resource_id = resource.get('id', resource.get('Id', resource.get('InstanceId', 'N/A')))
+        user_info = self.extract_user_info(resource)
+        
+        user_suffix = f" (user: {user_info})" if user_info else ""
+        return f"{resource_id}{user_suffix}"
+
+
+# ============================================================================
+# Resource Handler Factory
+# ============================================================================
+
+class ResourceHandlerFactory:
+    """Factory to create appropriate resource handler based on resource type."""
+    
+    # Mapping of resource types to handler classes
+    HANDLERS = {
+        'ec2': EC2Handler,
+        'security-group': SecurityGroupHandler,
+        'ami': AMIHandler,
+        'aws.account': SecurityHubHandler,  # Security Hub uses account resource
+    }
+    
+    @classmethod
+    def create_handler(cls, policy_name: str, resources: List[Dict], 
+                      custodian_data: Dict) -> ResourceHandler:
+        """
+        Create appropriate resource handler based on resource type.
+        
+        Args:
+            policy_name: Name of Cloud Custodian policy
+            resources: List of resources from policy execution
+            custodian_data: Full custodian message data
+        
+        Returns:
+            ResourceHandler instance for the resource type
+        """
+        # Determine resource type from custodian data
+        resource_type = custodian_data.get('policy', {}).get('resource', 'unknown')
+        
+        # Get handler class or default to GenericHandler
+        handler_class = cls.HANDLERS.get(resource_type, GenericHandler)
+        
+        logger.info(f"🔧 Using {handler_class.__name__} for resource type: {resource_type}")
+        
+        return handler_class(policy_name, resources, custodian_data)
+
+
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
+
+def decode_sqs_message(body: str) -> Dict[str, Any]:
+    """
+    Decode base64+gzip compressed Cloud Custodian SQS message.
+    
+    Args:
+        body: Base64+gzip encoded message body
+    
+    Returns:
+        Decoded message data as dict
+    """
+    try:
+        decoded_bytes = base64.b64decode(body)
+        decompressed = zlib.decompress(decoded_bytes)
+        message_data = json.loads(decompressed.decode('utf-8'))
+        return message_data
+    except Exception as e:
+        logger.error(f"Failed to decode SQS message: {str(e)}")
+        return None
+
+
+def format_html_notification(policy_name: str, action: Dict[str, Any], resources: list, account: str, region: str) -> str:
+    """
+    Create HTML formatted notification for SNS email subscribers.
+    
+    Args:
+        policy_name: Name of the Cloud Custodian policy
+        action: Policy action configuration
+        resources: List of affected resources
+        account: AWS account ID
+        region: AWS region
+    
+    Returns:
+        HTML formatted email body
+    """
+    timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
+    action_type = action.get('type', 'unknown')
+    
+    html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 20px; }}
+        .header {{ background-color: #ff9900; padding: 15px; color: white; }}
+        .content {{ padding: 20px; background-color: #f5f5f5; }}
+        .resource {{ background-color: white; padding: 15px; margin: 10px 0; border-left: 4px solid #232f3e; }}
+        .detail {{ margin: 5px 0; }}
+        .label {{ font-weight: bold; color: #232f3e; }}
+        .footer {{ padding: 10px; font-size: 12px; color: #666; }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>🔔 Cloud Custodian Real-Time Alert</h2>
+    </div>
+    <div class="content">
+        <div class="detail"><span class="label">Policy:</span> {policy_name}</div>
+        <div class="detail"><span class="label">Account:</span> {account}</div>
+        <div class="detail"><span class="label">Region:</span> {region}</div>
+        <div class="detail"><span class="label">Action:</span> {action_type}</div>
+        <div class="detail"><span class="label">Timestamp:</span> {timestamp}</div>
+        <div class="detail"><span class="label">Resources Affected:</span> {len(resources)}</div>
+        
+        <h3>Resources:</h3>
+"""
+    
+    for idx, resource in enumerate(resources[:10], 1):
+        resource_id = resource.get('id', resource.get('InstanceId', resource.get('ImageId', 'N/A')))
+        resource_type = resource.get('c7n:resource-type', 'resource')
+        
+        # Extract user information
+        user_info = None
+        if 'c7n:CreatorName' in resource:
+            user_info = resource['c7n:CreatorName']
+        elif 'Tags' in resource:
+            for tag in resource.get('Tags', []):
+                tag_key = tag.get('Key', '').lower()
+                if tag_key in ['created-by', 'createdby', 'creator', 'owner', 'user']:
+                    user_info = tag.get('Value')
+                    break
+        
+        html += f"""
+        <div class="resource">
+            <div class="detail"><span class="label">#{idx} Resource ID:</span> {resource_id}</div>
+            <div class="detail"><span class="label">Type:</span> {resource_type}</div>
+"""
+        
+        if user_info:
+            html += f'            <div class="detail"><span class="label">Created By:</span> {user_info}</div>\n'
+        
+        if 'State' in resource:
+            state = resource['State'].get('Name', 'unknown')
+            html += f'            <div class="detail"><span class="label">State:</span> {state}</div>\n'
+        
+        if 'Tags' in resource and resource['Tags']:
+            tags_html = ", ".join([f"{t.get('Key')}={t.get('Value')}" for t in resource['Tags'][:5]])
+            html += f'            <div class="detail"><span class="label">Tags:</span> {tags_html}</div>\n'
+        
+        html += "        </div>\n"
+    
+    if len(resources) > 10:
+        html += f"        <div class='detail'><em>... and {len(resources) - 10} more resources</em></div>\n"
+    
+    html += """
+    </div>
+    <div class="footer">
+        This is an automated real-time notification from Cloud Custodian.
+    </div>
+</body>
+</html>
+"""
+    return html
+
+
+def send_ses_email(subject: str, html_body: str, to_addresses: List[str] = None) -> Optional[str]:
+    """
+    Send email directly via SES with HTML formatting.
+    
+    Args:
+        subject: Email subject line
+        html_body: HTML formatted email body
+        to_addresses: List of recipient email addresses (optional, uses env var if not provided)
+    
+    Returns:
+        MessageId if successful, None if failed
+    """
+    if to_addresses is None:
+        to_addresses = TO_ADDRESSES
+    
+    try:
+        logger.info(f"📧 Sending email via SES")
+        logger.info(f"  From: {FROM_ADDRESS}")
+        logger.info(f"  To: {', '.join(to_addresses)}")
+        logger.info(f"  Subject: {subject}")
+        
+        response = ses.send_email(
+            Source=FROM_ADDRESS,
+            Destination={
+                'ToAddresses': to_addresses
+            },
+            Message={
+                'Subject': {
+                    'Data': subject,
+                    'Charset': 'UTF-8'
+                },
+                'Body': {
+                    'Html': {
+                        'Data': html_body,
+                        'Charset': 'UTF-8'
+                    }
+                }
+            }
+        )
+        
+        message_id = response.get('MessageId', 'N/A')
+        logger.info(f"✅ Email sent via SES - MessageId: {message_id}")
+        return message_id
+        
+    except ClientError as e:
+        error_code = e.response['Error']['Code']
+        error_msg = e.response['Error']['Message']
+        logger.error(f"❌ SES send failed: {error_code} - {error_msg}")
+        
+        if error_code == 'MessageRejected':
+            logger.error("   Email rejected - check sender verification and content")
+        elif error_code == 'MailFromDomainNotVerifiedException':
+            logger.error(f"   Domain {FROM_ADDRESS.split('@')[1]} not verified in SES")
+        elif error_code == 'ConfigurationSetDoesNotExist':
+            logger.error("   SES configuration set not found")
+        
+        return None
+    except Exception as e:
+        logger.error(f"❌ Unexpected error sending SES email: {str(e)}", exc_info=True)
+        return None
+
+
+def process_realtime_sqs_messages(invocation_id: Optional[str] = None) -> Dict[str, int]:
+    """
+    Poll SQS queue for Cloud Custodian messages from real-time policy executions
+    and send formatted notifications via SNS.
+    
+    This is only used for real-time/event-driven policies.
+    Periodic policies use the native c7n-mailer Lambda.
+    
+    Args:
+        invocation_id: Lambda invocation ID to filter messages (only process messages from this invocation)
+    
+    Returns:
+        Dict with message processing statistics
+    """
+    messages_processed = 0
+    sns_published = 0
+    
+    if not REALTIME_QUEUE_URL:
+        logger.warning("REALTIME_QUEUE_URL not configured, skipping SQS processing")
+        return {'processed': 0, 'published': 0}
+    
+    if not SNS_TOPIC_ARN:
+        logger.warning("SNS_TOPIC_ARN not configured, skipping SNS publishing")
+        return {'processed': 0, 'published': 0}
+    
+    try:
+        # Add 1.5 second delay to allow SQS message propagation (eventual consistency)
+        logger.info("⏱️  Waiting 1.5 seconds for SQS message propagation...")
+        time.sleep(1.5)
+        
+        # Check queue depth before fetching
+        try:
+            queue_attrs = sqs.get_queue_attributes(
+                QueueUrl=REALTIME_QUEUE_URL,
+                AttributeNames=['ApproximateNumberOfMessages', 'ApproximateNumberOfMessagesNotVisible']
+            )
+            visible_count = int(queue_attrs.get('Attributes', {}).get('ApproximateNumberOfMessages', 0))
+            in_flight_count = int(queue_attrs.get('Attributes', {}).get('ApproximateNumberOfMessagesNotVisible', 0))
+            logger.info(f"📊 SQS Queue Depth: {visible_count} visible messages, {in_flight_count} in-flight (being processed)")
+        except Exception as e:
+            logger.warning(f"⚠️  Failed to get queue depth: {e}")
+        
+        # Fetch messages from queue - poll until we find matching messages or exhaust queue
+        # Each Lambda invocation should only process its own published messages
+        # With invocation ID filtering + visibility timeout reset, we can safely poll more
+        all_messages = []
+        max_polls = 20  # Poll up to 200 messages (20 polls × 10 max) to handle deep queues
+        total_received = 0
+        total_non_matching = 0
+        
+        for poll_attempt in range(max_polls):
+            response = sqs.receive_message(
+                QueueUrl=REALTIME_QUEUE_URL,
+                MaxNumberOfMessages=10,  # SQS max per request
+                WaitTimeSeconds=1,  # Reduced wait time - process messages quickly from current invocation
+                AttributeNames=['All'],
+                MessageAttributeNames=['All']  # Include message attributes for invocation ID filtering
+            )
+            
+            batch_messages = response.get('Messages', [])
+            total_received += len(batch_messages)
+            
+            if batch_messages:
+                # Filter messages by invocation ID if provided
+                if invocation_id:
+                    filtered_messages = []
+                    non_matching_messages = []
+                    for msg in batch_messages:
+                        msg_attrs = msg.get('MessageAttributes', {})
+                        msg_invocation_id = msg_attrs.get('InvocationId', {}).get('StringValue')
+                        if msg_invocation_id == invocation_id:
+                            filtered_messages.append(msg)
+                        else:
+                            # Track non-matching messages to make them visible again
+                            non_matching_messages.append(msg)
+                            logger.debug(f"Skipping message from different invocation: {msg_invocation_id}")
+                    
+                    total_non_matching += len(non_matching_messages)
+                    
+                    # Make non-matching messages immediately visible again (visibility timeout = 0)
+                    # This prevents accumulation of in-flight messages blocking the queue
+                    if non_matching_messages:
+                        for msg in non_matching_messages:
+                            try:
+                                sqs.change_message_visibility(
+                                    QueueUrl=REALTIME_QUEUE_URL,
+                                    ReceiptHandle=msg['ReceiptHandle'],
+                                    VisibilityTimeout=0  # Make immediately visible
+                                )
+                            except Exception as e:
+                                logger.warning(f"Failed to change visibility for message: {e}")
+                    
+                    all_messages.extend(filtered_messages)
+                    logger.info(f"📬 Poll {poll_attempt + 1}/{max_polls}: Received {len(batch_messages)} messages, {len(filtered_messages)} match invocation ID")
+                    
+                    # Continue polling to collect ALL matching messages for this invocation
+                    # Don't stop after first batch - there may be more messages for this invocation
+                else:
+                    # No invocation ID filtering - process all messages
+                    all_messages.extend(batch_messages)
+                    logger.info(f"📬 Poll {poll_attempt + 1}/{max_polls}: Received {len(batch_messages)} messages from SQS")
+            else:
+                logger.info(f"📬 Poll {poll_attempt + 1}/{max_polls}: No messages received")
+                # No messages in this poll
+                if poll_attempt == 0:
+                    # On first attempt, wait a bit longer for messages to become visible
+                    time.sleep(2)
+                    continue
+                elif len(all_messages) > 0:
+                    # Found some matching messages already, but queue is now empty
+                    logger.info(f"📭 No more messages in queue, collected {len(all_messages)} matching messages total")
+                    break
+                else:
+                    # No matching messages found and queue is empty
+                    logger.info(f"📭 No more messages in queue")
+                    break
+        
+        messages = all_messages
+        logger.info(f"📊 Polling summary: Total received={total_received}, Non-matching returned={total_non_matching}, Matching kept={len(messages)}")
+        logger.info(f"📬 Total received: {len(messages)} real-time notification messages from SQS")
+        
+        # Deduplicate messages based on MessageId (prevent processing same message twice)
+        seen_message_ids = set()
+        unique_messages = []
+        for msg in messages:
+            msg_id = msg.get('MessageId', 'unknown')
+            if msg_id not in seen_message_ids:
+                unique_messages.append(msg)
+                seen_message_ids.add(msg_id)
+            else:
+                logger.warning(f"⚠️  Skipping duplicate message: {msg_id}")
+        
+        if len(messages) != len(unique_messages):
+            logger.info(f"📬 After deduplication: {len(unique_messages)} unique messages (removed {len(messages) - len(unique_messages)} duplicates)")
+        
+        messages = unique_messages
+        
+        # Log details about each message for debugging
+        for idx, msg in enumerate(messages, 1):
+            msg_id = msg.get('MessageId', 'unknown')
+            logger.info(f"   Message {idx}/{len(messages)}: ID={msg_id}")
+        
+        logger.info(f"🔄 Starting to process {len(messages)} message(s)...")
+        
+        for message_idx, message in enumerate(messages, 1):
+            try:
+                receipt_handle = message['ReceiptHandle']
+                body = message['Body']
+                
+                logger.info(f"")
+                logger.info(f"{'='*80}")
+                logger.info(f"🔄 Processing message {message_idx}/{len(messages)}: MessageId={message.get('MessageId', 'N/A')}")
+                logger.info(f"{'='*80}")
+                
+                # DEBUG: Log raw SQS message body for inspection
+                logger.info(f"🔍 RAW SQS MESSAGE BODY (first 500 chars):")
+                logger.info(f"   {body[:500]}")
+                logger.info(f"   Total length: {len(body)} characters")
+                logger.info(f"   Message ID: {message.get('MessageId', 'N/A')}")
+                
+                custodian_data = decode_sqs_message(body)
+                
+                if not custodian_data:
+                    logger.warning("Failed to decode message, skipping")
+                    continue
+                
+                # DEBUG: Log decoded custodian_data structure (first message only)
+                if messages_processed == 0:
+                    logger.info(f"")
+                    logger.info(f"📋 DECODED CUSTODIAN DATA STRUCTURE:")
+                    logger.info(f"   Full JSON (first 2000 chars): {json.dumps(custodian_data, default=str)[:2000]}")
+                    logger.info(f"   Keys: {list(custodian_data.keys())}")
+                
+                # DEBUG: Log decoded custodian_data structure (first message only)
+                if messages_processed == 0:
+                    logger.info(f"")
+                    logger.info(f"📋 DECODED CUSTODIAN DATA STRUCTURE:")
+                    logger.info(f"   Full JSON (complete):")
+                    # Log complete JSON structure
+                    full_json = json.dumps(custodian_data, default=str, indent=2)
+                    logger.info(full_json)
+                    logger.info(f"")
+                    logger.info(f"📋 Sample custodian_data keys: {list(custodian_data.keys())}")
+                    logger.info(f"📋 Policy data: {custodian_data.get('policy', {})}")
+                    logger.info(f"📋 Account data: account={custodian_data.get('account')}, account_id={custodian_data.get('account_id')}")
+                    # Check if event context is present (for Security Hub, GuardDuty, etc.)
+                    event_data = custodian_data.get('event') or {}
+                    if event_data:
+                        event_keys = list(event_data.keys())
+                        logger.info(f"📋 Event context found with keys: {event_keys}")
+                        logger.info(f"   Event JSON (complete):")
+                        # Log complete event JSON
+                        event_json = json.dumps(event_data, default=str, indent=2)
+                        logger.info(event_json)
+                        logger.info(f"")
+                        # For Security Hub, log finding details if present
+                        if 'detail' in event_data:
+                            detail = event_data['detail']
+                            if 'findings' in detail:
+                                logger.info(f"📋 Security Hub event with {len(detail['findings'])} finding(s)")
+                                logger.info(f"   First finding Severity: {detail['findings'][0].get('Severity', {})}")
+                        elif 'findings' in event_data:
+                            logger.info(f"📋 Event has {len(event_data['findings'])} finding(s) at root level")
+                    else:
+                        logger.info(f"⚠️  No 'event' key in custodian_data")
+                        # Check if event might be in policy data
+                        policy_data = custodian_data.get('policy', {})
+                        if 'data' in policy_data:
+                            logger.info(f"   Policy has 'data' field with keys: {list(policy_data['data'].keys())}")
+                    logger.info(f"")
+                
+                # ALWAYS log policy name and resource count for each message
+                logger.info(f"📨 Message {messages_processed + 1}: Policy='{custodian_data.get('policy', {}).get('name')}', Resources={len(custodian_data.get('resources', []))}")
+                
+                policy_name = custodian_data.get('policy', {}).get('name', 'unknown-policy')
+                account = custodian_data.get('account', 'unknown-account')
+                account_id = custodian_data.get('account_id', account)  # Try account_id first, fallback to account
+                region = custodian_data.get('region', 'unknown-region')
+                action = custodian_data.get('action', {})
+                resources = custodian_data.get('resources', [])
+                
+                # Get event context - check multiple locations where Cloud Custodian might store it
+                # 1. Try top-level 'event' key first
+                event = custodian_data.get('event')
+                
+                # 2. If top-level event is null/empty, check policy.event (for Security Hub, GuardDuty, etc.)
+                if not event:
+                    policy_data = custodian_data.get('policy', {})
+                    event = policy_data.get('event')
+                    if event:
+                        logger.info(f"📋 Found event in policy.event (not at top level)")
+                
+                # 3. Ensure event is a dict (not None or other type)
+                if not isinstance(event, dict):
+                    event = {}
+                    logger.warning(f"⚠️  Event is not a dict or is empty - Security Hub templates may show fallback values")
+                
+                # ============================================================================
+                # USE RESOURCE HANDLER FOR FILTERING
+                # ============================================================================
+                # Create appropriate handler for this resource type
+                handler = ResourceHandlerFactory.create_handler(policy_name, resources, custodian_data)
+                
+                # Apply resource-specific filtering
+                original_count = len(resources)
+                resources = handler.filter_resources()
+                
+                filtered_count = original_count - len(resources)
+                if filtered_count > 0:
+                    logger.info(f"🔍 Handler filtered {filtered_count} resource(s) from notification")
+                
+                # Skip notification if no resources remain after filtering
+                if not resources:
+                    logger.info(f"✅ No resources remaining after handler filtering, skipping notification")
+                    sqs.delete_message(QueueUrl=REALTIME_QUEUE_URL, ReceiptHandle=receipt_handle)
+                    messages_processed += 1
+                    continue
+                
+                # Extract environment from multiple sources (prioritized)
+                environment = None
+                
+                # 1. Try policy metadata
+                if not environment:
+                    environment = custodian_data.get('policy', {}).get('metadata', {}).get('environment')
+                
+                # 2. Map known account IDs to environments
+                # Update this mapping based on your account structure
+                if not environment and account_id:
+                    account_env_mapping = {
+                        '813185901390': 'dev',
+                        # 172327596604 is central account - skip mapping
+                        # Add more member account mappings as needed
+                    }
+                    environment = account_env_mapping.get(account_id)
+                
+                # 3. Try account name/alias patterns (aikyam-dev, aikyam-test, aikyam-prod)
+                if not environment and account:
+                    account_lower = account.lower()
+                    if 'dev' in account_lower:
+                        environment = 'dev'
+                    elif 'test' in account_lower or 'tst' in account_lower:
+                        environment = 'test'
+                    elif 'prod' in account_lower or 'prd' in account_lower:
+                        environment = 'prod'
+                    elif 'stage' in account_lower or 'stg' in account_lower:
+                        environment = 'stage'
+                
+                # 4. Try resource tags
+                if not environment and resources:
+                    for resource in resources:
+                        tags = resource.get('Tags', [])
+                        for tag in tags:
+                            tag_key = tag.get('Key', '').lower()
+                            if tag_key in ['environment', 'env', 'enviornment']:
+                                environment = tag.get('Value', '').lower()
+                                break
+                        if environment:
+                            break
+                
+                # 5. Default to 'unknown' if still not found (don't assume prod)
+                if not environment:
+                    environment = 'unknown'
+                
+                # Build resource summary for template with user details
+                resource_summary = []
+                user_details = []  # Track unique users who created resources
+                
+                # Use handler to format each resource
+                for resource in resources[:5]:  # Limit to first 5 resources
+                    formatted = handler.format_resource_summary(resource)
+                    resource_summary.append(formatted)
+                    
+                    # Track unique users
+                    user_info = handler.extract_user_info(resource)
+                    if user_info and user_info not in user_details:
+                        user_details.append(user_info)
+                
+                resources_text = ', '.join(resource_summary)
+                if len(resources) > 5:
+                    resources_text += f" and {len(resources) - 5} more"
+                
+                # Format user details for template
+                users_text = ', '.join(user_details) if user_details else 'Unknown'
+                
+                logger.info(f"📋 Processing real-time notification: {policy_name}, account: {account_id}, env: {environment}, resources: {len(resources)}")
+                logger.info(f"   Resource summary: {resources_text}")
+                logger.info(f"   Users: {users_text}")
+                
+                if not resources:
+                    logger.info("⏭️  No resources matched policy filters, skipping notification")
+                    sqs.delete_message(QueueUrl=REALTIME_QUEUE_URL, ReceiptHandle=receipt_handle)
+                    messages_processed += 1
+                    continue
+                
+                # Use the subject and body from the policy's notify action
+                # This preserves the custom formatting defined in the policy
+                subject = action.get('subject', f"Cloud Custodian Alert: {policy_name}")
+                
+                # Render Jinja2 template variables in subject
+                # Common variables: account_id, region, policy_name, etc.
+                template_vars = {
+                    'account': account,  # May be account alias
+                    'account_id': account_id,  # Actual account ID
+                    'region': region,
+                    'policy': policy_name,
+                    'policy_name': policy_name,
+                    'environment': environment,
+                    'env': environment,
+                    'resource_count': len(resources),
+                    'resources': resources_text,  # Resource summary
+                    'users': users_text,  # User details
+                    'user': users_text,  # Alias for users
+                    'event': event  # Raw event context (Security Hub findings, GuardDuty alerts, etc.)
+                }
+                
+                # Debug: Log if event is empty
+                if not event:
+                    logger.warning(f"⚠️  Event is empty in template_vars - Security Hub templates may not render correctly")
+                
+                # Simple template variable replacement (handles {{ variable }} syntax)
+                for key, value in template_vars.items():
+                    subject = subject.replace(f'{{{{ {key} }}}}', str(value))
+                    subject = subject.replace(f'{{{{{key}}}}}', str(value))
+                
+                # Check if action has a template or violation_desc (formatted message)
+                message_body = action.get('violation_desc', '')
+                if message_body:
+                    # Debug: Log event data structure if present
+                    if event:
+                        logger.info(f"📋 Event data available for template rendering")
+                        logger.info(f"   Event keys: {list(event.keys())}")
+                        if 'detail' in event:
+                            logger.info(f"   Event has 'detail' field with keys: {list(event['detail'].keys())}")
+                            if 'findings' in event.get('detail', {}):
+                                findings = event['detail']['findings']
+                                logger.info(f"   Found {len(findings)} Security Hub finding(s)")
+                                if findings:
+                                    logger.info(f"   First finding keys: {list(findings[0].keys())[:10]}")
+                    else:
+                        logger.warning(f"⚠️  No event data available for template rendering")
+                        logger.warning(f"   Template expects 'event' but custodian_data has no event field")
+                        logger.warning(f"   Available custodian_data keys: {list(custodian_data.keys())}")
+                    
+                    # Use Jinja2 for proper template rendering with resource-level variables
+                    # For multi-resource notifications, render for each resource
+                    try:
+                        if len(resources) == 1:
+                            # Debug: Log resource keys to understand structure
+                            if isinstance(resources[0], dict):
+                                logger.info(f"📋 Resource keys: {list(resources[0].keys())}")
+                                # Log a few key fields for S3 buckets
+                                for key in ['Name', 'name', 'BucketName', 'c7n:CreatorName']:
+                                    if key in resources[0]:
+                                        logger.info(f"   {key} = {resources[0][key]}")
+                            
+                            # Single resource - render directly
+                            template = Template(message_body)
+                            context = {
+                                **template_vars,  # Account-level vars
+                                'resource': resources[0]  # Resource-level vars
+                            }
+                            message_body = template.render(**context)
+                        else:
+                            # Multiple resources - render for each and combine
+                            rendered_messages = []
+                            template = Template(message_body)
+                            for resource in resources[:10]:  # Limit to first 10 to avoid huge emails
+                                context = {
+                                    **template_vars,
+                                    'resource': resource
+                                }
+                                rendered_messages.append(template.render(**context))
+                            
+                            message_body = '\n\n---\n\n'.join(rendered_messages)
+                            if len(resources) > 10:
+                                message_body += f"\n\n... and {len(resources) - 10} more resources"
+                        
+                        logger.info(f"✅ Rendered message body with Jinja2 for {len(resources)} resource(s)")
+                    except Exception as e:
+                        logger.error(f"❌ Jinja2 template rendering failed: {e}", exc_info=True)
+                        logger.error(f"   Template: {message_body[:200]}")
+                        if resources:
+                            logger.error(f"   First resource type: {type(resources[0])}")
+                            if isinstance(resources[0], dict):
+                                logger.error(f"   First resource keys: {list(resources[0].keys())}")
+                        # Fallback to simple string replacement
+                        for key, value in template_vars.items():
+                            message_body = message_body.replace(f'{{{{ {key} }}}}', str(value))
+                            message_body = message_body.replace(f'{{{{{key}}}}}', str(value))
+                else:
+                    # Fallback to basic HTML if no violation_desc
+                    message_body = format_html_notification(policy_name, action, resources, account, region)
+                
+                # Add [Real-Time] prefix to subject for identification
+                subject_with_prefix = f"[Real-Time] {subject}"
+                
+                logger.info(f"📨 Sending real-time notification")
+                logger.info(f"  Subject: {subject_with_prefix}")
+                logger.info(f"  Account: {account_id} (alias: {account}), Region: {region}, Environment: {environment}")
+                logger.info(f"  Resources: {len(resources)}, Users: {users_text}")
+                logger.info(f"  Notification method: {NOTIFICATION_METHOD}")
+                if event:
+                    event_source = 'Security Hub' if 'findings' in event else 'GuardDuty' if 'detail' in event else 'Other'
+                    logger.info(f"  Event context: {event_source} event data included in template")
+                logger.info(f"  Message preview: {message_body[:200]}...")
+                
+                # Send notification based on configured method
+                notification_sent = False
+                
+                if NOTIFICATION_METHOD in ['sns', 'both']:
+                    # Send via SNS
+                    logger.info(f"📤 Publishing to SNS: {SNS_TOPIC_ARN}")
+                    try:
+                        sns_response = sns.publish(
+                            TopicArn=SNS_TOPIC_ARN,
+                            Subject=subject_with_prefix[:100],  # SNS subject limit
+                            Message=message_body,
+                            MessageAttributes={
+                                'policy': {'DataType': 'String', 'StringValue': policy_name},
+                                'account': {'DataType': 'String', 'StringValue': account},
+                                'region': {'DataType': 'String', 'StringValue': region},
+                                'resource_count': {'DataType': 'Number', 'StringValue': str(len(resources))},
+                                'notification_type': {'DataType': 'String', 'StringValue': 'real-time'}
+                            }
+                        )
+                        message_id = sns_response.get('MessageId', 'N/A')
+                        logger.info(f"✅ SNS notification published - MessageId: {message_id}")
+                        notification_sent = True
+                        sns_published += 1
+                    except Exception as e:
+                        logger.error(f"❌ SNS publish failed: {str(e)}", exc_info=True)
+                
+                if NOTIFICATION_METHOD in ['ses', 'both']:
+                    # Send via SES
+                    logger.info(f"📧 Sending email via SES")
+                    message_id = send_ses_email(subject_with_prefix, message_body)
+                    if message_id:
+                        notification_sent = True
+                        sns_published += 1  # Count SES emails in the published counter
+                
+                if notification_sent:
+                    # Delete message only after successful send
+                    sqs.delete_message(QueueUrl=REALTIME_QUEUE_URL, ReceiptHandle=receipt_handle)
+                    messages_processed += 1
+                    logger.info(f"✅ Message processed and deleted (MessageId: {message.get('MessageId', 'N/A')})")
+                else:
+                    logger.error(f"❌ Failed to send notification via any method - message will retry (MessageId: {message.get('MessageId', 'N/A')})")
+                
+            except Exception as e:
+                logger.error(f"❌ Error processing SQS message: {str(e)} - message will retry (MessageId: {message.get('MessageId', 'N/A')})", exc_info=True)
+        
+        logger.info(f"📊 Real-time notification summary: Processed {messages_processed} messages, Published {sns_published} notifications (method: {NOTIFICATION_METHOD})")
+        return {'processed': messages_processed, 'published': sns_published}
+        
+    except ClientError as e:
+        logger.error(f"❌ SQS ClientError: {str(e)}", exc_info=True)
+        return {'processed': 0, 'published': 0}
+    except Exception as e:
+        logger.error(f"❌ Unexpected error in SQS processing: {str(e)}", exc_info=True)
+        return {'processed': 0, 'published': 0}

@@ -1,0 +1,83 @@
+vars:
+  email-notify: &email-notify
+    template: default.html
+    priority_header: "1"
+    from: c7n@central.ctkube.com
+    to:
+      - srinivasula.yallala@optum.com
+    transport:
+      type: sqs
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications
+
+# LAMBDA RUNTIME DEPRECATION DATES
+#  https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html
+# nodejs18.x - Jul 31, 2025
+# python3.9 - Dec 15, 2025
+
+
+policies:
+  - name: aws-lambda-deprecated-runtimes
+    resource: aws.lambda
+    description: |
+      Notifies of Lambda functions using deprecated runtimes
+    filters:
+      - type: value
+        key: Runtime
+        value: [nodejs, dotnetcore2.0, dotnetcore1.0, nodejs6.10, nodejs4.3-edge, nodejs4.3, nodejs8.10, python2.7, ruby2.5, nodejs10.x, dotnetcore2.1, dotnet5.0, python3.6, nodejs12.x, dotnetcore3.1, python3.7, nodejs14.x, ruby2.7, provided, go1.x, java8, dotnet6, dotnet7, nodejs16.x, python3.8]
+        op: in
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "[c7n] [{{ account }}] Lambda Functions Using Deprecated Runtimes Report ({{ region }})"
+        violation_desc: Lambda functions configured to use a deprecated runtime
+        action_desc: |
+          No action taken. Functions MUST be updated to the latest runtime.<br>
+          These functions can no longer be updated and are not receiving security patches.<br>
+          <a href="https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html">Documentation</a>
+
+  - name: aws-lambda-outdated-runtimes
+    resource: aws.lambda
+    description: |
+      Notifies of Lambda functions using oudated runtimes that will be deprecated soon
+    filters:
+      - type: value
+        key: Runtime
+        value: [nodejs18.x, python3.9]
+        op: in
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "[c7n] [{{ account }}] Lambda Functions Using Outdated Runtimes Report ({{ region }})"
+        violation_desc: Lambda functions configured to use an outdated runtime that will be deprecated soon
+        action_desc: |
+          No action taken. Functions should be updated to the latest runtime.<br>
+          These functions are nearing deprecation within the next 6 months. They will soon no longer receive security patches.<br>
+          Once Phase 2 deprecation ends, they will additionally no longer be able to be updated.<br>
+          <a href="https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html">Documentation</a>
+          
+  - name: aws-lambda-outdated-runtime-creation
+    resource: aws.lambda
+    description: |
+      Notify when a Lambda function is created with an outdated runtime.
+    filters:
+      # not invoked in last year
+      - type: metrics
+        name: Invocations
+        op: equal
+        statistics: Sum
+        days: 365
+        value: 0
+        missing-value: 0
+      # not modified in last 6 months
+      - type: value
+        key: LastModified
+        op: gt
+        value: 183
+        value_type: age
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "[c7n] [{{ account }}] Lambda Functions are unused ({{ region }})"
+        violation_desc: Lambda Functions that appear to be unused
+        action_desc: |
+          No action taken. Please delete if not needed.

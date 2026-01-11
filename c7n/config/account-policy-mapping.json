@@ -1,0 +1,802 @@
+{
+  "version": "1.0",
+  "description": "Multi-Account Cloud Custodian Policy Mapping with Global and Account-Specific Configurations",
+  "generated_at": "2026-01-02T00:00:00Z",
+  "statistics": {
+    "total_policies": 62,
+    "event_driven_policies": 24,
+    "unique_events": 21,
+    "managed_accounts": 2
+  },
+  "event_mapping": {
+    "description": "DEPRECATED: All event mappings should be defined under account_mapping[account_id].event_mapping. This section is kept for reference only.",
+    "RunInstances": [],
+    "GuardDuty Finding": [],
+    "DeleteObject": [],
+    "GetObject": [],
+    "ListBucket": [],
+    "CreateBucket": [],
+    "PutBucketEncryption": [],
+    "DeleteBucketEncryption": [],
+    "PutBucketPolicy": [],
+    "DeleteBucketPolicy": [],
+    "PutBucketAcl": [],
+    "CloudWatch Alarm State Change": [],
+    "CreateLoadBalancer": [],
+    "CreateListener": [],
+    "ModifyListener": [],
+    "ModifyLoadBalancerAttributes": [],
+    "ModifyImageAttribute": []
+  },
+  "account_mapping": {
+    "172327596604": {
+      "name": "srini-optum Central Management Account",
+      "environment": "production",
+      "description": "Central management account hosting Cloud Custodian Lambda executor and mailer with cross-account event routing",
+      "event_mapping": {
+        "GuardDuty Finding": [
+          {
+            "policy_name": "guardduty-findings-auto-archive",
+            "resource": "aws.guardduty-finding",
+            "source_file": "aws-guardduty-findings-remediate.yml",
+            "enforcement_level": "auto-remediate",
+            "description": "Central Account: Notify on high-severity GuardDuty threats"
+          }
+        ],
+        "Security Hub Findings - Imported": [
+          {
+            "policy_name": "securityhub-failed-findings-remediation",
+            "resource": "aws.security-hub-finding",
+            "source_file": "aws-securityhub-auto-remediate.yml",
+            "enforcement_level": "notify",
+            "description": "Central Account: Notify on high and critical SecurityHub findings"
+          }
+        ]
+      },
+      "iam_role": "arn:aws:iam::172327596604:role/cloud-custodian-cross-account-executor-role-central",
+      "external_id": "cloud-custodian-172327596604"
+    },
+    "813185901390": {
+      "name": "Cloud Custodian Test Member Account",
+      "environment": "test",
+      "description": "Member test account for Cloud Custodian cross-account execution and security event monitoring",
+      "event_mapping": {
+        "RunInstances": [
+          {
+            "policy_name": "ec2-stop-instances-on-launch",
+            "resource": "aws.ec2",
+            "source_file": "aws-ec2-security.yml",
+            "enforcement_level": "notify",
+            "description": "Notify when EC2 instances are launched for review"
+          }
+        ],
+        "GuardDuty Finding": [
+          {
+            "policy_name": "guardduty-findings-auto-archive",
+            "resource": "aws.guardduty-finding",
+            "source_file": "aws-guardduty-findings-remediate.yml",
+            "enforcement_level": "notify",
+            "description": "Test Account: Notify on high-severity GuardDuty threats"
+          }
+        ],
+        "Security Hub Findings - Imported": [
+          {
+            "policy_name": "securityhub-failed-findings-remediation",
+            "resource": "aws.security-hub-finding",
+            "source_file": "aws-securityhub-auto-remediate.yml",
+            "enforcement_level": "notify",
+            "description": "Test Account: Notify on high and critical SecurityHub findings"
+          }
+        ],
+        "CreateBucket": [
+          {
+            "policy_name": "s3-no-server-side-encryption",
+            "resource": "aws.s3",
+            "source_file": "aws-s3-security.yml",
+            "enforcement_level": "notify",
+            "description": "Detect S3 buckets created without server-side encryption"
+          }
+        ],
+        "DeleteBucketEncryption": [
+          {
+            "policy_name": "s3-no-server-side-encryption",
+            "resource": "aws.s3",
+            "source_file": "aws-s3-security.yml",
+            "enforcement_level": "notify",
+            "description": "Detect when S3 bucket encryption is removed"
+          }
+        ],
+        "PutBucketAcl": [
+          {
+            "policy_name": "s3-public-via-acl",
+            "resource": "aws.s3",
+            "source_file": "aws-s3-security.yml",
+            "enforcement_level": "notify",
+            "description": "Detect S3 buckets made publicly accessible via ACL"
+          },
+          {
+            "policy_name": "s3-global-view-acl",
+            "resource": "aws.s3",
+            "source_file": "aws-s3-security.yml",
+            "enforcement_level": "notify",
+            "description": "Detect S3 buckets with global view ACL permissions"
+          }
+        ],
+        "CreateLoadBalancer": [
+          {
+
+            "policy_name": "alb-missing-https-listener",
+            "resource": "aws.app-elb",
+            "source_file": "aws-alb-security.yml",
+            "enforcement_level": "notify",
+            "description": "Detect ALBs created without HTTPS listeners"
+          }
+        ],
+        "CreateListener": [
+          {
+            "policy_name": "alb-missing-https-listener",
+            "resource": "aws.app-elb",
+            "source_file": "aws-alb-security.yml",
+            "enforcement_level": "notify",
+            "description": "Detect ALBs with HTTP listener but no HTTPS listener"
+          },
+          {
+            "policy_name": "alb-outdated-ssl-policy",
+            "resource": "aws.app-elb",
+            "source_file": "aws-alb-security.yml",
+            "enforcement_level": "notify",
+            "description": "Detect ALBs not using latest predefined security policy"
+          }
+        ],
+        "ModifyLoadBalancerAttributes": [
+          {
+            "policy_name": "elbv2-logging-not-central-bucket",
+            "resource": "aws.app-elb",
+            "source_file": "aws-alb-security.yml",
+            "enforcement_level": "notify",
+            "description": "Detect ALBv2/NLBv2 logging configuration changes (template validates compliance)"
+          }
+        ],
+        "CreateDistribution": [
+          {
+            "policy_name": "cloudfront-insecure-ssl-protocols",
+            "resource": "aws.distribution",
+            "source_file": "aws-cloudfront-security.yml",
+            "enforcement_level": "notify",
+            "description": "Detect CloudFront distributions using insecure TLS protocols"
+          },
+          {
+            "policy_name": "cloudfront-logging-not-central",
+            "resource": "aws.distribution",
+            "source_file": "aws-cloudfront-security.yml",
+            "enforcement_level": "notify",
+            "description": "Detect CloudFront distributions logging to non-compliant buckets"
+          }
+        ],
+        "UpdateDistribution": [
+          {
+            "policy_name": "cloudfront-insecure-ssl-protocols",
+            "resource": "aws.distribution",
+            "source_file": "aws-cloudfront-security.yml",
+            "enforcement_level": "notify",
+            "description": "Detect CloudFront distributions using insecure TLS protocols"
+          }
+        ],
+        "SetRepositoryPolicy": [
+          {
+            "policy_name": "ecr-repository-public",
+            "resource": "aws.ecr",
+            "source_file": "aws-container-security.yml",
+            "enforcement_level": "auto-remediate",
+            "description": "Detect ECR repositories with cross-account or public access and remove public statements"
+          }
+        ],
+        "PutRepositoryPolicy": [
+          {
+            "policy_name": "ecr-repository-public",
+            "resource": "aws.ecr",
+            "source_file": "aws-container-security.yml",
+            "enforcement_level": "auto-remediate",
+            "description": "Detect ECR repositories with cross-account or public access and remove public statements"
+          }
+        ],
+        "DeleteRepositoryPolicy": [
+          {
+            "policy_name": "ecr-repository-public",
+            "resource": "aws.ecr",
+            "source_file": "aws-container-security.yml",
+            "enforcement_level": "notify",
+            "description": "Detect ECR repository policy deletions"
+          }
+        ],
+        "CreateCluster": [
+          {
+            "policy_name": "eks-cluster-public-access",
+            "resource": "aws.eks",
+            "source_file": "aws-container-security.yml",
+            "enforcement_level": "notify",
+            "description": "Detect EKS clusters with public endpoint access enabled"
+          },
+          {
+            "policy_name": "eks-control-plane-logging-disabled",
+            "resource": "aws.eks",
+            "source_file": "aws-container-security.yml",
+            "enforcement_level": "auto-remediate",
+            "description": "Detect EKS clusters without control plane logging and enable it"
+          }
+        ],
+        "UpdateClusterConfig": [
+          {
+            "policy_name": "eks-cluster-public-access",
+            "resource": "aws.eks",
+            "source_file": "aws-container-security.yml",
+            "enforcement_level": "notify",
+            "description": "Detect EKS clusters with public endpoint access enabled"
+          },
+          {
+            "policy_name": "eks-control-plane-logging-disabled",
+            "resource": "aws.eks",
+            "source_file": "aws-container-security.yml",
+            "enforcement_level": "auto-remediate",
+            "description": "Detect EKS clusters without control plane logging and enable it"
+          }
+        ],
+        "UpdateClusterVersion": [
+          {
+            "policy_name": "eks-cluster-public-access",
+            "resource": "aws.eks",
+            "source_file": "aws-container-security.yml",
+            "enforcement_level": "notify",
+            "description": "Detect EKS clusters with public endpoint access enabled"
+          },
+          {
+            "policy_name": "eks-control-plane-logging-disabled",
+            "resource": "aws.eks",
+            "source_file": "aws-container-security.yml",
+            "enforcement_level": "auto-remediate",
+            "description": "Detect EKS clusters without control plane logging and enable it"
+          }
+        ],
+        "CreateCacheCluster": [
+          {
+            "policy_name": "elasticache-redis-no-encryption-at-rest",
+            "resource": "aws.cache-cluster",
+            "source_file": "aws-data-encryption.yml",
+            "enforcement_level": "notify",
+            "description": "Detect ElastiCache Redis clusters without encryption at rest"
+          },
+          {
+            "policy_name": "elasticache-redis-no-transit-encryption",
+            "resource": "aws.cache-cluster",
+            "source_file": "aws-data-encryption.yml",
+            "enforcement_level": "notify",
+            "description": "Detect ElastiCache Redis clusters without in-transit encryption"
+          }
+        ],
+        "CreateReplicationGroup": [
+          {
+            "policy_name": "elasticache-redis-no-encryption-at-rest",
+            "resource": "aws.cache-cluster",
+            "source_file": "aws-data-encryption.yml",
+            "enforcement_level": "notify",
+            "description": "Detect ElastiCache Redis replication groups without encryption at rest"
+          },
+          {
+            "policy_name": "elasticache-redis-no-transit-encryption",
+            "resource": "aws.cache-cluster",
+            "source_file": "aws-data-encryption.yml",
+            "enforcement_level": "notify",
+            "description": "Detect ElastiCache Redis replication groups without in-transit encryption"
+          }
+        ],
+        "CreateFileSystem": [
+          {
+            "policy_name": "efs-encryption-disabled",
+            "resource": "aws.efs",
+            "source_file": "aws-data-encryption.yml",
+            "enforcement_level": "notify",
+            "description": "Detect EFS file systems without encryption at rest"
+          }
+        ],
+        "CreateStream": [
+          {
+            "policy_name": "kinesis-stream-not-encrypted",
+            "resource": "aws.kinesis",
+            "source_file": "aws-data-encryption.yml",
+            "enforcement_level": "notify",
+            "description": "Detect Kinesis streams without server-side encryption"
+          }
+        ],
+        "CreateTopic": [
+          {
+            "policy_name": "sns-topic-no-encryption",
+            "resource": "aws.sns",
+            "source_file": "aws-data-encryption.yml",
+            "enforcement_level": "notify",
+            "description": "Detect SNS topics without KMS encryption"
+          }
+        ]
+      },
+      "iam_role": "arn:aws:iam::813185901390:role/CloudCustodianExecutionRole",
+      "external_id": "cloud-custodian-813185901390",
+      "notes": "Test member account for Cloud Custodian security event monitoring"
+    }
+  },
+  "policies": {
+    "alb-http-no-redirect-to-https": {
+      "resource": "aws.app-elb",
+      "source_file": "aws-alb-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect ALBs not using latest predefined security policy",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "alb-missing-https-listener": {
+      "resource": "aws.app-elb",
+      "source_file": "aws-alb-security.yml",
+      "mode_type": "cloudtrail",
+      "description": "Detect ALBs created without HTTPS listeners",
+      "severity": "high",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "alb-outdated-ssl-policy": {
+      "resource": "aws.app-elb",
+      "source_file": "aws-alb-security.yml",
+      "mode_type": "cloudtrail",
+      "description": "Detect ALBs not using latest predefined security policy",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "elbv2-logging-not-central-bucket": {
+      "resource": "aws.app-elb",
+      "source_file": "aws-alb-security.yml",
+      "mode_type": "cloudtrail",
+      "description": "Detect ALBv2/NLBv2 with logging disabled or not to central bucket",
+      "severity": "high",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "elbv2-no-tls-listener": {
+      "resource": "aws.app-elb",
+      "source_file": "aws-alb-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect ELBv2 without TLS listener configured",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "nlb-outdated-ssl-policy": {
+      "resource": "aws.app-elb",
+      "source_file": "aws-alb-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect NLBs not using latest predefined security policy",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "ami-publicly-accessible": {
+      "resource": "aws.ami",
+      "source_file": "aws-ec2-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect AMIs that are publicly accessible",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "ebs-snapshot-unencrypted": {
+      "resource": "aws.ebs-snapshot",
+      "source_file": "aws-ec2-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect EBS snapshots that are not encrypted",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "ebs-snapshot-public": {
+      "resource": "aws.ebs-snapshot",
+      "source_file": "aws-ec2-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect EBS snapshots publicly accessible",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "ec2-unencrypted-ebs-volume": {
+      "resource": "aws.ec2",
+      "source_file": "aws-ec2-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect EC2 instances with unencrypted EBS volumes",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "ec2-instance-older-than-30-days": {
+      "resource": "aws.ec2",
+      "source_file": "aws-ec2-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect EC2 instances older than 30 days",
+      "severity": "low",
+      "compliance_frameworks": ["CIS"]
+    },
+    "ec2-imdsv1-enabled": {
+      "resource": "aws.ec2",
+      "source_file": "aws-ec2-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect EC2 instances with IMDSv1 enabled",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "AWS-Foundational-Security"]
+    },
+    "sg-allow-ssh-from-internet": {
+      "resource": "aws.security-group",
+      "source_file": "aws-security-groups.yml",
+      "mode_type": "periodic",
+      "description": "Detect Security Groups allowing SSH from internet",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "sg-allow-rdp-from-internet": {
+      "resource": "aws.security-group",
+      "source_file": "aws-security-groups.yml",
+      "mode_type": "periodic",
+      "description": "Detect Security Groups allowing RDP from internet",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "sg-allow-cifs-from-internet": {
+      "resource": "aws.security-group",
+      "source_file": "aws-security-groups.yml",
+      "mode_type": "periodic",
+      "description": "Detect Security Groups allowing CIFS from internet",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "sg-allow-mysql-from-internet": {
+      "resource": "aws.security-group",
+      "source_file": "aws-security-groups.yml",
+      "mode_type": "periodic",
+      "description": "Detect Security Groups allowing MySQL from internet",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "sg-allow-postgresql-from-internet": {
+      "resource": "aws.security-group",
+      "source_file": "aws-security-groups.yml",
+      "mode_type": "periodic",
+      "description": "Detect Security Groups allowing PostgreSQL from internet",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "sg-allow-sqlserver-from-internet": {
+      "resource": "aws.security-group",
+      "source_file": "aws-security-groups.yml",
+      "mode_type": "periodic",
+      "description": "Detect Security Groups allowing SQL Server from internet",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "sg-allow-oracle-from-internet": {
+      "resource": "aws.security-group",
+      "source_file": "aws-security-groups.yml",
+      "mode_type": "periodic",
+      "description": "Detect Security Groups allowing Oracle DB from internet",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "sg-allow-mongodb-from-internet": {
+      "resource": "aws.security-group",
+      "source_file": "aws-security-groups.yml",
+      "mode_type": "periodic",
+      "description": "Detect Security Groups allowing MongoDB from internet",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "sg-allow-telnet-from-internet": {
+      "resource": "aws.security-group",
+      "source_file": "aws-security-groups.yml",
+      "mode_type": "periodic",
+      "description": "Detect Security Groups allowing Telnet from internet",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "sg-allow-risky-ports-from-internet": {
+      "resource": "aws.security-group",
+      "source_file": "aws-security-groups.yml",
+      "mode_type": "periodic",
+      "description": "Detect Security Groups allowing risky ports from internet",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "sg-allow-all-traffic": {
+      "resource": "aws.security-group",
+      "source_file": "aws-security-groups.yml",
+      "mode_type": "periodic",
+      "description": "Detect Security Groups allowing all traffic from internet",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "sg-cifs-with-igw-route": {
+      "resource": "aws.security-group",
+      "source_file": "aws-security-groups.yml",
+      "mode_type": "periodic",
+      "description": "Detect CIFS port exposed via Internet Gateway",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "sg-rdp-with-igw-route": {
+      "resource": "aws.security-group",
+      "source_file": "aws-security-groups.yml",
+      "mode_type": "periodic",
+      "description": "Detect RDP port exposed via Internet Gateway",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "s3-global-put-permissions": {
+      "resource": "aws.s3",
+      "source_file": "aws-s3-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect S3 buckets with global PUT permissions",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "s3-global-permissions": {
+      "resource": "aws.s3",
+      "source_file": "aws-s3-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect S3 buckets with global GET/LIST permissions",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "s3-public-access-block-disabled": {
+      "resource": "aws.s3",
+      "source_file": "aws-s3-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect S3 buckets with public access block disabled",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "s3-global-view-acl": {
+      "resource": "aws.s3",
+      "source_file": "aws-s3-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect S3 buckets with global view ACL permissions",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "s3-public-via-acl": {
+      "resource": "aws.s3",
+      "source_file": "aws-s3-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect S3 buckets publicly accessible via ACL",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "s3-no-server-side-encryption": {
+      "resource": "aws.s3",
+      "source_file": "aws-s3-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect S3 buckets without server-side encryption",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "s3-no-secure-transport-policy": {
+      "resource": "aws.s3",
+      "source_file": "aws-s3-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect S3 buckets without secure transport policy",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "rds-cluster-encryption-disabled": {
+      "resource": "aws.rds-cluster",
+      "source_file": "aws-rds-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect RDS clusters without encryption at rest",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "rds-instance-publicly-accessible": {
+      "resource": "aws.rds",
+      "source_file": "aws-rds-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect RDS instances that are publicly accessible",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "rds-snapshot-public": {
+      "resource": "aws.rds-snapshot",
+      "source_file": "aws-rds-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect RDS snapshots publicly accessible",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "iam-expired-ssl-certificates": {
+      "resource": "aws.iam-certificate",
+      "source_file": "aws-iam-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect IAM SSL/TLS certificates that have expired",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS"]
+    },
+    "iam-user-console-and-keys": {
+      "resource": "aws.iam-user",
+      "source_file": "aws-iam-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect IAM users with both console and access keys",
+      "severity": "low",
+      "compliance_frameworks": ["CIS"]
+    },
+    "iam-access-keys-not-rotated": {
+      "resource": "aws.iam-user",
+      "source_file": "aws-iam-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect IAM access keys not rotated for 365 days",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "cloudfront-insecure-ssl-protocols": {
+      "resource": "aws.distribution",
+      "source_file": "aws-cloudfront-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect CloudFront using insecure SSL/TLS protocols",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "cloudfront-logging-not-central": {
+      "resource": "aws.distribution",
+      "source_file": "aws-cloudfront-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect CloudFront logging not to central bucket",
+      "severity": "low",
+      "compliance_frameworks": ["CIS"]
+    },
+    "ecr-repository-public": {
+      "resource": "aws.ecr",
+      "source_file": "aws-container-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect ECR repositories exposed to public",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "eks-cluster-public-access": {
+      "resource": "aws.eks",
+      "source_file": "aws-container-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect EKS clusters with public endpoint access",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "eks-control-plane-logging-disabled": {
+      "resource": "aws.eks",
+      "source_file": "aws-container-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect EKS clusters with control plane logging disabled",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS"]
+    },
+    "elasticache-redis-no-encryption-at-rest": {
+      "resource": "aws.cache-cluster",
+      "source_file": "aws-data-encryption.yml",
+      "mode_type": "cloudtrail",
+      "description": "Detect ElastiCache Redis without encryption at rest using CloudTrail event validation",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "elasticache-redis-no-transit-encryption": {
+      "resource": "aws.cache-cluster",
+      "source_file": "aws-data-encryption.yml",
+      "mode_type": "cloudtrail",
+      "description": "Detect ElastiCache Redis without in-transit encryption using CloudTrail event validation",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "efs-encryption-disabled": {
+      "resource": "aws.efs",
+      "source_file": "aws-data-encryption.yml",
+      "mode_type": "periodic",
+      "description": "Detect EFS without encryption at rest",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "elasticsearch-encryption-disabled": {
+      "resource": "aws.elasticsearch",
+      "source_file": "aws-data-encryption.yml",
+      "mode_type": "periodic",
+      "description": "Detect Elasticsearch domains without encryption at rest",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "kinesis-stream-not-encrypted": {
+      "resource": "aws.kinesis",
+      "source_file": "aws-data-encryption.yml",
+      "mode_type": "periodic",
+      "description": "Detect Kinesis streams without server-side encryption",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "redshift-cluster-not-encrypted": {
+      "resource": "aws.redshift",
+      "source_file": "aws-data-encryption.yml",
+      "mode_type": "periodic",
+      "description": "Detect Redshift clusters without encryption",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "redshift-logging-not-central": {
+      "resource": "aws.redshift",
+      "source_file": "aws-data-encryption.yml",
+      "mode_type": "periodic",
+      "description": "Detect Redshift audit logging not to central bucket",
+      "severity": "low",
+      "compliance_frameworks": ["CIS"]
+    },
+    "sns-topic-no-encryption": {
+      "resource": "aws.sns",
+      "source_file": "aws-data-encryption.yml",
+      "mode_type": "periodic",
+      "description": "Detect SNS topics without server-side encryption",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "PCI-DSS"]
+    },
+    "waf-classic-logging-not-central": {
+      "resource": "aws.waf",
+      "source_file": "aws-waf-security.yml",
+      "mode_type": "periodic",
+      "description": "Detect WAF Classic logging not to central stream",
+      "severity": "low",
+      "compliance_frameworks": ["CIS"]
+    },
+    "s3-public-bucket-remediation-realtime": {
+      "resource": "aws.s3",
+      "source_file": "s3-public-bucket-remediation-realtime.yml",
+      "mode_type": "cloudtrail",
+      "description": "Monitor S3 buckets in real-time and automatically secure public buckets",
+      "severity": "critical",
+      "compliance_frameworks": ["CIS", "PCI-DSS", "HIPAA"]
+    },
+    "security-hub-findings-notification": {
+      "resource": "aws.security-hub-finding",
+      "source_file": "security-hub-findings-notification.yml",
+      "mode_type": "cloudtrail",
+      "description": "Monitor Security Hub findings in real-time and notify on HIGH and CRITICAL severity findings",
+      "severity": "variable",
+      "compliance_frameworks": ["CIS", "AWS-Foundational-Security"]
+    },
+    "guardduty-findings-auto-archive": {
+      "resource": "aws.guardduty-finding",
+      "source_file": "aws-guardduty-findings-remediate.yml",
+      "mode_type": "event-driven",
+      "description": "Send notifications for high-severity GuardDuty findings",
+      "severity": "high-critical",
+      "compliance_frameworks": ["CIS", "AWS-Foundational-Security", "PCI-DSS", "HIPAA"]
+    },
+    "ec2-stop-instances-on-launch": {
+      "resource": "aws.ec2",
+      "source_file": "aws-ec2-security.yml",
+      "mode_type": "cloudtrail",
+      "description": "Notify on EC2 instance launches and optionally stop instances for compliance review",
+      "severity": "medium",
+      "compliance_frameworks": ["CIS", "AWS-Foundational-Security"]
+    }
+  },
+  "enforcement_levels": {
+    "strict": "Immediate automated remediation without notification delay",
+    "auto-remediate": "Automated remediation with notification",
+    "moderate": "Partial remediation with manual review options",
+    "notify": "Notification only, manual remediation required",
+    "notify-only": "Notification without any automated action"
+  },
+  "metadata": {
+    "version": "3.1.0",
+    "last_updated": "2025-12-02T00:00:00Z",
+    "author": "Cloud Custodian Team",
+    "description": "Comprehensive multi-account policy mapping with 54 security policies covering ALB, EC2, Security Groups, S3, RDS, IAM, CloudFront, EKS, ECR, ElastiCache, EFS, Elasticsearch, Kinesis, Redshift, SNS, and WAF",
+    "central_account_id": "172327596604",
+    "member_account_ids": ["813185901390"],
+    "policy_categories": [
+      "Load Balancer Security",
+      "Compute Security", 
+      "Network Security",
+      "Storage Security",
+      "Database Security",
+      "Identity & Access Management",
+      "Content Delivery",
+      "Container Security",
+      "Data Encryption",
+      "Web Application Firewall"
+    ]
+  }
+}

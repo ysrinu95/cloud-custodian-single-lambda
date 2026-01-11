@@ -1,0 +1,53 @@
+policies:
+  # WAF Classic Global with logging not to central stream
+  - name: waf-classic-logging-not-central
+    resource: aws.waf
+    description: Detect WAF Classic (Global) with logging enabled but not to central logging stream
+    
+    filters:
+      - type: value
+        key: LoggingConfiguration
+        value: present
+      - not:
+        - type: value
+          key: LoggingConfiguration.LogDestinationConfigs[0]
+          op: regex
+          value: ".*lp-cl.*"
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "3"
+        subject: "⚠️ WAF Classic Logging Not to Central Stream - Global"
+        violation_desc: |
+          **WAF Classic Web ACL Logging Not to Central Stream**
+          
+          **Web ACL ID:** {{ resource.WebACLId }}
+          **Web ACL Name:** {{ resource.Name }}
+          **Current Log Destination:** {{ resource.LoggingConfiguration.LogDestinationConfigs[0] }}
+          **Required Pattern:** Kinesis Firehose stream with lp-cl prefix
+          
+          **Remediation:**
+          ```bash
+          # Create Kinesis Firehose to central S3 bucket
+          aws firehose create-delivery-stream \
+            --delivery-stream-name aws-waf-logs-<web-acl-name> \
+            --s3-destination-configuration \
+            BucketARN=arn:aws:s3:::lp-cl-logging-bucket,\
+            Prefix=service=waf/,\
+            CompressionFormat=GZIP
+          
+          # Update WAF logging configuration
+          aws waf put-logging-configuration \
+            --logging-configuration '{
+              "ResourceArn": "{{ resource.WebACLArn }}",
+              "LogDestinationConfigs": [
+                "arn:aws:firehose:us-east-1:{{ account_id }}:deliverystream/aws-waf-logs-<web-acl-name>"
+              ]
+            }'
+          ```
+        to:
+          - compliance-team@company.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications

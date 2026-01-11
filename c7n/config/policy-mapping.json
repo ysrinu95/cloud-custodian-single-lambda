@@ -1,0 +1,58 @@
+{
+  "version": "1.0",
+  "description": "Cloud Custodian Policy Event Mapping",
+  "generated_at": "auto-generated",
+  "statistics": {
+    "total_policies": 3,
+    "event_driven_policies": 3,
+    "unique_events": 3
+  },
+  "event_mapping": {
+    "RunInstances": [
+      {
+        "policy_name": "aws-ec2-stop-public-instances",
+        "resource": "aws.ec2",
+        "source_file": "aws-ec2-terminate-public-instances.yml"
+      }
+    ],
+    "CreateBucket": [
+      {
+        "policy_name": "s3-public-bucket-remediation-realtime",
+        "resource": "aws.s3",
+        "source_file": "s3-public-bucket-remediation-realtime.yml"
+      },
+      {
+        "policy_name": "s3-bucket-encryption-realtime",
+        "resource": "aws.s3",
+        "source_file": "aws-s3-no-encryption.yml"
+      }      
+    ],
+    "Security Hub Findings - Imported": [
+      {
+        "policy_name": "security-hub-findings-notification",
+        "resource": "aws.security-hub-finding",
+        "source_file": "security-hub-findings-notification.yml"
+      }
+    ]
+  },
+  "policies": {
+    "aws-ec2-stop-public-instances": {
+      "resource": "aws.ec2",
+      "source_file": "aws-ec2-stop-public-instances.yml",
+      "mode_type": "cloudtrail",
+      "description": "Notifies of and stops EC2 instances launched in a public subnet\n"
+    },
+    "s3-public-bucket-remediation-realtime": {
+      "resource": "aws.s3",
+      "source_file": "s3-public-bucket-remediation-realtime.yml",
+      "mode_type": "cloudtrail",
+      "description": "Monitor S3 buckets in real-time and automatically secure public buckets.\nTriggers when S3 buckets are created or modified.\n"
+    },
+    "security-hub-findings-notification": {
+      "resource": "aws.security-hub-finding",
+      "source_file": "security-hub-findings-notification.yml",
+      "mode_type": "cloudtrail",
+      "description": "Monitor Security Hub findings in real-time and notify on HIGH and CRITICAL severity findings.\nTriggers when Security Hub imports new findings.\n"
+    }
+  }
+}

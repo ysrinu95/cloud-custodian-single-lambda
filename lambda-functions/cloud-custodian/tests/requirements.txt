@@ -1,0 +1,5 @@
+# Test dependencies for Cloud Custodian unit tests
+pytest>=7.0.0
+jinja2>=3.0.0
+boto3>=1.26.0
+moto>=4.0.0

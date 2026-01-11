@@ -1,0 +1,22 @@
+accounts:
+- account_id: '172327596604'
+  name: srini-optum
+  regions:
+  - us-east-1
+  role: arn:aws:iam::172327596604:role/cloud-custodian
+  vars:
+    environment: central
+  tags:
+  - environment:central
+  - ou:cloud-custodian
+
+- account_id: '813185901390'
+  name: cloud-custodian-test-member
+  regions:
+  - us-east-1
+  role: arn:aws:iam::813185901390:role/cloud-custodian
+  vars:
+    environment: member
+  tags:
+  - environment:member
+  - ou:cloud-custodian

@@ -1,0 +1,279 @@
+policies:
+  # AMI publicly accessible - realtime/periodic
+  - name: ami-publicly-accessible
+    resource: aws.ami
+    description: Detect Amazon Machine Images (AMIs) that are publicly accessible
+    
+    filters:
+      - type: value
+        key: Public
+        value: true
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: AMI Publicly Accessible - {{ region }}"
+        violation_desc: |
+          **Amazon Machine Image Is Publicly Accessible**
+          
+          **AMI ID:** {{ resource.ImageId }}
+          **Name:** {{ resource.Name }}
+          **Owner:** {{ resource.OwnerId }}
+          **Creation Date:** {{ resource.CreationDate }}
+          
+          **Risk:** Public AMIs can expose sensitive data, configurations, or intellectual property.
+          
+          **Remediation:**
+          ```bash
+          # Make AMI private
+          aws ec2 modify-image-attribute \
+            --image-id {{ resource.ImageId }} \
+            --launch-permission "Remove=[{Group=all}]"
+          ```
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+      
+      - type: remove-launch-permissions
+        accounts: matched
+
+  # EBS snapshot not encrypted - realtime/periodic
+  - name: ebs-snapshot-unencrypted
+    resource: aws.ebs-snapshot
+    description: Detect EBS snapshots that are not encrypted
+    
+    filters:
+      - type: value
+        key: Encrypted
+        value: false
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "2"
+        subject: "⚠️ EBS Snapshot Not Encrypted - {{ region }}"
+        violation_desc: |
+          **EBS Snapshot Without Encryption**
+          
+          **Snapshot ID:** {{ resource.SnapshotId }}
+          **Volume ID:** {{ resource.VolumeId }}
+          **Volume Size:** {{ resource.VolumeSize }} GB
+          **Start Time:** {{ resource.StartTime }}
+          **Owner:** {{ resource.OwnerId }}
+          
+          **Risk:** Unencrypted snapshots can expose data at rest.
+          
+          **Remediation:**
+          ```bash
+          # Copy snapshot with encryption enabled
+          aws ec2 copy-snapshot \
+            --source-region {{ region }} \
+            --source-snapshot-id {{ resource.SnapshotId }} \
+            --description "Encrypted copy of {{ resource.SnapshotId }}" \
+            --encrypted \
+            --kms-key-id <kms-key-id>
+          
+          # Delete unencrypted snapshot after verification
+          aws ec2 delete-snapshot --snapshot-id {{ resource.SnapshotId }}
+          ```
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+
+  # EBS snapshots accessible to public - realtime/periodic
+  - name: ebs-snapshot-public
+    resource: aws.ebs-snapshot
+    description: Detect EBS snapshots that are publicly accessible
+    
+    filters:
+      - type: cross-account
+        whitelist_endpoints:
+          - '{{account_id}}'
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: EBS Snapshot Publicly Accessible - {{ region }}"
+        violation_desc: |
+          **EBS Snapshot Is Publicly Accessible**
+          
+          **Snapshot ID:** {{ resource.SnapshotId }}
+          **Volume ID:** {{ resource.VolumeId }}
+          **Volume Size:** {{ resource.VolumeSize }} GB
+          **Description:** {{ resource.Description }}
+          
+          **Risk:** Public EBS snapshots can expose sensitive data to unauthorized parties.
+          
+          **Remediation:**
+          ```bash
+          # Remove public permissions
+          aws ec2 modify-snapshot-attribute \
+            --snapshot-id {{ resource.SnapshotId }} \
+            --create-volume-permission "Remove=[{Group=all}]"
+          ```
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+      
+      - type: set-permissions
+        remove-accounts: matched
+
+  # EC2 instances with unencrypted EBS volumes - cloudtrail/periodic
+  - name: ec2-unencrypted-ebs-volume
+    resource: aws.ec2
+    description: Detect EC2 instances with unencrypted EBS volumes attached
+    
+    filters:
+      - type: ebs
+        key: Encrypted
+        value: false
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "2"
+        subject: "⚠️ EC2 Instance with Unencrypted EBS Volume - {{ region }}"
+        violation_desc: |
+          **EC2 Instance Has Unencrypted EBS Volume**
+          
+          **Instance ID:** {{ resource.InstanceId }}
+          **Instance Name:** {{ resource.Tags[?Key=='Name'].Value | [0] }}
+          **Instance Type:** {{ resource.InstanceType }}
+          **State:** {{ resource.State.Name }}
+          **Unencrypted Volumes:** {{ resource.BlockDeviceMappings[?Ebs.Encrypted==`false`].Ebs.VolumeId }}
+          
+          **Risk:** Unencrypted EBS volumes can expose data at rest.
+          
+          **Remediation:**
+          1. Create encrypted snapshot of unencrypted volume
+          2. Create new encrypted volume from snapshot
+          3. Stop instance and swap volumes
+          
+          ```bash
+          # Create snapshot
+          aws ec2 create-snapshot \
+            --volume-id <volume-id> \
+            --description "Snapshot for encryption"
+          
+          # Copy with encryption
+          aws ec2 copy-snapshot \
+            --source-snapshot-id <snapshot-id> \
+            --encrypted \
+            --kms-key-id <kms-key-id>
+          
+          # Create encrypted volume
+          aws ec2 create-volume \
+            --snapshot-id <encrypted-snapshot-id> \
+            --availability-zone {{ resource.Placement.AvailabilityZone }} \
+            --encrypted
+          ```
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+
+  # EC2 Instance Metadata Service v1 enabled - cloudtrail/periodic
+  - name: ec2-imdsv1-enabled
+    resource: aws.ec2
+    description: Detect EC2 instances with IMDSv1 enabled (should use IMDSv2 only)
+    
+    filters:
+      - or:
+        - type: value
+          key: MetadataOptions.HttpTokens
+          value: optional
+        - type: value
+          key: MetadataOptions.HttpTokens
+          value: absent
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "2"
+        subject: "⚠️ EC2 Instance Metadata Service v1 Enabled - {{ region }}"
+        violation_desc: |
+          **EC2 Instance Using Insecure IMDSv1**
+          
+          **Instance ID:** {{ resource.InstanceId }}
+          **Instance Name:** {{ resource.Tags[?Key=='Name'].Value | [0] }}
+          **Current IMDS Config:** {{ resource.MetadataOptions.HttpTokens }}
+          
+          **Risk:** IMDSv1 is vulnerable to SSRF attacks that can leak credentials.
+          
+          **Remediation:**
+          ```bash
+          # Require IMDSv2 only
+          aws ec2 modify-instance-metadata-options \
+            --instance-id {{ resource.InstanceId }} \
+            --http-tokens required \
+            --http-put-response-hop-limit 1
+          ```
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+      
+      - type: set-metadata-access
+        enforce-imdsv2: true
+
+  # EC2 instances launched in public subnet - realtime
+  - name: ec2-stop-instances-on-launch
+    resource: aws.ec2
+    description: Notify of and terminate EC2 instances launched in a public subnet
+    
+    filters:
+      - type: value
+        key: PublicIpAddress
+        value: not-null
+   
+    actions:
+      - type: terminate
+      
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 Public EC2 Instance Launched - Terminated - {{ account }} - {{ region }}"
+        violation_desc: |
+          **EC2 Instance Launched in Public Subnet - Automatically Terminated**
+          
+          **Instance ID:** {{ resource.InstanceId }}
+          **Instance Type:** {{ resource.InstanceType }}
+          **Public IP:** {{ resource.PublicIpAddress or "N/A" }}
+          **Private IP:** {{ resource.PrivateIpAddress or "N/A" }}
+          **VPC ID:** {{ resource.VpcId or "N/A" }}
+          **Subnet ID:** {{ resource.SubnetId or "N/A" }}
+          **Account:** {{ account }}
+          **Region:** {{ region }}
+          **Launch Time:** {{ resource.LaunchTime or "N/A" }}
+          **State:** {{ resource.State.Name or "terminated" }}
+          
+          **Created By:** {{ event.detail.userIdentity.userName or event.detail.userIdentity.principalId or "Unknown" }}
+          
+          **Tags:**
+          {% for tag in resource.Tags %}
+          - {{ tag.Key }}: {{ tag.Value }}
+          {% endfor %}
+          
+          **Risk:** EC2 instances with public IPs are directly accessible from the internet and increase attack surface.
+          
+          **Action Taken:** The instance has been automatically terminated.
+          
+          **Remediation:**
+          To expose an application or service publicly, use a load balancer in a public subnet that routes traffic internally.
+          
+          **Documentation:** https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-standards-fsbp-controls.html#ec2-9-remediation
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications

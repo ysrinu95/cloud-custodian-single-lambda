@@ -1,0 +1,468 @@
+{
+    "event": null,
+    "account_id": "813185901390",
+    "partition": "aws",
+    "account": "aikyam-engg",
+    "version": "0.9.30",
+    "region": "us-east-1",
+    "execution_id": "3816a42c-e1d8-482f-89ec-fa641f9cece2",
+    "execution_start": 1766464025.1456838,
+    "policy": {
+        "name": "ec2-stop-instances-on-launch",
+        "resource": "aws.ec2",
+        "description": "Notify of and terminate EC2 instances launched in a public subnet",
+        "filters": [
+            {
+                "type": "value",
+                "key": "InstanceId",
+                "value": "i-02e0748e24bb24916"
+            },
+            {
+                "type": "value",
+                "key": "PublicIpAddress",
+                "value": "not-null"
+            }
+        ],
+        "actions": [
+            {
+                "type": "terminate"
+            },
+            {
+                "type": "notify",
+                "template": "default.html",
+                "priority_header": "1",
+                "subject": "🚨 Public EC2 Instance Launched - Terminated - {{ account }} - {{ region }}",
+                "violation_desc": "**EC2 Instance Launched in Public Subnet - Automatically Terminated**\n\n**Instance ID:** {{ resource.InstanceId }}\n**Instance Type:** {{ resource.InstanceType }}\n**Public IP:** {{ resource.PublicIpAddress or \"N/A\" }}\n**Private IP:** {{ resource.PrivateIpAddress or \"N/A\" }}\n**VPC ID:** {{ resource.VpcId or \"N/A\" }}\n**Subnet ID:** {{ resource.SubnetId or \"N/A\" }}\n**Account:** {{ account }}\n**Region:** {{ region }}\n**Launch Time:** {{ resource.LaunchTime or \"N/A\" }}\n**State:** {{ resource.State.Name or \"terminated\" }}\n\n**Created By:** {% set creator = namespace(found=false, name='Unknown') %}{% for tag in resource.Tags %}{% if tag.Key == 'c7n:CreatorName' and not creator.found %}{% set creator.name = tag.Value %}{% set creator.found = true %}{% endif %}{% endfor %}{{ creator.name }}\n\n**Tags:**\n{% for tag in resource.Tags %}\n- {{ tag.Key }}: {{ tag.Value }}\n{% endfor %}\n\n**Risk:** EC2 instances with public IPs are directly accessible from the internet and increase attack surface.\n\n**Action Taken:** The instance has been automatically terminated.\n\n**Remediation:**\nTo expose an application or service publicly, use a load balancer in a public subnet that routes traffic internally.\n\n**Documentation:** https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-standards-fsbp-controls.html#ec2-9-remediation\n",
+                "to": [
+                    "srinivasula.yallala@optum.com"
+                ],
+                "transport": {
+                    "type": "sqs",
+                    "queue": "https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications"
+                }
+            }
+        ],
+        "event": {
+            "version": "0",
+            "id": "824bcef4-5775-8aa3-89c7-3c9dfad5db2b",
+            "detail-type": "AWS API Call via CloudTrail",
+            "source": "aws.ec2",
+            "account": "813185901390",
+            "time": "2025-12-23T04:26:49Z",
+            "region": "us-east-1",
+            "resources": [],
+            "detail": {
+                "eventVersion": "1.11",
+                "userIdentity": {
+                    "type": "IAMUser",
+                    "arn": "arn:aws:iam::813185901390:user/AWS_813185901390_service_user",
+                    "accountId": "813185901390",
+                    "userName": "AWS_813185901390_service_user"
+                },
+                "eventTime": "2025-12-23T04:26:49Z",
+                "eventSource": "ec2.amazonaws.com",
+                "eventName": "RunInstances",
+                "awsRegion": "us-east-1",
+                "sourceIPAddress": "198.203.175.170",
+                "userAgent": "aws-cli/2.20.0 md/awscrt#0.22.0 ua/2.0 os/linux#5.14.0-611.13.1.el9_7.x86_64 md/arch#x86_64 lang/python#3.12.6 md/pyimpl#CPython cfg/retry-mode#standard md/installer#exe md/distrib#rocky.8 md/prompt#off md/command#ec2.run-instances",
+                "requestParameters": {
+                    "instancesSet": {
+                        "items": [
+                            {
+                                "imageId": "ami-08d7aabbb50c2c24e",
+                                "minCount": 1,
+                                "maxCount": 1
+                            }
+                        ]
+                    },
+                    "instanceType": "t2.micro",
+                    "blockDeviceMapping": {},
+                    "monitoring": {
+                        "enabled": false
+                    },
+                    "disableApiTermination": false,
+                    "disableApiStop": false,
+                    "clientToken": "b509cc07-809b-4b7e-ac1b-a77444f20836",
+                    "networkInterfaceSet": {
+                        "items": [
+                            {
+                                "deviceIndex": 0,
+                                "subnetId": "subnet-0028235d",
+                                "associatePublicIpAddress": true
+                            }
+                        ]
+                    },
+                    "tagSpecificationSet": {
+                        "items": [
+                            {
+                                "resourceType": "instance",
+                                "tags": [
+                                    {
+                                        "key": "Name",
+                                        "value": "custodian-demo-public-instance"
+                                    },
+                                    {
+                                        "key": "TestResource",
+                                        "value": "true"
+                                    },
+                                    {
+                                        "key": "CreatedBy",
+                                        "value": "CloudCustodianDemo"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "responseElements": {
+                    "requestId": "a9d83be1-dc82-441c-9375-c05ed44ae2ce",
+                    "reservationId": "r-0541f9fc817a6dcbc",
+                    "ownerId": "813185901390",
+                    "groupSet": {},
+                    "instancesSet": {
+                        "items": [
+                            {
+                                "instanceId": "i-02e0748e24bb24916",
+                                "imageId": "ami-08d7aabbb50c2c24e",
+                                "bootMode": "uefi-preferred",
+                                "currentInstanceBootMode": "legacy-bios",
+                                "instanceState": {
+                                    "code": 0,
+                                    "name": "pending"
+                                },
+                                "privateDnsName": "ip-10-1-28-224.ec2.internal",
+                                "operator": {
+                                    "managed": false
+                                },
+                                "amiLaunchIndex": 0,
+                                "productCodes": {},
+                                "instanceType": "t2.micro",
+                                "launchTime": 1766464009000,
+                                "placement": {
+                                    "availabilityZone": "us-east-1b",
+                                    "availabilityZoneId": "use1-az6",
+                                    "tenancy": "default"
+                                },
+                                "monitoring": {
+                                    "state": "disabled"
+                                },
+                                "subnetId": "subnet-0028235d",
+                                "vpcId": "vpc-b892fac3",
+                                "privateIpAddress": "10.1.28.224",
+                                "stateReason": {
+                                    "code": "pending",
+                                    "message": "pending"
+                                },
+                                "architecture": "x86_64",
+                                "rootDeviceType": "ebs",
+                                "rootDeviceName": "/dev/xvda",
+                                "blockDeviceMapping": {},
+                                "virtualizationType": "hvm",
+                                "hypervisor": "xen",
+                                "tagSet": {
+                                    "items": [
+                                        {
+                                            "key": "CreatedBy",
+                                            "value": "CloudCustodianDemo"
+                                        },
+                                        {
+                                            "key": "TestResource",
+                                            "value": "true"
+                                        },
+                                        {
+                                            "key": "Name",
+                                            "value": "custodian-demo-public-instance"
+                                        }
+                                    ]
+                                },
+                                "clientToken": "b509cc07-809b-4b7e-ac1b-a77444f20836",
+                                "groupSet": {
+                                    "items": [
+                                        {
+                                            "groupId": "sg-9138fbd8",
+                                            "groupName": "default"
+                                        }
+                                    ]
+                                },
+                                "sourceDestCheck": true,
+                                "networkInterfaceSet": {
+                                    "items": [
+                                        {
+                                            "networkInterfaceId": "eni-04556d181659203a3",
+                                            "subnetId": "subnet-0028235d",
+                                            "vpcId": "vpc-b892fac3",
+                                            "ownerId": "813185901390",
+                                            "operator": {
+                                                "managed": false
+                                            },
+                                            "status": "in-use",
+                                            "macAddress": "0e:88:c6:ee:05:25",
+                                            "privateIpAddress": "10.1.28.224",
+                                            "privateDnsName": "ip-10-1-28-224.ec2.internal",
+                                            "sourceDestCheck": true,
+                                            "interfaceType": "interface",
+                                            "groupSet": {
+                                                "items": [
+                                                    {
+                                                        "groupId": "sg-9138fbd8",
+                                                        "groupName": "default"
+                                                    }
+                                                ]
+                                            },
+                                            "attachment": {
+                                                "attachmentId": "eni-attach-0bd109070e8605ca1",
+                                                "deviceIndex": 0,
+                                                "networkCardIndex": 0,
+                                                "status": "attaching",
+                                                "attachTime": 1766464009000,
+                                                "deleteOnTermination": true
+                                            },
+                                            "privateIpAddressesSet": {
+                                                "item": [
+                                                    {
+                                                        "privateIpAddress": "10.1.28.224",
+                                                        "privateDnsName": "ip-10-1-28-224.ec2.internal",
+                                                        "primary": true
+                                                    }
+                                                ]
+                                            },
+                                            "ipv6AddressesSet": {},
+                                            "tagSet": {}
+                                        }
+                                    ]
+                                },
+                                "ebsOptimized": false,
+                                "enaSupport": true,
+                                "cpuOptions": {
+                                    "coreCount": 1,
+                                    "threadsPerCore": 1
+                                },
+                                "capacityReservationSpecification": {
+                                    "capacityReservationPreference": "open"
+                                },
+                                "enclaveOptions": {
+                                    "enabled": false
+                                },
+                                "metadataOptions": {
+                                    "state": "pending",
+                                    "httpTokens": "required",
+                                    "httpPutResponseHopLimit": 2,
+                                    "httpEndpoint": "enabled",
+                                    "httpProtocolIpv4": "enabled",
+                                    "httpProtocolIpv6": "disabled",
+                                    "instanceMetadataTags": "disabled"
+                                },
+                                "maintenanceOptions": {
+                                    "autoRecovery": "default",
+                                    "rebootMigration": "default"
+                                },
+                                "privateDnsNameOptions": {
+                                    "hostnameType": "ip-name",
+                                    "enableResourceNameDnsARecord": false,
+                                    "enableResourceNameDnsAAAARecord": false
+                                }
+                            }
+                        ]
+                    }
+                },
+                "requestID": "a9d83be1-dc82-441c-9375-c05ed44ae2ce",
+                "eventID": "577740da-8029-41fa-81c4-37828784b7c3",
+                "readOnly": false,
+                "resources": [
+                    {
+                        "accountId": "813185901390",
+                        "type": "AWS::EC2::Instance",
+                        "ARN": "arn:aws:ec2:us-east-1:813185901390:instance/i-02e0748e24bb24916"
+                    }
+                ],
+                "eventType": "AwsApiCall",
+                "managementEvent": true,
+                "recipientAccountId": "813185901390",
+                "eventCategory": "Management",
+                "tlsDetails": {
+                    "tlsVersion": "TLSv1.3",
+                    "cipherSuite": "TLS_AES_128_GCM_SHA256",
+                    "clientProvidedHostHeader": "ec2.us-east-1.amazonaws.com"
+                }
+            }
+        }
+    },
+    "action": {
+        "type": "notify",
+        "template": "default.html",
+        "priority_header": "1",
+        "subject": "🚨 Public EC2 Instance Launched - Terminated - {{ account }} - {{ region }}",
+        "violation_desc": "**EC2 Instance Launched in Public Subnet - Automatically Terminated**\n\n**Instance ID:** {{ resource.InstanceId }}\n**Instance Type:** {{ resource.InstanceType }}\n**Public IP:** {{ resource.PublicIpAddress or \"N/A\" }}\n**Private IP:** {{ resource.PrivateIpAddress or \"N/A\" }}\n**VPC ID:** {{ resource.VpcId or \"N/A\" }}\n**Subnet ID:** {{ resource.SubnetId or \"N/A\" }}\n**Account:** {{ account }}\n**Region:** {{ region }}\n**Launch Time:** {{ resource.LaunchTime or \"N/A\" }}\n**State:** {{ resource.State.Name or \"terminated\" }}\n\n**Created By:** {% set creator = namespace(found=false, name='Unknown') %}{% for tag in resource.Tags %}{% if tag.Key == 'c7n:CreatorName' and not creator.found %}{% set creator.name = tag.Value %}{% set creator.found = true %}{% endif %}{% endfor %}{{ creator.name }}\n\n**Tags:**\n{% for tag in resource.Tags %}\n- {{ tag.Key }}: {{ tag.Value }}\n{% endfor %}\n\n**Risk:** EC2 instances with public IPs are directly accessible from the internet and increase attack surface.\n\n**Action Taken:** The instance has been automatically terminated.\n\n**Remediation:**\nTo expose an application or service publicly, use a load balancer in a public subnet that routes traffic internally.\n\n**Documentation:** https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-standards-fsbp-controls.html#ec2-9-remediation\n",
+        "to": [
+            "srinivasula.yallala@optum.com"
+        ],
+        "transport": {
+            "type": "sqs",
+            "queue": "https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications"
+        }
+    },
+    "resources": [
+        {
+            "Architecture": "x86_64",
+            "BlockDeviceMappings": [
+                {
+                    "DeviceName": "/dev/xvda",
+                    "Ebs": {
+                        "AttachTime": "2025-12-23T04:26:50+00:00",
+                        "DeleteOnTermination": true,
+                        "Status": "attached",
+                        "VolumeId": "vol-03bc6e25e50822812"
+                    }
+                }
+            ],
+            "ClientToken": "b509cc07-809b-4b7e-ac1b-a77444f20836",
+            "EbsOptimized": false,
+            "EnaSupport": true,
+            "Hypervisor": "xen",
+            "NetworkInterfaces": [
+                {
+                    "Association": {
+                        "IpOwnerId": "amazon",
+                        "PublicDnsName": "ec2-54-227-161-154.compute-1.amazonaws.com",
+                        "PublicIp": "54.227.161.154"
+                    },
+                    "Attachment": {
+                        "AttachTime": "2025-12-23T04:26:49+00:00",
+                        "AttachmentId": "eni-attach-0bd109070e8605ca1",
+                        "DeleteOnTermination": true,
+                        "DeviceIndex": 0,
+                        "Status": "attached",
+                        "NetworkCardIndex": 0
+                    },
+                    "Description": "",
+                    "Groups": [
+                        {
+                            "GroupId": "sg-9138fbd8",
+                            "GroupName": "default"
+                        }
+                    ],
+                    "Ipv6Addresses": [],
+                    "MacAddress": "0e:88:c6:ee:05:25",
+                    "NetworkInterfaceId": "eni-04556d181659203a3",
+                    "OwnerId": "813185901390",
+                    "PrivateDnsName": "ip-10-1-28-224.ec2.internal",
+                    "PrivateIpAddress": "10.1.28.224",
+                    "PrivateIpAddresses": [
+                        {
+                            "Association": {
+                                "IpOwnerId": "amazon",
+                                "PublicDnsName": "ec2-54-227-161-154.compute-1.amazonaws.com",
+                                "PublicIp": "54.227.161.154"
+                            },
+                            "Primary": true,
+                            "PrivateDnsName": "ip-10-1-28-224.ec2.internal",
+                            "PrivateIpAddress": "10.1.28.224"
+                        }
+                    ],
+                    "SourceDestCheck": true,
+                    "Status": "in-use",
+                    "SubnetId": "subnet-0028235d",
+                    "VpcId": "vpc-b892fac3",
+                    "InterfaceType": "interface",
+                    "Operator": {
+                        "Managed": false
+                    }
+                }
+            ],
+            "RootDeviceName": "/dev/xvda",
+            "RootDeviceType": "ebs",
+            "SecurityGroups": [
+                {
+                    "GroupId": "sg-9138fbd8",
+                    "GroupName": "default"
+                }
+            ],
+            "SourceDestCheck": true,
+            "Tags": [
+                {
+                    "Key": "CreatedBy",
+                    "Value": "CloudCustodianDemo"
+                },
+                {
+                    "Key": "TestResource",
+                    "Value": "true"
+                },
+                {
+                    "Key": "Name",
+                    "Value": "custodian-demo-public-instance"
+                }
+            ],
+            "VirtualizationType": "hvm",
+            "CpuOptions": {
+                "CoreCount": 1,
+                "ThreadsPerCore": 1
+            },
+            "CapacityReservationSpecification": {
+                "CapacityReservationPreference": "open"
+            },
+            "HibernationOptions": {
+                "Configured": false
+            },
+            "MetadataOptions": {
+                "State": "applied",
+                "HttpTokens": "required",
+                "HttpPutResponseHopLimit": 2,
+                "HttpEndpoint": "enabled",
+                "HttpProtocolIpv6": "disabled",
+                "InstanceMetadataTags": "disabled"
+            },
+            "EnclaveOptions": {
+                "Enabled": false
+            },
+            "BootMode": "uefi-preferred",
+            "PlatformDetails": "Linux/UNIX",
+            "UsageOperation": "RunInstances",
+            "UsageOperationUpdateTime": "2025-12-23T04:26:49+00:00",
+            "PrivateDnsNameOptions": {
+                "HostnameType": "ip-name",
+                "EnableResourceNameDnsARecord": false,
+                "EnableResourceNameDnsAAAARecord": false
+            },
+            "MaintenanceOptions": {
+                "AutoRecovery": "default",
+                "RebootMigration": "default"
+            },
+            "CurrentInstanceBootMode": "legacy-bios",
+            "NetworkPerformanceOptions": {
+                "BandwidthWeighting": "default"
+            },
+            "Operator": {
+                "Managed": false
+            },
+            "InstanceId": "i-02e0748e24bb24916",
+            "ImageId": "ami-08d7aabbb50c2c24e",
+            "State": {
+                "Code": 16,
+                "Name": "running"
+            },
+            "PrivateDnsName": "ip-10-1-28-224.ec2.internal",
+            "PublicDnsName": "ec2-54-227-161-154.compute-1.amazonaws.com",
+            "StateTransitionReason": "",
+            "AmiLaunchIndex": 0,
+            "ProductCodes": [],
+            "InstanceType": "t2.micro",
+            "LaunchTime": "2025-12-23T04:26:49+00:00",
+            "Placement": {
+                "GroupName": "",
+                "Tenancy": "default",
+                "AvailabilityZone": "us-east-1b"
+            },
+            "Monitoring": {
+                "State": "disabled"
+            },
+            "SubnetId": "subnet-0028235d",
+            "VpcId": "vpc-b892fac3",
+            "PrivateIpAddress": "10.1.28.224",
+            "PublicIpAddress": "54.227.161.154",
+            "c7n:MatchedFilters": [
+                "InstanceId",
+                "PublicIpAddress"
+            ]
+        }
+    ]
+}

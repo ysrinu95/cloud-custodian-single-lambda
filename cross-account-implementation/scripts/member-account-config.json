@@ -1,9 +1,0 @@
-{
-  "member_account_id": "813185901390",
-  "member_account_name": "Cloud Custodian Test Member",
-  "member_account_email": "ysrinu95@gmail.com",
-  "central_account_id": "172327596604",
-  "access_role_name": "OrganizationAccountAccessRole",
-  "access_role_arn": "arn:aws:iam::813185901390:role/OrganizationAccountAccessRole",
-  "created_at": "2025-11-19T17:32:26Z"
-}

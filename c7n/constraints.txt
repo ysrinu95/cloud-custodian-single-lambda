@@ -1,0 +1,6 @@
+# Constraints for c7n to satisfy package version requirements and avoid pip resolver
+# c7n, c7n-mailer and c7n-policystream require boto3==1.40.11
+# safety requires packaging<22.0,>=21.0 so we pin packaging to 21.0
+
+boto3==1.40.11
+packaging==21.0

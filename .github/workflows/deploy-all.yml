@@ -1,0 +1,315 @@
+name: Deploy All Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform action'
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+        default: 'plan'
+      deploy_central:
+        description: 'Deploy Central Account'
+        required: true
+        type: boolean
+        default: true
+      deploy_member:
+        description: 'Deploy Member Account'
+        required: true
+        type: boolean
+        default: true
+
+env:
+  AWS_REGION: us-east-1
+  TERRAFORM_VERSION: "1.6.0"
+  PYTHON_VERSION: "3.12"
+  CENTRAL_ACCOUNT_ID: "172327596604"
+  MEMBER_ACCOUNT_ID: "813185901390"
+  TF_STATE_BUCKET: "ysr95-cloud-custodian-tf-bkt"
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  # ============================================================================
+  # Job 1: Build Artifacts
+  # ============================================================================
+  build:
+    name: Build Lambda Artifacts
+    runs-on: ubuntu-latest
+    if: github.event.inputs.action != 'destroy'
+    
+    outputs:
+      layer_size: ${{ steps.size.outputs.size_mb }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-layer-${{ hashFiles('lambda-functions/cloud-custodian-layer/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-layer-
+
+      - name: Build Lambda Layer
+        run: |
+          echo "📦 Building Lambda layer..."
+          mkdir -p layer/python/lib/python${{ env.PYTHON_VERSION }}/site-packages
+          
+          pip install --upgrade pip
+          pip install -r lambda-functions/cloud-custodian-layer/requirements.txt \
+            -t layer/python/lib/python${{ env.PYTHON_VERSION }}/site-packages/
+          
+          # Optimize layer
+          cd layer/python/lib/python${{ env.PYTHON_VERSION }}/site-packages/
+          find . -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find . -name "*.pyc" -delete 2>/dev/null || true
+          rm -rf boto3* botocore* 2>/dev/null || true
+          cd ../../../../..
+          
+          cd layer && zip -r ../cloud-custodian-layer.zip python/ -q
+
+      - name: Check layer size
+        id: size
+        run: |
+          SIZE=$(du -m cloud-custodian-layer.zip | cut -f1)
+          echo "size_mb=$SIZE" >> $GITHUB_OUTPUT
+          echo "📏 Layer size: ${SIZE}MB"
+          [ $SIZE -gt 250 ] && exit 1 || true
+
+      - name: Build Lambda Function
+        run: |
+          echo "📦 Building Lambda function..."
+          mkdir -p lambda-package
+          cp lambda-functions/cloud-custodian/*.py lambda-package/
+          cd lambda-package && zip -r ../lambda-function.zip . -q
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lambda-artifacts
+          path: |
+            cloud-custodian-layer.zip
+            lambda-function.zip
+          retention-days: 7
+
+  # ============================================================================
+  # Job 2: Deploy Central Account
+  # ============================================================================
+  deploy-central:
+    name: Deploy Central Account
+    runs-on: ubuntu-latest
+    needs: build
+    if: |
+      always() && 
+      github.event.inputs.deploy_central == 'true' &&
+      (needs.build.result == 'success' || github.event.inputs.action == 'destroy')
+    environment:
+      name: central-${{ github.event.inputs.action }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        if: github.event.inputs.action != 'destroy'
+        uses: actions/download-artifact@v4
+        with:
+          name: lambda-artifacts
+          path: terraform/central/
+
+      - name: Configure AWS credentials (Central)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.CENTRAL_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Init (Central)
+        working-directory: terraform/central
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
+            -backend-config="key=central/cloud-custodian/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=terraform-state-lock"
+
+      - name: Create dummy files for destroy
+        if: github.event.inputs.action == 'destroy'
+        working-directory: terraform/central
+        run: |
+          echo "dummy" > lambda-function.zip
+          echo "dummy" > cloud-custodian-layer.zip
+
+      - name: Terraform Plan (Central)
+        if: github.event.inputs.action == 'plan'
+        working-directory: terraform/central
+        run: |
+          terraform plan \
+            -var="lambda_package_path=lambda-function.zip" \
+            -var="lambda_layer_path=cloud-custodian-layer.zip"
+
+      - name: Terraform Apply (Central)
+        if: github.event.inputs.action == 'apply'
+        working-directory: terraform/central
+        run: |
+          echo "🚀 Applying Central Account infrastructure..."
+          terraform apply -auto-approve \
+            -var="lambda_package_path=lambda-function.zip" \
+            -var="lambda_layer_path=cloud-custodian-layer.zip"
+          echo "✅ Central Account deployed!"
+
+      - name: Terraform Destroy (Central)
+        if: github.event.inputs.action == 'destroy'
+        working-directory: terraform/central
+        run: |
+          echo "⚠️ Destroying Central Account infrastructure..."
+          terraform destroy -auto-approve \
+            -var="lambda_package_path=lambda-function.zip" \
+            -var="lambda_layer_path=cloud-custodian-layer.zip"
+          echo "✅ Central Account destroyed!"
+
+      - name: Get outputs
+        if: github.event.inputs.action == 'apply'
+        id: outputs
+        working-directory: terraform/central
+        run: |
+          echo "lambda_function=$(terraform output -raw lambda_function_name 2>/dev/null || echo 'N/A')" >> $GITHUB_OUTPUT
+          echo "event_bus=$(terraform output -raw event_bus_arn 2>/dev/null || echo 'N/A')" >> $GITHUB_OUTPUT
+
+      - name: Central Summary
+        run: |
+          echo "## Central Account (${{ env.CENTRAL_ACCOUNT_ID }})" >> $GITHUB_STEP_SUMMARY
+          echo "Action: **${{ github.event.inputs.action }}**" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # Job 3: Deploy Member Account
+  # ============================================================================
+  deploy-member:
+    name: Deploy Member Account
+    runs-on: ubuntu-latest
+    needs: [build, deploy-central]
+    if: |
+      always() && 
+      github.event.inputs.deploy_member == 'true' &&
+      (needs.deploy-central.result == 'success' || needs.deploy-central.result == 'skipped')
+    environment:
+      name: member-${{ github.event.inputs.action }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (Member)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.MEMBER_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Init (Member)
+        working-directory: terraform/member
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
+            -backend-config="key=member/${{ env.MEMBER_ACCOUNT_ID }}/cloud-custodian/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=terraform-state-lock"
+
+      - name: Terraform Plan (Member)
+        if: github.event.inputs.action == 'plan'
+        working-directory: terraform/member
+        run: |
+          terraform plan \
+            -var="central_account_id=${{ env.CENTRAL_ACCOUNT_ID }}"
+
+      - name: Terraform Apply (Member)
+        if: github.event.inputs.action == 'apply'
+        working-directory: terraform/member
+        run: |
+          echo "🚀 Applying Member Account infrastructure..."
+          terraform apply -auto-approve \
+            -var="central_account_id=${{ env.CENTRAL_ACCOUNT_ID }}"
+          echo "✅ Member Account deployed!"
+
+      - name: Terraform Destroy (Member)
+        if: github.event.inputs.action == 'destroy'
+        working-directory: terraform/member
+        run: |
+          echo "⚠️ Destroying Member Account infrastructure..."
+          terraform destroy -auto-approve \
+            -var="central_account_id=${{ env.CENTRAL_ACCOUNT_ID }}"
+          echo "✅ Member Account destroyed!"
+
+      - name: Member Summary
+        run: |
+          echo "## Member Account (${{ env.MEMBER_ACCOUNT_ID }})" >> $GITHUB_STEP_SUMMARY
+          echo "Action: **${{ github.event.inputs.action }}**" >> $GITHUB_STEP_SUMMARY
+          echo "Central Account: \`${{ env.CENTRAL_ACCOUNT_ID }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # Job 4: Final Summary
+  # ============================================================================
+  summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [deploy-central, deploy-member]
+    if: always()
+
+    steps:
+      - name: Generate Summary
+        run: |
+          echo "# 🏗️ Cloud Custodian Infrastructure Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Account | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          
+          # Central status
+          CENTRAL_STATUS="${{ needs.deploy-central.result }}"
+          if [ "$CENTRAL_STATUS" == "success" ]; then
+            echo "| Central | \`${{ env.CENTRAL_ACCOUNT_ID }}\` | ✅ Success |" >> $GITHUB_STEP_SUMMARY
+          elif [ "$CENTRAL_STATUS" == "skipped" ]; then
+            echo "| Central | \`${{ env.CENTRAL_ACCOUNT_ID }}\` | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Central | \`${{ env.CENTRAL_ACCOUNT_ID }}\` | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Member status
+          MEMBER_STATUS="${{ needs.deploy-member.result }}"
+          if [ "$MEMBER_STATUS" == "success" ]; then
+            echo "| Member | \`${{ env.MEMBER_ACCOUNT_ID }}\` | ✅ Success |" >> $GITHUB_STEP_SUMMARY
+          elif [ "$MEMBER_STATUS" == "skipped" ]; then
+            echo "| Member | \`${{ env.MEMBER_ACCOUNT_ID }}\` | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Member | \`${{ env.MEMBER_ACCOUNT_ID }}\` | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Action:** ${{ github.event.inputs.action }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${GITHUB_SHA::7}\`" >> $GITHUB_STEP_SUMMARY

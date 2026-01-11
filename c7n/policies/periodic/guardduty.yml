@@ -1,0 +1,66 @@
+vars:
+  email-notify: &email-notify
+    template: default.html
+    priority_header: "1"
+    from: c7n@central.ctkube.com
+    to:
+      - srinivasula.yallala@optum.com
+    transport:
+      type: sqs
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications
+
+policies:
+  - name: aws-guarduty-account-new-finding
+    resource: account
+    description: |
+      Notifies of new account findings in GuardDuty
+    filters:
+      - type: value
+        key: Severity
+        value: 4.5
+        op: greater-than   # medium and high severity
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "🚨 GuardDuty Finding - Account - {{ account }} - {{ region }}"
+        violation_desc: |
+          **New GuardDuty Finding - Account Level**
+          Please investigate immediately.
+          View in GuardDuty console: https://console.aws.amazon.com/guardduty/
+
+  - name: aws-guarduty-iam-user-new-finding
+    resource: iam-user
+    description: |
+      Notifies of new IAM user findings in GuardDuty
+    filters:
+      - type: value
+        key: Severity
+        value: 4.5
+        op: greater-than   # medium and high severity
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "🚨 GuardDuty Finding - IAM User - {{ account }} - {{ region }}"
+        violation_desc: |
+          **New GuardDuty Finding - IAM User**
+
+          Please investigate immediately.
+          View in GuardDuty console: https://console.aws.amazon.com/guardduty/
+
+  - name: aws-guarduty-ec2-new-finding
+    resource: ec2
+    description: |
+      Notifies of new EC2 findings in GuardDuty
+    filters:
+      - type: value
+        key: Severity
+        value: 4.5
+        op: greater-than   # medium and high severity
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "🚨 GuardDuty Finding - EC2 - {{ account }} - {{ region }}"
+        violation_desc: |
+          **New GuardDuty Finding - EC2 Instance**
+          Please investigate immediately.
+          View in GuardDuty console: https://console.aws.amazon.com/guardduty/

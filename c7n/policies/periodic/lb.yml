@@ -1,0 +1,42 @@
+vars:
+  email-notify: &email-notify
+    template: default.html
+    priority_header: "1"
+    from: c7n@central.ctkube.com
+    to:
+      - srinivasula.yallala@optum.com
+    transport:
+      type: sqs
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications
+      
+policies:  
+  - name: aws-elb-outdated-tls-protocols
+    resource: app-elb
+    description: |
+      Notifies on usage of outdated TLS protocols
+    filters:
+      - type: value
+        key: Scheme
+        value: internet-facing    #todo: eventually migrate all internal LB's to HTTPS    
+      - type: listener
+        key: Protocol
+        value: HTTP
+      - type: listener
+        matched: true
+        key: 'DefaultActions[].RedirectConfig.Protocol'
+        value: [HTTPS]
+        op: ne
+    actions:
+      - type: notify
+        <<: *email-notify
+        priority_header: 1
+        subject: "[c7n] [{{ account }}] LB HTTP Listeners in use that do not redirect to HTTPS found ({{ region }})"
+        violation_desc: LB HTTP Listeners in use that do not redirected to HTTPS
+        action_desc: |
+          LB HTTP Listeners in use that do not redirected to HTTPS. Please configure HTTPS or redirect HTTP to HTTPS.       
+          <a href="https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-listeners.html#listener-configuration">Documentation</a>          
+
+  - name: aws-elb-create-internet-facing-load-balancer
+    resource: aws.app-elb
+    description: |
+      Notifies on creation of an internet-facing load balancer

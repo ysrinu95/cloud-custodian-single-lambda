@@ -5,8 +5,11 @@ on:
     branches:
       - main
     paths:
-      - 'policies/**/*.yml'
-      - 'config/policy-mapping.json'
+      - 'c7n/policies/**/*.yml'
+      - 'c7n/config/account-policy-mapping.json'
+      - 'c7n/config/accounts.yml'
+      - 'c7n/config/mailer-templates/**'
+      - 'c7n/config/mailer.yml'
   workflow_dispatch:
     inputs:
       force_upload:
@@ -17,11 +20,12 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  S3_BUCKET: ysr95-custodian-policies
+  S3_BUCKET: ysr95-cloud-custodian-data
+  CENTRAL_ACCOUNT_ID: "172327596604"
 
 jobs:
   upload-policies:
-    name: Upload Policies and Mapping to S3
+    name: Upload Policies and Config to S3
     runs-on: ubuntu-latest
     
     permissions:
@@ -32,48 +36,70 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2  # Fetch last 2 commits to compare changes
+          fetch-depth: 2
       
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          # OIDC authentication
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
+          role-to-assume: arn:aws:iam::${{ env.CENTRAL_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
           aws-region: ${{ env.AWS_REGION }}
       
       - name: Validate policy mapping JSON
         run: |
-          echo "Validating policy-mapping.json..."
-          if ! jq empty config/policy-mapping.json; then
-            echo "❌ Invalid JSON in policy-mapping.json"
+          echo "Validating account-policy-mapping.json..."
+          if ! jq empty c7n/config/account-policy-mapping.json; then
+            echo "❌ Invalid JSON in account-policy-mapping.json"
             exit 1
           fi
-          echo "✅ policy-mapping.json is valid JSON"
+          echo "✅ account-policy-mapping.json is valid JSON"
       
       - name: Count policy files
         id: count
         run: |
-          POLICY_COUNT=$(find policies -name "*.yml" -type f | wc -l)
+          POLICY_COUNT=$(find c7n/policies -name "*.yml" -type f | wc -l)
+          TEMPLATE_COUNT=$(find c7n/config/mailer-templates -name "*.j2" -type f | wc -l)
           echo "policy_count=$POLICY_COUNT" >> $GITHUB_OUTPUT
+          echo "template_count=$TEMPLATE_COUNT" >> $GITHUB_OUTPUT
           echo "Found $POLICY_COUNT policy files"
+          echo "Found $TEMPLATE_COUNT mailer templates"
       
-      - name: Upload policy mapping configuration
+      - name: Upload config files
         run: |
-          echo "Uploading policy-mapping.json to S3..."
-          aws s3 cp config/policy-mapping.json \
-            s3://${{ env.S3_BUCKET }}/config/policy-mapping.json \
-            --region ${{ env.AWS_REGION }} \
+          echo "Uploading config files to S3..."
+          aws s3 cp c7n/config/account-policy-mapping.json \
+            s3://${{ env.S3_BUCKET }}/config/account-policy-mapping.json \
             --content-type "application/json"
-          echo "✅ Policy mapping uploaded successfully"
+          
+          aws s3 cp c7n/config/accounts.yml \
+            s3://${{ env.S3_BUCKET }}/config/accounts.yml \
+            --content-type "text/yaml"
+          
+          aws s3 cp c7n/config/mailer.yml \
+            s3://${{ env.S3_BUCKET }}/config/mailer.yml \
+            --content-type "text/yaml"
+          
+          echo "✅ Config files uploaded successfully"
+      
+      - name: Upload mailer templates
+        run: |
+          echo "Uploading mailer templates to S3..."
+          aws s3 sync c7n/config/mailer-templates/ \
+            s3://${{ env.S3_BUCKET }}/config/mailer-templates/ \
+            --exclude "*.md" \
+            --include "*.j2" \
+            --include "*.html" \
+            --delete
+          echo "✅ Mailer templates uploaded successfully"
       
       - name: Upload all policy files
         if: github.event.inputs.force_upload == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           echo "Force uploading all policy files..."
-          aws s3 sync policies/ \
+          aws s3 sync c7n/policies/ \
             s3://${{ env.S3_BUCKET }}/policies/ \
-            --region ${{ env.AWS_REGION }} \
             --exclude "*.md" \
+            --exclude "*.txt" \
+            --exclude "__pycache__/*" \
             --include "*.yml" \
             --delete
           echo "✅ All ${{ steps.count.outputs.policy_count }} policies uploaded"
@@ -83,25 +109,24 @@ jobs:
         run: |
           echo "Uploading only changed policy files..."
           
-          # Get list of changed policy files
-          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD -- policies/*.yml || echo "")
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD -- c7n/policies/*.yml || echo "")
           
           if [ -z "$CHANGED_FILES" ]; then
-            echo "ℹ️ No policy files changed"
+            echo "ℹ️ No policy files changed, syncing all..."
+            aws s3 sync c7n/policies/ s3://${{ env.S3_BUCKET }}/policies/ \
+              --exclude "*.md" --exclude "*.txt" --include "*.yml"
             exit 0
           fi
           
           echo "Changed files:"
           echo "$CHANGED_FILES"
           
-          # Upload each changed file
           UPLOADED=0
           while IFS= read -r file; do
             if [ -f "$file" ]; then
-              echo "Uploading $file..."
-              aws s3 cp "$file" \
-                "s3://${{ env.S3_BUCKET }}/$file" \
-                --region ${{ env.AWS_REGION }}
+              S3_PATH="${file/c7n\//}"
+              echo "Uploading $file to s3://${{ env.S3_BUCKET }}/$S3_PATH..."
+              aws s3 cp "$file" "s3://${{ env.S3_BUCKET }}/$S3_PATH"
               UPLOADED=$((UPLOADED + 1))
             fi
           done <<< "$CHANGED_FILES"
@@ -112,23 +137,31 @@ jobs:
         run: |
           echo "Verifying uploaded files..."
           
-          # Verify policy mapping
-          if aws s3 ls "s3://${{ env.S3_BUCKET }}/config/policy-mapping.json" --region ${{ env.AWS_REGION }}; then
-            echo "✅ policy-mapping.json exists in S3"
+          if aws s3 ls "s3://${{ env.S3_BUCKET }}/config/account-policy-mapping.json"; then
+            echo "✅ account-policy-mapping.json exists in S3"
           else
-            echo "❌ policy-mapping.json not found in S3"
+            echo "❌ account-policy-mapping.json not found in S3"
             exit 1
           fi
           
-          # Count policies in S3
-          S3_POLICY_COUNT=$(aws s3 ls "s3://${{ env.S3_BUCKET }}/policies/" --recursive --region ${{ env.AWS_REGION }} | grep ".yml$" | wc -l)
+          S3_POLICY_COUNT=$(aws s3 ls "s3://${{ env.S3_BUCKET }}/policies/" --recursive | grep ".yml$" | wc -l)
           echo "S3 has $S3_POLICY_COUNT policy files"
+          
+          S3_TEMPLATE_COUNT=$(aws s3 ls "s3://${{ env.S3_BUCKET }}/config/mailer-templates/" --recursive | grep ".j2$" | wc -l)
+          echo "S3 has $S3_TEMPLATE_COUNT mailer templates"
           
           LOCAL_COUNT="${{ steps.count.outputs.policy_count }}"
           if [ "$S3_POLICY_COUNT" -lt "$LOCAL_COUNT" ]; then
             echo "⚠️ Warning: S3 has fewer policies ($S3_POLICY_COUNT) than local ($LOCAL_COUNT)"
           else
             echo "✅ S3 policy count looks good"
+          fi
+          
+          LOCAL_TEMPLATE_COUNT="${{ steps.count.outputs.template_count }}"
+          if [ "$S3_TEMPLATE_COUNT" -lt "$LOCAL_TEMPLATE_COUNT" ]; then
+            echo "⚠️ Warning: S3 has fewer templates ($S3_TEMPLATE_COUNT) than local ($LOCAL_TEMPLATE_COUNT)"
+          else
+            echo "✅ S3 template count looks good"
           fi
       
       - name: Summary
@@ -137,13 +170,11 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "✅ **Upload completed successfully**" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **S3 Bucket:** \`${{ env.S3_BUCKET }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Region:** \`${{ env.AWS_REGION }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Local Policy Count:** ${{ steps.count.outputs.policy_count }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Trigger:** \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "${{ github.event.inputs.force_upload }}" == "true" ]; then
-            echo "- **Mode:** Force upload (all files)" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- **Mode:** Incremental upload (changed files only)" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| S3 Bucket | \`${{ env.S3_BUCKET }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Region | \`${{ env.AWS_REGION }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Central Account | \`${{ env.CENTRAL_ACCOUNT_ID }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Policy Count | ${{ steps.count.outputs.policy_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Template Count | ${{ steps.count.outputs.template_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Trigger | \`${{ github.event_name }}\` |" >> $GITHUB_STEP_SUMMARY

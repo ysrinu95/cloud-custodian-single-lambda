@@ -1,0 +1,486 @@
+policies:
+  # Security Group allows all traffic on specific ports
+  # Port 22 (SSH)
+  - name: sg-allow-ssh-from-internet
+    resource: aws.security-group
+    description: Detect Security Groups allowing SSH (port 22) from internet (0.0.0.0/0)
+    
+    filters:
+      - type: ingress
+        Ports: [22]
+        Cidr:
+          value: "0.0.0.0/0"
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: Security Group Allows SSH from Internet - {{ region }}"
+        violation_desc: |
+          **Security Group Allows SSH Access from Internet**
+          
+          **Security Group ID:** {{ resource.GroupId }}
+          **Group Name:** {{ resource.GroupName }}
+          **VPC ID:** {{ resource.VpcId }}
+          **Description:** {{ resource.Description }}
+          
+          **Risk:** SSH access from 0.0.0.0/0 exposes instances to brute-force attacks.
+          
+          **Remediation:**
+          ```bash
+          # Remove overly permissive rule
+          aws ec2 revoke-security-group-ingress \
+            --group-id {{ resource.GroupId }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr 0.0.0.0/0
+          
+          # Add restricted rule (example: corporate IP range)
+          aws ec2 authorize-security-group-ingress \
+            --group-id {{ resource.GroupId }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr <corporate-ip-range>/32
+          ```
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+
+  # Port 3389 (RDP)
+  - name: sg-allow-rdp-from-internet
+    resource: aws.security-group
+    description: Detect Security Groups allowing RDP (port 3389) from internet
+    
+    filters:
+      - type: ingress
+        Ports: [3389]
+        Cidr:
+          value: "0.0.0.0/0"
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: Security Group Allows RDP from Internet - {{ region }}"
+        violation_desc: |
+          **Security Group Allows RDP Access from Internet**
+          
+          **Security Group ID:** {{ resource.GroupId }}
+          **Group Name:** {{ resource.GroupName }}
+          **Risk:** RDP from 0.0.0.0/0 exposes Windows instances to attacks.
+          
+          **Remediation:**
+          ```bash
+          aws ec2 revoke-security-group-ingress \
+            --group-id {{ resource.GroupId }} \
+            --protocol tcp --port 3389 --cidr 0.0.0.0/0
+          ```
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+
+  # Port 445 (CIFS/SMB)
+  - name: sg-allow-cifs-from-internet
+    resource: aws.security-group
+    description: Detect Security Groups allowing CIFS (port 445) from internet
+    
+    filters:
+      - type: ingress
+        Ports: [445]
+        Cidr:
+          value: "0.0.0.0/0"
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: Security Group Allows CIFS from Internet - {{ region }}"
+        violation_desc: |
+          **Security Group Allows CIFS/SMB Access from Internet**
+          
+          **Security Group ID:** {{ resource.GroupId }}
+          **Risk:** Port 445 from internet exposes file shares to ransomware.
+          
+          **Remediation:**
+          ```bash
+          aws ec2 revoke-security-group-ingress \
+            --group-id {{ resource.GroupId }} \
+            --protocol tcp --port 445 --cidr 0.0.0.0/0
+          ```
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+
+  # Port 3306 (MySQL)
+  - name: sg-allow-mysql-from-internet
+    resource: aws.security-group
+    description: Detect Security Groups allowing MySQL (port 3306) from internet
+    
+    filters:
+      - type: ingress
+        Ports: [3306]
+        Cidr:
+          value: "0.0.0.0/0"
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: Security Group Allows MySQL from Internet - {{ region }}"
+        violation_desc: |
+          **Security Group Allows MySQL Access from Internet**
+          
+          **Security Group ID:** {{ resource.GroupId }}
+          **Risk:** Exposes MySQL databases to unauthorized access.
+          
+          **Remediation:**
+          ```bash
+          aws ec2 revoke-security-group-ingress \
+            --group-id {{ resource.GroupId }} \
+            --protocol tcp --port 3306 --cidr 0.0.0.0/0
+          ```
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+
+  # Port 5432 (PostgreSQL)
+  - name: sg-allow-postgresql-from-internet
+    resource: aws.security-group
+    description: Detect Security Groups allowing PostgreSQL (port 5432) from internet
+    
+    filters:
+      - type: ingress
+        Ports: [5432]
+        Cidr:
+          value: "0.0.0.0/0"
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: Security Group Allows PostgreSQL from Internet"
+        violation_desc: |
+          **Security Group Allows PostgreSQL Access from Internet**
+          
+          **Security Group ID:** {{ resource.GroupId }}
+          **Risk:** Exposes PostgreSQL databases to unauthorized access.
+          
+          **Remediation:**
+          ```bash
+          aws ec2 revoke-security-group-ingress \
+            --group-id {{ resource.GroupId }} \
+            --protocol tcp --port 5432 --cidr 0.0.0.0/0
+          ```
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+
+  # Port 1433 (SQL Server)
+  - name: sg-allow-sqlserver-from-internet
+    resource: aws.security-group
+    description: Detect Security Groups allowing SQL Server (port 1433) from internet
+    
+    filters:
+      - type: ingress
+        Ports: [1433]
+        Cidr:
+          value: "0.0.0.0/0"
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: Security Group Allows SQL Server from Internet"
+        violation_desc: |
+          **Security Group Allows SQL Server Access from Internet**
+          
+          **Security Group ID:** {{ resource.GroupId }}
+          **Risk:** Exposes SQL Server databases to attacks.
+          
+          **Remediation:**
+          ```bash
+          aws ec2 revoke-security-group-ingress \
+            --group-id {{ resource.GroupId }} \
+            --protocol tcp --port 1433 --cidr 0.0.0.0/0
+          ```
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+
+  # Port 1521 (Oracle DB)
+  - name: sg-allow-oracle-from-internet
+    resource: aws.security-group
+    description: Detect Security Groups allowing Oracle DB (port 1521) from internet
+    
+    filters:
+      - type: ingress
+        Ports: [1521]
+        Cidr:
+          value: "0.0.0.0/0"
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: Security Group Allows Oracle DB from Internet"
+        violation_desc: |
+          **Security Group Allows Oracle Database Access from Internet**
+          
+          **Security Group ID:** {{ resource.GroupId }}
+          **Risk:** Exposes Oracle databases to unauthorized access.
+          
+          **Remediation:**
+          ```bash
+          aws ec2 revoke-security-group-ingress \
+            --group-id {{ resource.GroupId }} \
+            --protocol tcp --port 1521 --cidr 0.0.0.0/0
+          ```
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+
+  # Port 27017 (MongoDB)
+  - name: sg-allow-mongodb-from-internet
+    resource: aws.security-group
+    description: Detect Security Groups allowing MongoDB (port 27017) from internet
+    
+    filters:
+      - type: ingress
+        Ports: [27017]
+        Cidr:
+          value: "0.0.0.0/0"
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: Security Group Allows MongoDB from Internet"
+        violation_desc: |
+          **Security Group Allows MongoDB Access from Internet**
+          
+          **Security Group ID:** {{ resource.GroupId }}
+          **Risk:** Exposes MongoDB databases to ransomware and data theft.
+          
+          **Remediation:**
+          ```bash
+          aws ec2 revoke-security-group-ingress \
+            --group-id {{ resource.GroupId }} \
+            --protocol tcp --port 27017 --cidr 0.0.0.0/0
+          ```
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+
+  # Port 23 (Telnet)
+  - name: sg-allow-telnet-from-internet
+    resource: aws.security-group
+    description: Detect Security Groups allowing Telnet (port 23) from internet
+    
+    filters:
+      - type: ingress
+        Ports: [23]
+        Cidr:
+          value: "0.0.0.0/0"
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: Security Group Allows Telnet from Internet"
+        violation_desc: |
+          **Security Group Allows Telnet Access from Internet**
+          
+          **Security Group ID:** {{ resource.GroupId }}
+          **Risk:** Telnet transmits credentials in plaintext.
+          
+          **Remediation:**
+          ```bash
+          aws ec2 revoke-security-group-ingress \
+            --group-id {{ resource.GroupId }} \
+            --protocol tcp --port 23 --cidr 0.0.0.0/0
+          ```
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+
+  # Additional risky ports
+  - name: sg-allow-risky-ports-from-internet
+    resource: aws.security-group
+    description: Detect Security Groups allowing risky ports from internet
+    
+    filters:
+      - or:
+        - type: ingress
+          Ports: [20, 21]  # FTP
+          Cidr: {value: "0.0.0.0/0"}
+        - type: ingress
+          Ports: [25]  # SMTP
+          Cidr: {value: "0.0.0.0/0"}
+        - type: ingress
+          Ports: [53]  # DNS
+          Cidr: {value: "0.0.0.0/0"}
+        - type: ingress
+          Ports: [110]  # POP3
+          Cidr: {value: "0.0.0.0/0"}
+        - type: ingress
+          Ports: [135]  # Windows RPC
+          Cidr: {value: "0.0.0.0/0"}
+        - type: ingress
+          Ports: [137, 138, 139]  # NetBIOS
+          Cidr: {value: "0.0.0.0/0"}
+        - type: ingress
+          Ports: [1434]  # SQL Server Browser
+          Cidr: {value: "0.0.0.0/0"}
+        - type: ingress
+          Ports: [4333]  # MSQL
+          Cidr: {value: "0.0.0.0/0"}
+        - type: ingress
+          Ports: [5500, 5900]  # VNC
+          Cidr: {value: "0.0.0.0/0"}
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: Security Group Allows Risky Ports from Internet"
+        violation_desc: |
+          **Security Group Allows Risky Ports from Internet**
+          
+          **Security Group ID:** {{ resource.GroupId }}
+          **Group Name:** {{ resource.GroupName }}
+          **VPC ID:** {{ resource.VpcId }}
+          
+          **Exposed Ports:** {{ resource.IpPermissions[?IpRanges[?CidrIp=='0.0.0.0/0']].FromPort }}
+          
+          **Risk:** Exposes sensitive services to internet attacks.
+          
+          **Action Required:** Review and restrict access immediately.
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+
+  # Security Groups overly permissive to all traffic
+  - name: sg-allow-all-traffic
+    resource: aws.security-group
+    description: Detect Security Groups with inbound rules allowing all traffic from internet
+    
+    filters:
+      - type: ingress
+        IpProtocol: "-1"
+        Cidr:
+          value: "0.0.0.0/0"
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: Security Group Allows All Traffic from Internet"
+        violation_desc: |
+          **Security Group Allows ALL Traffic from Internet**
+          
+          **Security Group ID:** {{ resource.GroupId }}
+          **Group Name:** {{ resource.GroupName }}
+          **VPC ID:** {{ resource.VpcId }}
+          
+          **Risk:** Complete exposure of all ports and protocols to internet.
+          
+          **Immediate Action Required:**
+          ```bash
+          # Remove the rule allowing all traffic
+          aws ec2 revoke-security-group-ingress \
+            --group-id {{ resource.GroupId }} \
+            --ip-permissions IpProtocol=-1,IpRanges='[{CidrIp=0.0.0.0/0}]'
+          ```
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+
+  # Open CIFS 445 with IGW route
+  - name: sg-cifs-with-igw-route
+    resource: aws.security-group
+    description: Detect Security Groups allowing CIFS with Internet Gateway route
+    
+    filters:
+      - type: ingress
+        Ports: [445]
+        Cidr:
+          value: "0.0.0.0/0"
+      - type: subnet
+        key: "c7n:matched-subnet.MapPublicIpOnLaunch"
+        value: true
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: CIFS Port 445 Exposed via Internet Gateway"
+        violation_desc: |
+          **CIFS Port 445 Exposed to Internet with IGW Route**
+          
+          **Security Group ID:** {{ resource.GroupId }}
+          **VPC ID:** {{ resource.VpcId }}
+          
+          **Risk:** SMB vulnerabilities (WannaCry, NotPetya) can be exploited.
+          
+          **Immediate Action Required:** Remove rule immediately.
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+
+  # Open RDP 3389 with IGW route
+  - name: sg-rdp-with-igw-route
+    resource: aws.security-group
+    description: Detect Security Groups allowing RDP with Internet Gateway route
+    
+    filters:
+      - type: ingress
+        Ports: [3389]
+        Cidr:
+          value: "0.0.0.0/0"
+      - type: subnet
+        key: "c7n:matched-subnet.MapPublicIpOnLaunch"
+        value: true
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: RDP Port 3389 Exposed via Internet Gateway"
+        violation_desc: |
+          **RDP Port 3389 Exposed to Internet with IGW Route**
+          
+          **Security Group ID:** {{ resource.GroupId }}
+          **VPC ID:** {{ resource.VpcId }}
+          
+          **Risk:** Brute-force attacks and credential stuffing.
+          
+          **Immediate Action Required:** Remove rule immediately.
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications

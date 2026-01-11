@@ -1,0 +1,52 @@
+vars:
+  email-notify: &email-notify
+    template: default.html
+    priority_header: "1"
+    from: c7n@central.ctkube.com
+    to:
+      - srinivasula.yallala@optum.com
+    transport:
+      type: sqs
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications
+policies:
+  - name: aws-rds-stop-public-db-instances
+    resource: aws.rds
+    description: |
+      Notifies of and stops RDS DB instances launched as publicly accessible
+    filters:
+      - type: value
+        key: PubliclyAccessible
+        value: true
+    actions:
+      #- type: stop
+      - type: notify
+        <<: *email-notify
+        priority_header: 1
+        subject: "[c7n] [{{ account }}] Public RDS DB Instances Launched ({{ region }})"
+        violation_desc: RDS DB instance launched with public access
+        action_desc: |
+          Actions taken: The violating RDS DB instance has been stopped. <br>
+          No RDS DB Instances should be exposed to public. <br>
+
+  - name: aws-rds-engine-version-upgrade-available
+    resource: aws.rds
+    description: |
+      Notifies of RDS instances with engine upgrades available
+    filters:
+      - type: upgrade-available
+        major: true # list major versions available
+      # - type: engine
+      #   key: Status
+      #   value: available
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "[c7n] [{{ account }}] RDS Engine Upgrade Available ({{ region }})"
+        violation_desc: RDS database engine upgrade available
+        action_desc: |
+          Please upgrade the database engine version.
+          
+  - name: aws-rds-snapshot-old
+    resource: rds-snapshot
+    description: |
+      Notifies of and deletes old RDS instance manual snapshots

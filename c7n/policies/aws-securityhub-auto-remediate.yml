@@ -1,0 +1,106 @@
+policies:
+  - name: securityhub-failed-findings-remediation
+    resource: aws.account
+    description: |
+      Send email notifications for high and critical SecurityHub findings.
+      Focuses on failed compliance status and NEW/NOTIFIED/MEDIUM findings.
+    
+    filters:
+      # Filter for SecurityHub Finding events
+      - type: event
+        key: source
+        value: aws.securityhub
+      
+      # Only process findings with FAILED compliance status
+      - type: event
+        key: detail.findings[0].Compliance.Status
+        value: FAILED
+      
+      # Only process NEW or NOTIFIED findings (not already remediated)
+      - type: event
+        key: detail.findings[0].Workflow.Status
+        op: in
+        value: 
+          - NEW
+          - NOTIFIED
+      
+      # Focus on high and critical severity findings
+      - type: event
+        key: detail.findings[0].Severity.Label
+        op: in
+        value:
+          - HIGH
+          - CRITICAL
+          - MEDIUM
+    
+    actions:
+      # Send email notification about the finding
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "⚠️ SecurityHub Critical Finding - {{ account }} - {{ region }}"
+        violation_desc: |
+          **SecurityHub Critical Finding**
+          
+          **Account:** {{ account }}
+          **Region:** {{ region }}
+          {% if event and event.detail and event.detail.findings and event.detail.findings|length > 0 %}
+          **Severity:** {{ event.detail.findings[0].Severity.Label or "High" }}
+          **Compliance:** {{ event.detail.findings[0].Compliance.Status or "FAILED" }}
+          **Status:** {{ event.detail.findings[0].Workflow.Status or "NEW" }}
+          
+          **Product:** {{ event.detail.findings[0].ProductFields.get('aws/securityhub/ProductName', 'N/A') }} ({{ event.detail.findings[0].ProductFields.get('aws/securityhub/CompanyName', 'N/A') }})
+          **Control ID:** {{ event.detail.findings[0].ProductFields.get('ControlId', 'N/A') }}
+          **Standards:** {{ event.detail.findings[0].ProductFields.get('StandardsArn', 'N/A') }}
+          
+          **Title:** {{ event.detail.findings[0].Title or "SecurityHub Finding" }}
+          
+          **Description:** {{ event.detail.findings[0].Description or "Critical security finding detected" }}
+          {% endif %}
+
+          **Root Cause:**
+          {% if event.detail.findings[0].Compliance.StatusReasons and event.detail.findings[0].Compliance.StatusReasons|length > 0 %}
+          - **Reason:** {{ event.detail.findings[0].Compliance.StatusReasons[0].Description or "Not available" }}
+          - **Code:** {{ event.detail.findings[0].Compliance.StatusReasons[0].ReasonCode or "N/A" }}
+          {% else %}
+          - See description above for details
+          {% endif %}
+          
+          **Product Details:**
+          {% if event.detail.findings[0].ProductFields %}
+          {% for key, value in event.detail.findings[0].ProductFields.items() %}
+          - {{ key }}: {{ value }}
+          {% endfor %}
+          {% else %}
+          - No product details available
+          {% endif %}
+          
+          **Affected Resources:**
+          {% if event.detail.findings[0].Resources and event.detail.findings[0].Resources|length > 0 %}
+          - Resource Type: {{ event.detail.findings[0].Resources[0].Type or "N/A" }}
+          - Resource ID: {{ event.detail.findings[0].Resources[0].Id or "N/A" }}
+          {% else %}
+          - No resource information available
+          {% endif %}
+          
+          **Remediation:**
+          {% if event.detail.findings[0].Remediation and event.detail.findings[0].Remediation.Recommendation %}
+          {{ event.detail.findings[0].Remediation.Recommendation.Text or "Review finding in SecurityHub console for remediation steps" }}
+          {% else %}
+          **Severity:** High
+          **Status:** NEW
+          **Title:** SecurityHub Finding (Event details not available)
+          **Description:** A critical security finding was detected. Please review in the SecurityHub console.
+          {% endif %}
+          
+          **Required Actions:**
+          1. Review the finding in SecurityHub console
+          2. Investigate affected resources
+          3. Apply recommended remediation steps
+          4. Update finding status after remediation
+          
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications

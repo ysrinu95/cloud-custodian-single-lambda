@@ -1,9 +1,0 @@
-[
-  {
-    "Source": "aws.guardduty",
-    "DetailType": "GuardDuty Finding",
-    "Detail": "{\"schemaVersion\":\"2.0\",\"accountId\":\"813185901390\",\"region\":\"us-east-1\",\"partition\":\"aws\",\"id\":\"test-crypto-finding-001\",\"arn\":\"arn:aws:guardduty:us-east-1:813185901390:detector/18cd61c0dd2c241dd440cfbb7bce284e/finding/test-crypto-finding-001\",\"type\":\"CryptoCurrency:EC2/BitcoinTool.B!DNS\",\"resource\":{\"resourceType\":\"Instance\",\"instanceDetails\":{\"instanceId\":\"i-1234567890abcdef0\",\"instanceType\":\"t2.micro\",\"launchTime\":\"2025-11-27T09:00:00.000Z\",\"tags\":[{\"key\":\"Name\",\"value\":\"test-crypto-mining-instance\"}]}},\"service\":{\"serviceName\":\"guardduty\",\"detectorId\":\"18cd61c0dd2c241dd440cfbb7bce284e\",\"action\":{\"actionType\":\"DNS_REQUEST\",\"dnsRequestAction\":{\"domain\":\"pool.minergate.com\",\"protocol\":\"UDP\",\"blocked\":false}},\"resourceRole\":\"TARGET\",\"additionalInfo\":{\"domain\":\"pool.minergate.com\"},\"eventFirstSeen\":\"2025-11-27T09:30:00.000Z\",\"eventLastSeen\":\"2025-11-27T09:45:00.000Z\",\"archived\":false,\"count\":15},\"severity\":8.0,\"createdAt\":\"2025-11-27T09:30:00.000Z\",\"updatedAt\":\"2025-11-27T09:45:00.000Z\",\"title\":\"Bitcoin mining activity detected\",\"description\":\"EC2 instance i-1234567890abcdef0 is querying a domain name associated with Bitcoin mining activity.\"}",
-    "EventBusName": "default",
-    "Resources": []
-  }
-]

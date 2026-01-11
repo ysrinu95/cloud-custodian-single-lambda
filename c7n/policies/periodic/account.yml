@@ -1,0 +1,56 @@
+vars:
+  email-notify: &email-notify
+    template: default.html
+    priority_header: "1"
+    from: c7n@central.ctkube.com
+    to:
+      - srinivasula.yallala@optum.com
+    transport:
+      type: sqs
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications
+  phd-conditions: &phd-conditions
+    - region: us-east-1 # global resource
+    - type: value
+      key: account_id
+      op: in
+      value: ["101300729637"] # only run in production
+
+policies:
+  # NOTE: Root user login detection moved to event-based policies
+  # Event filters cannot be used in periodic mode policies
+  # - name: aws-account-root-user-login-detected
+  #   mode:
+  #     type: cloudtrail
+  #     events:
+  #       - source: signin.amazonaws.com
+  #         event: ConsoleLogin
+  #         ids: "userIdentity.type"
+  #   resource: account
+  #   description: Notifies of any AWS root user console logins
+  #   filters:
+  #     - type: event
+  #       key: detail.userIdentity.type
+  #       value: Root
+
+  - name: aws-phd-health-event-issue
+    resource: aws.health-event
+    description: |
+      Notifies of Personal Health Dashboard account notification events
+    filters:
+      - type: value
+        key: statusCode
+        op: not-equal
+        value: closed
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "📢 AWS PHD - Account Notification - {{ account }} - {{ region }}"
+        violation_desc: |
+          **Personal Health Dashboard - Account Notification**
+          
+          **Event Type:** {{ resource.eventTypeCategory }}
+          **Status:** {{ resource.statusCode }}
+          **Region:** {{ resource.region }}
+          
+          See Personal Health Dashboard 'Other notifications' tab for more info:
+          https://health.aws.amazon.com

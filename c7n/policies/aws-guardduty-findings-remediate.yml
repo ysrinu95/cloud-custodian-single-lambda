@@ -1,0 +1,74 @@
+policies:
+  - name: guardduty-findings-auto-archive
+    resource: aws.account
+    description: |
+      Automatically process high-severity GuardDuty findings and send email alerts.
+      This policy detects Backdoor, Trojan, Cryptocurrency, and UnauthorizedAccess threats.
+    
+    filters:
+      - type: event
+        key: detail.severity
+        value: 7
+        op: gte
+    
+    actions:
+      # Send critical security alert via email
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 GuardDuty Threat Alert - {{ account }} - {{ region }}"
+        violation_desc: |
+          **GuardDuty Threat Detection**
+          
+          **Account:** {{ account }}
+          **Region:** {{ region }}
+          **Severity:** {{ event.detail.severity }}/10
+          **Finding Type:** {{ event.detail.type }}
+          **Title:** {{ event.detail.title }}
+          
+          {% if event.detail.resource.instanceDetails %}
+          **EC2 Instance Details:**
+          - Instance ID: {{ event.detail.resource.instanceDetails.instanceId }}
+          - Instance Type: {{ event.detail.resource.instanceDetails.instanceType }}
+          - Availability Zone: {{ event.detail.resource.instanceDetails.availabilityZone or "N/A" }}
+          - Private IP: {{ event.detail.resource.instanceDetails.networkInterfaces[0].privateIpAddress if event.detail.resource.instanceDetails.networkInterfaces else "N/A" }}
+          - Image ID: {{ event.detail.resource.instanceDetails.imageId or "N/A" }}
+          {% elif event.detail.resource.accessKeyDetails %}
+          **IAM Access Key Details:**
+          - User Name: {{ event.detail.resource.accessKeyDetails.userName }}
+          - User Type: {{ event.detail.resource.accessKeyDetails.userType }}
+          - Access Key ID: {{ event.detail.resource.accessKeyDetails.accessKeyId }}
+          - Principal ID: {{ event.detail.resource.accessKeyDetails.principalId }}
+          {% else %}
+          **Resource Details:**
+          - Resource Type: {{ event.detail.resource.resourceType or "N/A" }}
+          {% endif %}
+          
+          **Threat Information:**
+          - First Seen: {{ event.detail.service.eventFirstSeen or "N/A" }}
+          - Last Seen: {{ event.detail.service.eventLastSeen or "N/A" }}
+          - Occurrences: {{ event.detail.service.count or 1 }}
+          - Action Type: {{ event.detail.service.action.actionType or "N/A" }}
+          {% if event.detail.service.action.dnsRequestAction %}
+          - Domain: {{ event.detail.service.action.dnsRequestAction.domain }}
+          {% elif event.detail.service.action.awsApiCallAction %}
+          - API Called: {{ event.detail.service.action.awsApiCallAction.api }}
+          - Service: {{ event.detail.service.action.awsApiCallAction.serviceName }}
+          - Caller IP: {{ event.detail.service.action.awsApiCallAction.remoteIpDetails.ipAddressV4 if event.detail.service.action.awsApiCallAction.remoteIpDetails else "N/A" }}
+          {% endif %}
+          
+          **Description:** {{ event.detail.description }}
+          
+          **IMMEDIATE ACTIONS REQUIRED:**
+          1. Review the finding in GuardDuty console
+          2. Investigate affected resources
+          3. Isolate compromised resources if needed
+          4. Review CloudTrail logs for suspicious activity
+          5. Take appropriate remediation actions
+          
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+

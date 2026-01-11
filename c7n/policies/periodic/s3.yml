@@ -1,0 +1,45 @@
+vars:
+  email-notify: &email-notify
+    template: default.html
+    priority_header: "1"
+    from: c7n@central.ctkube.com
+    to:
+      - srinivasula.yallala@optum.com
+    transport:
+      type: sqs
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications
+policies:
+  - name: aws-s3-no-encryption
+    conditions:
+      - region: us-east-1 # global resource
+    resource: aws.s3
+    description: |
+      Notifies of S3 buckets without encyrption enabled
+    filters:
+      - type: bucket-encryption
+        state: False
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "[c7n] [{{ account }}] S3 Buckets Without Encryption Report ({{ region }})"
+        violation_desc: S3 buckets without encryption enabled
+        action_desc: |
+          No action taken. Encryption should be added to buckets.<br>
+          <a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-encryption.html">Documentation</a>
+
+  - name: aws-s3-public-access
+    conditions:
+      - region: us-east-1 # global resource
+    resource: aws.s3
+    description: |
+      Notifies of S3 buckets that do not have public access fully restricted
+    filters:
+      - type: check-public-block
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "[c7n] [{{ account }}] S3 Buckets Potential Public Access Report ({{ region }})"
+        violation_desc: S3 buckets with potential public access
+        action_desc: |
+          No action taken. S3 bucket public access should be fully restricted.<br>
+          <a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html">Documentation</a>

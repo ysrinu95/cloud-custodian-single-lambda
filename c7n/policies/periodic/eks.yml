@@ -1,0 +1,200 @@
+vars:
+  email-notify: &email-notify
+    template: default.html
+    priority_header: "1"
+    from: c7n@central.ctkube.com
+    to:
+      - srinivasula.yallala@optum.com
+    transport:
+      type: sqs
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications
+
+policies:
+  - name: aws-eks-cluster-old-version
+    resource: aws.eks
+    description: |
+      Notifies of EKS clusters running outdated Kubernetes versions
+    filters:
+      - type: value
+        key: version
+        op: less-than
+        value: "1.28"
+      - type: value
+        key: status
+        value: ACTIVE
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "⚠️ EKS Cluster Outdated Version - {{ account }} - {{ region }}"
+        violation_desc: |
+          **EKS Cluster Running Outdated Kubernetes Version**
+          
+          **Cluster:** {{ resource['name'] }}
+          **Current Version:** {{ resource['version'] }}
+          **Status:** {{ resource['status'] }}
+          
+          **Action Required:**
+          - Review EKS version deprecation timeline
+          - Plan upgrade to supported Kubernetes version (1.28+)
+          - Test workloads in non-production environment first
+          - Schedule maintenance window for upgrade
+
+  - name: aws-eks-cluster-public-endpoint
+    resource: aws.eks
+    description: |
+      Notifies of EKS clusters with public API endpoint access enabled
+    filters:
+      - type: value
+        key: resourcesVpcConfig.endpointPublicAccess
+        value: true
+      - type: value
+        key: status
+        value: ACTIVE
+      - tag:c7n-exception:public-endpoint: absent
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "⚠️ EKS Cluster Public Endpoint Enabled - {{ account }} - {{ region }}"
+        violation_desc: |
+          **EKS Cluster Has Public API Endpoint Access**
+          
+          **Cluster:** {{ resource['name'] }}
+          **Public Access:** Enabled
+          **Public CIDR:** {{ resource['resourcesVpcConfig']['publicAccessCidrs'] | join(', ') if resource['resourcesVpcConfig']['publicAccessCidrs'] else 'All (0.0.0.0/0)' }}
+          
+          **Security Recommendation:**
+          - Consider disabling public endpoint access if not required
+          - Restrict public access to specific IP ranges
+          - Enable private endpoint access for internal traffic
+          - Review security group rules
+
+  - name: aws-eks-cluster-logging-disabled
+    resource: aws.eks
+    description: |
+      Notifies of EKS clusters without control plane logging enabled
+    filters:
+      - type: value
+        key: status
+        value: ACTIVE
+      - or:
+        - type: value
+          key: logging.clusterLogging[0].enabled
+          value: false
+        - type: value
+          key: logging.clusterLogging[0]
+          value: absent
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "⚠️ EKS Cluster Logging Disabled - {{ account }} - {{ region }}"
+        violation_desc: |
+          **EKS Cluster Control Plane Logging Not Enabled**
+          
+          **Cluster:** {{ resource['name'] }}
+          **Logging Status:** Disabled or not configured
+          
+          **Action Required:**
+          - Enable EKS control plane logging for audit, api, authenticator
+          - Configure CloudWatch log retention
+          - Set up log monitoring and alerting
+          - Required for compliance and troubleshooting
+
+  - name: aws-eks-nodegroup-old-ami
+    resource: aws.eks-nodegroup
+    description: |
+      Notifies of EKS node groups running outdated AMI versions
+    filters:
+      - type: value
+        key: status
+        value: ACTIVE
+      - type: value
+        key: health.issues
+        value: empty
+        op: ne
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "⚠️ EKS NodeGroup Health Issues - {{ account }} - {{ region }}"
+        violation_desc: |
+          **EKS NodeGroup Has Health Issues**
+          
+          **Cluster:** {{ resource['clusterName'] }}
+          **NodeGroup:** {{ resource['nodegroupName'] }}
+          **Status:** {{ resource['status'] }}
+          **Health Issues:** {{ resource['health']['issues'] | join(', ') if resource['health']['issues'] else 'None' }}
+          
+          **Action Required:**
+          - Investigate health issues immediately
+          - Check node group scaling configuration
+          - Review EC2 instance health
+          - Update AMI if outdated
+
+  - name: aws-eks-nodegroup-autoscaling-disabled
+    resource: aws.eks-nodegroup
+    description: |
+      Notifies of EKS node groups without autoscaling configured
+    filters:
+      - type: value
+        key: status
+        value: ACTIVE
+      - type: value
+        key: scalingConfig.desiredSize
+        value: null
+        op: eq
+      - tag:c7n-exception:no-autoscaling: absent
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "⚠️ EKS NodeGroup Autoscaling Not Configured - {{ account }} - {{ region }}"
+        violation_desc: |
+          **EKS NodeGroup Without Proper Autoscaling**
+          
+          **Cluster:** {{ resource['clusterName'] }}
+          **NodeGroup:** {{ resource['nodegroupName'] }}
+          **Current Scaling Config:** Min={{ resource['scalingConfig']['minSize'] }}, Max={{ resource['scalingConfig']['maxSize'] }}, Desired={{ resource['scalingConfig']['desiredSize'] }}
+          
+          **Recommendation:**
+          - Configure appropriate min/max/desired capacity
+          - Enable Cluster Autoscaler or Karpenter
+          - Set up proper scaling policies
+          - Monitor resource utilization
+
+  # NOTE: The following policy was disabled because the resource type
+  # `aws.eks-fargate-profile` is not currently supported in our periodic
+  # policy schema for this custodian version (validator rejects this
+  # resource definition). Fargate profile lifecycle checks are best run
+  # via the AWS API or a custom script, or moved to a different toolchain.
+  #
+  # If you want to re-enable this check, consider one of the following:
+  # - Move to an event-driven policy (cloudtrail) if you want to act on
+  #   profile creation events.
+  # - Implement a periodic custom script that queries EKS for fargate
+  #   profiles and publishes results to a monitoring system.
+  #
+  # - name: aws-eks-fargate-profile-unused
+  #   resource: aws.eks-fargate-profile
+  #   description: |
+  #     Notifies of EKS Fargate profiles that appear to be unused
+  #   filters:
+  #     - type: value
+  #       key: status
+  #       value: ACTIVE
+  #     - type: value
+  #       key: selectors
+  #       value: empty
+  #       op: eq
+  #   actions:
+  #     - type: notify
+  #       <<: *email-notify
+  #       subject: "⚠️ EKS Fargate Profile Unused - {{ account }} - {{ region }}"
+  #       violation_desc: |
+  #         **EKS Fargate Profile With No Selectors**
+  #         
+  #         **Cluster:** {{ resource.clusterName }}
+  #         **Profile:** {{ resource.fargateProfileName }}
+  #         **Selectors:** None configured
+  #         
+  #         **Action Required:**
+  #         - Review if this Fargate profile is still needed
+  #         - Configure pod selectors if profile should be active
+  #         - Delete profile if no longer required to reduce costs

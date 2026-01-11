@@ -1,6 +1,0 @@
-# Cloud Custodian and AWS dependencies
-c7n==0.9.30
-c7n-org==0.6.29
-c7n-mailer>=0.6.23
-c7n-awscc>=0.1.0
-# boto3, botocore, python-dateutil, pyyaml, and jinja2 versions managed by c7n dependencies

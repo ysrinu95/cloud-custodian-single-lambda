@@ -1,12 +1,53 @@
+# Function to fetch and decode SQS messages
+show_sqs_messages() {
+    echo "📨 SQS Messages (decrypted):"
+    local total=0
+    while true; do
+        messages_json=$(aws sqs receive-message --queue-url "$SQS_QUEUE_URL" --max-number-of-messages 10 --region "$AWS_REGION" --output json 2>/dev/null)
+        count=$(echo "$messages_json" | jq '.Messages | length')
+        : "${count:=0}"
+        : "${total:=0}"
+        if [ "$count" -eq 0 ]; then
+            if [ "$total" -eq 0 ]; then
+                print_info "No messages found in SQS queue."
+            fi
+            break
+        fi
+        for i in $(seq 0 $((count - 1))); do
+            raw_body=$(echo "$messages_json" | jq -r ".Messages[$i].Body")
+            receipt_handle=$(echo "$messages_json" | jq -r ".Messages[$i].ReceiptHandle")
+            # If message is base64 encoded, decode it. If not, just print as is.
+            if echo "$raw_body" | grep -Eq '^[A-Za-z0-9+/=]+$'; then
+                decoded=$(echo "$raw_body" | base64 -d 2>/dev/null)
+                if [ $? -eq 0 ]; then
+                    echo "----- Message $((total+1)) -----"
+                    echo "$decoded"
+                else
+                    echo "----- Message $((total+1)) -----"
+                    echo "$raw_body"
+                fi
+            else
+                echo "----- Message $((total+1)) -----"
+                echo "$raw_body"
+            fi
+            total=$((total+1))
+            # Uncomment below to delete messages after reading:
+            # aws sqs delete-message --queue-url "$SQS_QUEUE_URL" --receipt-handle "$receipt_handle" --region "$AWS_REGION" 2>/dev/null
+        done
+    done
+    echo "--------------------------"
+    # For KMS-encrypted messages, use:
+    # aws kms decrypt --ciphertext-blob fileb://<(echo "$raw_body" | base64 -d) --output text --query Plaintext | base64 -d
+}
 #!/bin/bash
 # Simple SQS and SES Email Status Monitor
 # Focused monitoring script for c7n-mailer email sending status
 
 # Configuration (adjust these to match your setup)
-AWS_REGION="us-west-2"
-SQS_QUEUE_URL="https://sqs.us-west-2.amazonaws.com/172327596604/c7n-mailer-test"
+AWS_REGION="us-east-1"
+SQS_QUEUE_URL="https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue"
 LAMBDA_FUNCTION="cloud-custodian-mailer"
-REFRESH_INTERVAL=5
+REFRESH_INTERVAL=60
 
 # Colors
 GREEN='\033[0;32m'
@@ -44,6 +85,8 @@ check_sqs_status() {
         
         MESSAGES=$(echo "$QUEUE_ATTRS" | jq -r '.Attributes.ApproximateNumberOfMessages // "0"')
         IN_FLIGHT=$(echo "$QUEUE_ATTRS" | jq -r '.Attributes.ApproximateNumberOfMessagesNotVisible // "0"')
+        : "${MESSAGES:=0}"
+        : "${IN_FLIGHT:=0}"
         
         echo "  📊 Available Messages: $MESSAGES"
         echo "  🔄 Processing Messages: $IN_FLIGHT"
@@ -74,6 +117,10 @@ check_ses_status() {
             BOUNCES=$(echo "$LATEST" | jq -r '.Bounces // 0')
             COMPLAINTS=$(echo "$LATEST" | jq -r '.Complaints // 0')
             REJECTS=$(echo "$LATEST" | jq -r '.Rejects // 0')
+            : "${ATTEMPTS:=0}"
+            : "${BOUNCES:=0}"
+            : "${COMPLAINTS:=0}"
+            : "${REJECTS:=0}"
             
             echo "  📤 Recent Delivery Attempts: $ATTEMPTS"
             echo "  ↩️  Bounces: $BOUNCES"
@@ -96,8 +143,8 @@ check_ses_status() {
     if SES_QUOTA=$(aws ses get-send-quota --region "$AWS_REGION" --output json 2>/dev/null); then
         SENT_24H=$(echo "$SES_QUOTA" | jq -r '.SentLast24Hours // 0')
         MAX_24H=$(echo "$SES_QUOTA" | jq -r '.Max24HourSend // 0')
-        
-        if [ "$MAX_24H" -gt 0 ]; then
+        # Use bc for floating-point comparison
+        if (( $(echo "$MAX_24H > 0" | bc -l) )); then
             PERCENTAGE=$(echo "scale=1; $SENT_24H * 100 / $MAX_24H" | bc -l 2>/dev/null || echo "0")
             echo "  📊 24h Usage: $SENT_24H / $MAX_24H emails ($PERCENTAGE%)"
         fi
@@ -198,6 +245,7 @@ monitor_status() {
     echo ""
     
     check_sqs_status
+    show_sqs_messages
     check_ses_status
     check_lambda_status
     check_lambda_logs

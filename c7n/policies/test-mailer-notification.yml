@@ -1,0 +1,44 @@
+policies:
+  # Simple test policy to verify mailer notifications
+  - name: test-mailer-s3-bucket-notification
+    resource: aws.s3
+    description: Test policy to verify Cloud Custodian mailer sends email notifications
+    
+    # This will find S3 buckets (almost every account has at least one)
+    filters:
+      - type: value
+        key: Name
+        op: regex
+        value: ".*"  # Matches any bucket name
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "3"
+        subject: "🧪 TEST: Cloud Custodian Mailer Notification Test"
+        violation_desc: |
+          **This is a TEST notification from Cloud Custodian Mailer**
+          
+          **Bucket Name:** {{ resource.Name }}
+          **Creation Date:** {{ resource.CreationDate }}
+          **Region:** {{ region }}
+          
+          **Purpose:** Testing that c7n-mailer successfully processes SQS messages and sends email notifications.
+          
+          **Action Required:** None - this is a test notification to verify the mailer integration is working.
+          
+          If you receive this email, it means:
+          ✅ Cloud Custodian policies are executing correctly
+          ✅ SQS queue integration is working
+          ✅ Mailer Lambda is processing messages
+          ✅ SNS email notifications are being delivered
+          
+          **Next Steps:**
+          - Verify the email formatting looks correct
+          - Check that resource details are displayed properly
+          - Confirm the email was delivered to the right recipients
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications

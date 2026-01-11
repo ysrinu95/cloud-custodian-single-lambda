@@ -1,0 +1,53 @@
+vars:
+  email-notify: &email-notify
+    template: default.html
+    priority_header: "1"
+    from: c7n@central.ctkube.com
+    to:
+      - srinivasula.yallala@optum.com
+    transport:
+      type: sqs
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications
+
+policies:
+  - name: aws-security-hub-critical-findings
+    resource: aws.securityhub-finding
+    description: |
+      Notifies of new critical findings in Security Hub
+    query:
+      - Filters:
+          SeverityLabel:
+            - Comparison: EQUALS
+              Value: CRITICAL
+          WorkflowStatus:
+            - Comparison: EQUALS
+              Value: NEW
+          RecordState:
+            - Comparison: EQUALS
+              Value: ACTIVE
+          # temporarily filter out findings from Amazon Inspector & SSM Patch Manager
+          ProductName:
+            - Comparison: NOT_EQUALS
+              Value: Inspector
+            - Comparison: NOT_EQUALS
+              Value: Systems Manager Patch Manager
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "🚨 SecurityHub Critical Finding - {{ account }} - {{ region }}"
+        violation_desc: |
+          **SecurityHub Critical Finding**
+          
+          **Finding ID:** {{ resource['Id'] }}
+          **Severity:** {{ resource['Severity']['Label'] }}
+          **Title:** {{ resource['Title'] }}
+          **Description:** {{ resource['Description'] }}
+          **Product:** {{ resource['ProductName'] }}
+          **Workflow Status:** {{ resource['Workflow']['Status'] }}
+          **Compliance Status:** {{ resource.get('Compliance', {}).get('Status', 'N/A') }}
+          **Resource Type:** {{ resource['Resources'][0]['Type'] if resource.get('Resources') else 'N/A' }}
+          **Resource ID:** {{ resource['Resources'][0]['Id'] if resource.get('Resources') else 'N/A' }}
+          **First Observed:** {{ resource['FirstObservedAt'] }}
+          **Last Observed:** {{ resource['UpdatedAt'] }}
+          
+          Please investigate immediately.

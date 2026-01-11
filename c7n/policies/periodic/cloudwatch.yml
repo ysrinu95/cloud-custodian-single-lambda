@@ -1,0 +1,74 @@
+vars:
+  email-notify: &email-notify
+    template: default.html
+    priority_header: "1"
+    from: c7n@central.ctkube.com
+    to:
+      - srinivasula.yallala@optum.com
+    transport:
+      type: sqs
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications
+
+policies:
+  - name: aws-cloudwatch-stale-log-groups
+    resource: aws.log-group
+    description: |
+      Notifies of CloudWatch log groups found to be unused
+    filters:
+      # not written to in last year
+      #  c7n takes creation times into account if unused
+      - type: last-write
+        days: 365
+      # exclude c7n log groups
+      - not:
+        - type: value
+          key: logGroupName
+          op: regex
+          value: "^/aws/lambda/custodian-"
+      - tag:c7n-exception:unused: absent          
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "[c7n] [{{ account }}] CloudWatch Log Groups Are Unused ({{ region }})"
+        violation_desc: CloudWatch log groups not written to in the last year
+        action_desc: |
+          Please check the unused log groups and delete if unused
+
+  # todo: this policy can likely be deprecated in favor of aws-cloudwatch-log-group-retention
+  - name: aws-cloudwatch-c7n-log-group-retention
+    resource: aws.log-group
+    description: |
+      Notifies and sets the log group retention for c7n log groups
+    filters:
+     - type: value
+       key: logGroupName
+       op: regex
+       value: "^/aws/lambda/custodian-"
+     - retentionInDays: absent
+    actions:
+     #- type: retention
+     #  days: 60
+     - type: notify
+       <<: *email-notify
+       subject: "[c7n] [{{ account }}] CloudWatch c7n Log Group Retention Updated ({{ region }})"
+       violation_desc: c7n log groups with no retention set
+       action_desc: |
+         Log retention has been updated to 60 days.
+
+  - name: aws-cloudwatch-log-group-retention
+    resource: aws.log-group
+    description: |
+      Notifies and sets the retention for log groups set to never expire
+    filters:
+      - retentionInDays: absent
+    actions:
+      #- type: retention
+      #   days: 365
+      - type: notify
+        <<: *email-notify
+        subject: "[c7n] [{{ account }}] CloudWatch Log Group Retention Updated ({{ region }})"
+        violation_desc: CloudWatch Log Group with no retention set
+        action_desc: |
+          Log group retention has been updated to 365 days.<br>
+          If the log group is defined in code, please update the source to include a retention period.<br>
+          See <a href="https://docs.aws.amazon.com/managedservices/latest/userguide/log-customize-retention.html">AWS documentation</a> for more info.

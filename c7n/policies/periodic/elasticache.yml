@@ -1,0 +1,178 @@
+policies:
+  # ElastiCache Redis cluster without encryption at rest
+  - name: elasticache-redis-no-encryption-at-rest
+    resource: aws.cache-cluster
+    description: Detect ElastiCache Redis clusters with encryption at rest disabled
+    
+    filters:
+      - type: value
+        key: Engine
+        value: redis
+      - or:
+        - type: value
+          key: AtRestEncryptionEnabled
+          value: False
+        - type: value
+          key: AtRestEncryptionEnabled
+          value: absent
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "2"
+        subject: "⚠️ ElastiCache Redis Encryption at Rest Disabled - {{ account }} - {{ region }}"
+        violation_desc: |
+          **ElastiCache Redis Cluster Without Encryption at Rest**
+          
+          **Cluster ID:** {{ resource.CacheClusterId }}
+          **Engine:** {{ resource.Engine }} {{ resource.EngineVersion }}
+          **Node Type:** {{ resource.CacheNodeType }}
+          **Status:** {{ resource.CacheClusterStatus }}
+          **Encryption at Rest:** {{ resource.AtRestEncryptionEnabled }}
+          
+          **Risk:** Data at rest is not encrypted. Redis clusters without encryption expose sensitive cached data to unauthorized access if storage is compromised.
+          
+          **Remediation:**
+          Note: Cannot enable encryption on existing cluster. Must delete and recreate:
+          
+          ```bash
+          # Delete the unencrypted cluster
+          aws elasticache delete-cache-cluster --cache-cluster-id {{ resource.CacheClusterId }}
+          
+          # Create new encrypted cluster
+          aws elasticache create-cache-cluster \
+            --cache-cluster-id {{ resource.CacheClusterId }}-encrypted \
+            --engine redis \
+            --cache-node-type {{ resource.CacheNodeType }} \
+            --num-cache-nodes {{ resource.NumCacheNodes }} \
+            --at-rest-encryption-enabled
+          ```
+          
+          **Best Practice:** Always enable both at-rest and in-transit encryption for ElastiCache Redis clusters.
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications
+
+  # ElastiCache Redis with in-transit encryption disabled (Replication Group)
+  - name: elasticache-redis-no-transit-encryption-replication
+    resource: aws.cache-cluster
+    description: Detect ElastiCache Redis replication groups with in-transit encryption disabled
+    
+    filters:
+      - type: value
+        key: Engine
+        value: redis
+      - or:
+        - type: value
+          key: TransitEncryptionEnabled
+          value: False
+        - type: value
+          key: TransitEncryptionEnabled
+          value: absent
+      - type: value
+        key: ReplicationGroupId
+        value: present
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "2"
+        subject: "⚠️ ElastiCache Redis In-Transit Encryption Disabled (Replication) - {{ account }} - {{ region }}"
+        violation_desc: |
+          **ElastiCache Redis Replication Group Without In-Transit Encryption**
+          
+          **Cluster ID:** {{ resource.CacheClusterId }}
+          **Replication Group ID:** {{ resource.ReplicationGroupId }}
+          **Engine:** {{ resource.Engine }} {{ resource.EngineVersion }}
+          **Node Type:** {{ resource.CacheNodeType }}
+          **Status:** {{ resource.CacheClusterStatus }}
+          **Transit Encryption:** {{ resource.TransitEncryptionEnabled }}
+          
+          **Risk:** Data in transit between nodes and clients is unencrypted. Network traffic can be intercepted and read in plain text.
+          
+          **Remediation:**
+          Note: Cannot enable encryption on existing cluster. Must delete and recreate:
+          
+          ```bash
+          # Delete the unencrypted cluster
+          aws elasticache delete-replication-group --replication-group-id {{ resource.ReplicationGroupId }}
+          
+          # Create new encrypted replication group
+          aws elasticache create-replication-group \
+            --replication-group-id {{ resource.ReplicationGroupId }}-encrypted \
+            --engine redis \
+            --cache-node-type {{ resource.CacheNodeType }} \
+            --transit-encryption-enabled \
+            --at-rest-encryption-enabled \
+            --auth-token <strong-auth-token>
+          ```
+          
+          **Best Practice:** Always enable both at-rest and in-transit encryption for ElastiCache Redis clusters.
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications
+
+  # ElastiCache Redis with in-transit encryption disabled (Non-replication)
+  - name: elasticache-redis-no-transit-encryption-standalone
+    resource: aws.cache-cluster
+    description: Detect standalone ElastiCache Redis clusters with in-transit encryption disabled
+    
+    filters:
+      - type: value
+        key: Engine
+        value: redis
+      - or:
+        - type: value
+          key: TransitEncryptionEnabled
+          value: False
+        - type: value
+          key: TransitEncryptionEnabled
+          value: absent
+      - type: value
+        key: ReplicationGroupId
+        value: absent
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "2"
+        subject: "⚠️ ElastiCache Redis In-Transit Encryption Disabled (Standalone) - {{ account }} - {{ region }}"
+        violation_desc: |
+          **Standalone ElastiCache Redis Cluster Without In-Transit Encryption**
+          
+          **Cluster ID:** {{ resource.CacheClusterId }}
+          **Engine:** {{ resource.Engine }} {{ resource.EngineVersion }}
+          **Node Type:** {{ resource.CacheNodeType }}
+          **Status:** {{ resource.CacheClusterStatus }}
+          **Transit Encryption:** {{ resource.TransitEncryptionEnabled }}
+          
+          **Risk:** Client-server communication is unencrypted. Network traffic can be intercepted and read in plain text.
+          
+          **Remediation:**
+          Note: Cannot enable encryption on existing cluster. Must delete and recreate:
+          
+          ```bash
+          # Delete the unencrypted cluster
+          aws elasticache delete-cache-cluster --cache-cluster-id {{ resource.CacheClusterId }}
+          
+          # Create new encrypted cluster
+          aws elasticache create-cache-cluster \
+            --cache-cluster-id {{ resource.CacheClusterId }}-encrypted \
+            --engine redis \
+            --cache-node-type {{ resource.CacheNodeType }} \
+            --num-cache-nodes {{ resource.NumCacheNodes }} \
+            --transit-encryption-enabled \
+            --at-rest-encryption-enabled \
+            --auth-token <strong-auth-token>
+          ```
+          
+          **Best Practice:** Always enable both at-rest and in-transit encryption for ElastiCache Redis clusters.
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications

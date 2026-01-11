@@ -1,0 +1,74 @@
+vars:
+  email-notify: &email-notify
+    template: default.html
+    priority_header: "1"
+    from: c7n@central.ctkube.com
+    to:
+      - srinivasula.yallala@optum.com
+    transport:
+      type: sqs
+      queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications
+
+policies:
+  - name: aws-ec2-public-ips
+    resource: aws.ec2
+    description: |
+      Notifies of instances found with a public IP address
+    filters:
+      - type: value
+        key: PublicIpAddress
+        value: present
+    actions:
+      - type: notify
+        <<: *email-notify
+        subject: "[c7n] [{{ account }}] EC2 Instances With Public IP Report ({{ region }})"
+        violation_desc: EC2 instances with a public IP address
+        action_desc: |
+          No action taken. EC2 instances should be on private subnets.
+          
+  # - name: aws-ec2-unused-security-groups
+  #   resource: aws.security-group
+  #   description: |
+  #     Notifies of unused security groups
+  #   mode:
+  #     type: periodic
+  #     schedule: cron(0, 23, ?, *, SUN, *) # every Sunday at 23:00 UTC
+  #     role: arn:aws:iam::{account_id}:role/devops/cloud-custodian
+  #     tags: *tags
+  #   filters:
+  #     - unused
+  #   actions:
+  #     - type: notify
+  #       <<: *email-notify
+  #       subject: "[c7n] [{{ account }}] Unused Security Group Report ({{ region }})"
+  #       violation_desc: Unused security groups
+  #       action_desc: |
+  #         No action taken. Unused security groups should be deleted.
+  
+  - name: aws-security-group-unsafe-ports 
+    resource: aws.security-group
+    description: |
+      Notifies of and remediates security group creation with unrestricted access over unsafe ports
+    filters:
+      - or:
+        - type: ingress
+          Ports: [3389, 20, 23, 110, 143, 3306, 8080, 1433, 9200, 9300, 25, 445, 135, 21, 1434, 4333, 5432, 5500, 5601, 22, 3000, 5000, 8088, 8888]
+          Cidr:
+            value: "0.0.0.0/0"
+        - type: ingress
+          Ports: [3389, 20, 23, 110, 143, 3306, 8080, 1433, 9200, 9300, 25, 445, 135, 21, 1434, 4333, 5432, 5500, 5601, 22, 3000, 5000, 8088, 8888]
+          CidrV6:
+            value: "::/0"
+    actions:
+      #- type: remove-permissions
+      #  ingress: matched
+      - type: notify
+        <<: *email-notify
+        priority_header: 1
+        subject: "[c7n] [{{ account }}] Open Security Group Rule Created ({{ region }})"
+        violation_desc: Security group with rules open to the world
+        action_desc: |
+          Actions taken: The violating security group rule has been removed as it typically allows 
+          direct incoming public internet traffic access to your resource. This violates AWS 
+          security best practice. <br>          
+          <a href="https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-standards-fsbp-controls.html#ec2-19-remediation">Documentation</a> 

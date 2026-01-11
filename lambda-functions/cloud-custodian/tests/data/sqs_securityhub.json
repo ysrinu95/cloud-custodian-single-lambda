@@ -1,0 +1,180 @@
+{
+    "event": null,
+    "account_id": "813185901390",
+    "partition": "aws",
+    "account": "aikyam-engg",
+    "version": "0.9.30",
+    "region": "us-east-1",
+    "execution_id": "f0483c80-aa7d-43c1-98b5-d5f0e95515b9",
+    "execution_start": 1766471897.4208865,
+    "policy": {
+        "name": "securityhub-failed-findings-remediation",
+        "resource": "aws.account",
+        "description": "Send email notifications for high and critical SecurityHub findings.\nFocuses on failed compliance status and NEW/NOTIFIED findings.\n",
+        "filters": [
+            {
+                "type": "event",
+                "key": "source",
+                "value": "aws.securityhub"
+            },
+            {
+                "type": "event",
+                "key": "detail.findings[0].Compliance.Status",
+                "value": "FAILED"
+            },
+            {
+                "type": "event",
+                "key": "detail.findings[0].Workflow.Status",
+                "op": "in",
+                "value": [
+                    "NEW",
+                    "NOTIFIED"
+                ]
+            },
+            {
+                "type": "event",
+                "key": "detail.findings[0].Severity.Label",
+                "op": "in",
+                "value": [
+                    "HIGH",
+                    "CRITICAL"
+                ]
+            }
+        ],
+        "actions": [
+            {
+                "type": "notify",
+                "template": "default.html",
+                "priority_header": "1",
+                "subject": "⚠️ SecurityHub Critical Finding - {{ account }} - {{ region }}",
+                "violation_desc": "**SecurityHub Critical Finding**\n\n**Account:** {{ account }}\n**Region:** {{ region }}\n{% if event and event.detail and event.detail.findings and event.detail.findings|length > 0 %}\n**Severity:** {{ event.detail.findings[0].Severity.Label or \"High\" }}\n**Compliance:** {{ event.detail.findings[0].Compliance.Status or \"FAILED\" }}\n**Status:** {{ event.detail.findings[0].Workflow.Status or \"NEW\" }}\n\n**Title:** {{ event.detail.findings[0].Title or \"SecurityHub Finding\" }}\n\n**Description:** {{ event.detail.findings[0].Description or \"Critical security finding detected\" }}\n\n**Affected Resources:**\n{% if event.detail.findings[0].Resources and event.detail.findings[0].Resources|length > 0 %}\n- Resource Type: {{ event.detail.findings[0].Resources[0].Type or \"N/A\" }}\n- Resource ID: {{ event.detail.findings[0].Resources[0].Id or \"N/A\" }}\n{% else %}\n- No resource information available\n{% endif %}\n\n**Remediation:**\n{{ event.detail.findings[0].Remediation.Recommendation.Text or \"Review finding in SecurityHub console for remediation steps\" }}\n{% else %}\n**Severity:** High\n**Status:** NEW\n**Title:** SecurityHub Finding (Event details not available)\n**Description:** A critical security finding was detected. Please review in the SecurityHub console.\n{% endif %}\n\n**Required Actions:**\n1. Review the finding in SecurityHub console\n2. Investigate affected resources\n3. Apply recommended remediation steps\n4. Update finding status after remediation\n",
+                "to": [
+                    "srinivasula.yallala@optum.com"
+                ],
+                "transport": {
+                    "type": "sqs",
+                    "queue": "https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications"
+                }
+            }
+        ],
+        "event": {
+            "version": "0",
+            "id": "ed85072b-2743-6aaf-37d5-8cda9ae2f7ea",
+            "detail-type": "Security Hub Findings - Imported",
+            "source": "aws.securityhub",
+            "account": "813185901390",
+            "time": "2025-12-23T06:38:06Z",
+            "region": "us-east-1",
+            "resources": [
+                "arn:aws:securityhub:us-east-2::product/aws/securityhub/arn:aws:securityhub:us-east-2:813185901390:subscription/cis-aws-foundations-benchmark/v/1.2.0/1.14/finding/9ef06527-666c-4bb6-885f-ce6e74466935"
+            ],
+            "detail": {
+                "findings": [
+                    {
+                        "ProductArn": "arn:aws:securityhub:us-east-2::product/aws/securityhub",
+                        "Types": [
+                            "Software and Configuration Checks/Industry and Regulatory Standards/CIS AWS Foundations Benchmark"
+                        ],
+                        "Description": "The root user is the most privileged user in an AWS account. MFA adds an extra layer of protection on top of a user name and password. With MFA enabled, when a user signs in to an AWS website, they will be prompted for their user name and password as well as for an authentication code from their AWS MFA device. For Level 2, it is recommended that the root user be protected with a hardware MFA.",
+                        "Compliance": {
+                            "Status": "FAILED",
+                            "SecurityControlId": "IAM.6",
+                            "RelatedRequirements": [
+                                "CIS AWS Foundations 1.14"
+                            ],
+                            "AssociatedStandards": [
+                                {
+                                    "StandardsId": "ruleset/cis-aws-foundations-benchmark/v/1.2.0"
+                                }
+                            ]
+                        },
+                        "ProductName": "Security Hub",
+                        "FirstObservedAt": "2022-03-29T18:07:17.607Z",
+                        "CreatedAt": "2022-03-29T18:07:17.607Z",
+                        "LastObservedAt": "2025-12-23T06:37:30.171Z",
+                        "CompanyName": "AWS",
+                        "FindingProviderFields": {
+                            "Types": [
+                                "Software and Configuration Checks/Industry and Regulatory Standards/CIS AWS Foundations Benchmark"
+                            ],
+                            "Severity": {
+                                "Normalized": 90,
+                                "Label": "CRITICAL",
+                                "Product": 90,
+                                "Original": "CRITICAL"
+                            }
+                        },
+                        "ProductFields": {
+                            "StandardsGuideArn": "arn:aws:securityhub:::ruleset/cis-aws-foundations-benchmark/v/1.2.0",
+                            "StandardsGuideSubscriptionArn": "arn:aws:securityhub:us-east-2:813185901390:subscription/cis-aws-foundations-benchmark/v/1.2.0",
+                            "RuleId": "1.14",
+                            "RecommendationUrl": "https://docs.aws.amazon.com/console/securityhub/IAM.6/remediation",
+                            "RelatedAWSResources:0/name": "securityhub-root-account-hardware-mfa-enabled-d671086c",
+                            "RelatedAWSResources:0/type": "AWS::Config::ConfigRule",
+                            "StandardsControlArn": "arn:aws:securityhub:us-east-2:813185901390:control/cis-aws-foundations-benchmark/v/1.2.0/1.14",
+                            "aws/securityhub/ProductName": "Security Hub",
+                            "aws/securityhub/CompanyName": "AWS",
+                            "Resources:0/Id": "arn:aws:iam::813185901390:root",
+                            "aws/securityhub/FindingId": "arn:aws:securityhub:us-east-2::product/aws/securityhub/arn:aws:securityhub:us-east-2:813185901390:subscription/cis-aws-foundations-benchmark/v/1.2.0/1.14/finding/9ef06527-666c-4bb6-885f-ce6e74466935",
+                            "PreviousComplianceStatus": "FAILED"
+                        },
+                        "Remediation": {
+                            "Recommendation": {
+                                "Text": "For information on how to correct this issue, consult the AWS Security Hub controls documentation.",
+                                "Url": "https://docs.aws.amazon.com/console/securityhub/IAM.6/remediation"
+                            }
+                        },
+                        "SchemaVersion": "2018-10-08",
+                        "GeneratorId": "arn:aws:securityhub:::ruleset/cis-aws-foundations-benchmark/v/1.2.0/rule/1.14",
+                        "RecordState": "ACTIVE",
+                        "Title": "1.14 Ensure hardware MFA is enabled for the root user",
+                        "Workflow": {
+                            "Status": "NEW"
+                        },
+                        "Severity": {
+                            "Normalized": 90,
+                            "Label": "CRITICAL",
+                            "Product": 90,
+                            "Original": "CRITICAL"
+                        },
+                        "UpdatedAt": "2025-12-23T06:37:41.809Z",
+                        "WorkflowState": "NEW",
+                        "AwsAccountName": "aikyam-engg",
+                        "AwsAccountId": "813185901390",
+                        "Region": "us-east-2",
+                        "Id": "arn:aws:securityhub:us-east-2:813185901390:subscription/cis-aws-foundations-benchmark/v/1.2.0/1.14/finding/9ef06527-666c-4bb6-885f-ce6e74466935",
+                        "Resources": [
+                            {
+                                "Partition": "aws",
+                                "Type": "AwsAccount",
+                                "Region": "us-east-2",
+                                "Id": "AWS::::Account:813185901390"
+                            }
+                        ],
+                        "ProcessedAt": "2025-12-23T06:37:52.021Z"
+                    }
+                ]
+            }
+        }
+    },
+    "action": {
+        "type": "notify",
+        "template": "default.html",
+        "priority_header": "1",
+        "subject": "⚠️ SecurityHub Critical Finding - {{ account }} - {{ region }}",
+        "violation_desc": "**SecurityHub Critical Finding**\n\n**Account:** {{ account }}\n**Region:** {{ region }}\n{% if event and event.detail and event.detail.findings and event.detail.findings|length > 0 %}\n**Severity:** {{ event.detail.findings[0].Severity.Label or \"High\" }}\n**Compliance:** {{ event.detail.findings[0].Compliance.Status or \"FAILED\" }}\n**Status:** {{ event.detail.findings[0].Workflow.Status or \"NEW\" }}\n\n**Title:** {{ event.detail.findings[0].Title or \"SecurityHub Finding\" }}\n\n**Description:** {{ event.detail.findings[0].Description or \"Critical security finding detected\" }}\n\n**Affected Resources:**\n{% if event.detail.findings[0].Resources and event.detail.findings[0].Resources|length > 0 %}\n- Resource Type: {{ event.detail.findings[0].Resources[0].Type or \"N/A\" }}\n- Resource ID: {{ event.detail.findings[0].Resources[0].Id or \"N/A\" }}\n{% else %}\n- No resource information available\n{% endif %}\n\n**Remediation:**\n{{ event.detail.findings[0].Remediation.Recommendation.Text or \"Review finding in SecurityHub console for remediation steps\" }}\n{% else %}\n**Severity:** High\n**Status:** NEW\n**Title:** SecurityHub Finding (Event details not available)\n**Description:** A critical security finding was detected. Please review in the SecurityHub console.\n{% endif %}\n\n**Required Actions:**\n1. Review the finding in SecurityHub console\n2. Investigate affected resources\n3. Apply recommended remediation steps\n4. Update finding status after remediation\n",
+        "to": [
+            "srinivasula.yallala@optum.com"
+        ],
+        "transport": {
+            "type": "sqs",
+            "queue": "https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications"
+        }
+    },
+    "resources": [
+        {
+            "account_id": "813185901390",
+            "account_name": "aikyam-engg"
+        }
+    ]
+}

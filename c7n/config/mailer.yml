@@ -1,14 +1,31 @@
 # mailer queue settings
-queue_url: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
-role: arn:aws:iam::172327596604:role/CloudCustodian-ExecutionRole
+queue_url: https://sqs.us-east-1.amazonaws.com/172327596604/cloud-custodian-mailer-queue
+role: arn:aws:iam::172327596604:role/cloud-custodian-mailer-execution-role
 region: us-east-1
+
+# Lambda schedule for EventBridge rule (for SQS polling)
+# Using rate-based schedule for continuous polling
+lambda_schedule: "rate(5 minutes)"
 
 # lambda function settings
 lambda_tags:
-  contact: devops@optum.com
-  environment: central
-  repo: cloud-custodian
-runtime: python3.11
+  # Contact and identification tags
+  contact: srinivasula.yallala@optum.com
+  environment: engg
+  repo: aikyam-everything-as-code
+  
+  # Required organizational/governance tags for SCP compliance
+  terraform: "True"
+  oid-owned: "True"
+  aide-id: UHGWM110-019726
+  service-tier: p1
+  
+  # Additional metadata tags
+  application: cloud-custodian
+  component: mailer
+  managed-by: jenkins
+  
+runtime: python3.12
 
 # custom-defined contact tags for email notify
 contact_tags:
@@ -16,4 +33,4 @@ contact_tags:
   - owner
 
 # sender address for email notify
-from_address: ysrinu95@gmail.com
+from_address: c7n@central.ctkube.com

@@ -1,0 +1,412 @@
+name: Deploy Central Account Infrastructure
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'terraform/central/**'
+      - 'lambda-functions/cloud-custodian/**'
+      - 'c7n/policies/**'
+      - '.github/workflows/deploy-central.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'terraform/central/**'
+      - 'lambda-functions/cloud-custodian/**'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform action'
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+        default: 'plan'
+
+env:
+  AWS_REGION: us-east-1
+  TERRAFORM_VERSION: "1.6.0"
+  PYTHON_VERSION: "3.12"
+  CENTRAL_ACCOUNT_ID: "172327596604"
+  TF_STATE_BUCKET: "ysr95-cloud-custodian-tf-bkt"
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  # ============================================================================
+  # Job 1: Build Lambda Layer
+  # ============================================================================
+  build-layer:
+    name: Build Cloud Custodian Layer
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.action != 'destroy')
+    
+    outputs:
+      layer_size: ${{ steps.size.outputs.size_mb }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-layer-${{ hashFiles('lambda-functions/cloud-custodian-layer/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-layer-
+
+      - name: Create layer directory structure
+        run: |
+          echo "📦 Creating Lambda layer structure..."
+          mkdir -p layer/python/lib/python${{ env.PYTHON_VERSION }}/site-packages
+
+      - name: Install dependencies to layer
+        run: |
+          echo "📥 Installing Cloud Custodian and dependencies..."
+          pip install --upgrade pip
+          pip install -r lambda-functions/cloud-custodian-layer/requirements.txt \
+            -t layer/python/lib/python${{ env.PYTHON_VERSION }}/site-packages/
+
+      - name: Optimize layer size
+        run: |
+          echo "🗜️ Optimizing layer size..."
+          cd layer/python/lib/python${{ env.PYTHON_VERSION }}/site-packages/
+          
+          # Remove test files and documentation
+          find . -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find . -name "*.pyc" -delete 2>/dev/null || true
+          find . -name "*.pyo" -delete 2>/dev/null || true
+          find . -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true
+          find . -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+          
+          # Remove boto3/botocore (already in Lambda runtime)
+          rm -rf boto3* botocore* 2>/dev/null || true
+
+      - name: Create layer zip
+        run: |
+          echo "🗜️ Creating layer zip file..."
+          cd layer
+          zip -r ../cloud-custodian-layer.zip python/ -q
+
+      - name: Check layer size
+        id: size
+        run: |
+          SIZE=$(du -m cloud-custodian-layer.zip | cut -f1)
+          echo "size_mb=$SIZE" >> $GITHUB_OUTPUT
+          echo "📏 Layer size: ${SIZE}MB"
+          
+          if [ $SIZE -gt 250 ]; then
+            echo "::error::Layer size exceeds 250MB limit!"
+            exit 1
+          elif [ $SIZE -gt 200 ]; then
+            echo "::warning::Layer size approaching 250MB limit (${SIZE}MB)"
+          fi
+
+      - name: Upload layer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-custodian-layer
+          path: cloud-custodian-layer.zip
+          retention-days: 7
+
+  # ============================================================================
+  # Job 2: Build Lambda Function Package
+  # ============================================================================
+  build-lambda:
+    name: Build Lambda Function Package
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.action != 'destroy')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create Lambda function zip
+        run: |
+          echo "📦 Creating Lambda function package..."
+          mkdir -p lambda-package
+          
+          # Copy all Lambda handler files
+          cp lambda-functions/cloud-custodian/*.py lambda-package/
+          
+          # Create zip
+          cd lambda-package
+          zip -r ../lambda-function.zip . -q
+          cd ..
+          
+          echo "📏 Lambda function size: $(du -k lambda-function.zip | cut -f1)KB"
+
+      - name: Upload lambda artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lambda-function
+          path: lambda-function.zip
+          retention-days: 7
+
+  # ============================================================================
+  # Job 3: Terraform Plan (Central Account)
+  # ============================================================================
+  terraform-plan:
+    name: Terraform Plan (Central)
+    runs-on: ubuntu-latest
+    needs: [build-layer, build-lambda]
+    
+    outputs:
+      plan_exit_code: ${{ steps.plan.outputs.exitcode }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download layer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: cloud-custodian-layer
+          path: terraform/central/
+
+      - name: Download lambda artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: lambda-function
+          path: terraform/central/
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.CENTRAL_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Terraform Format Check
+        working-directory: terraform/central
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      - name: Terraform Init
+        working-directory: terraform/central
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
+            -backend-config="key=central/cloud-custodian/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=terraform-state-lock"
+
+      - name: Terraform Validate
+        working-directory: terraform/central
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: terraform/central
+        run: |
+          set +e
+          terraform plan \
+            -var="lambda_package_path=lambda-function.zip" \
+            -var="lambda_layer_path=cloud-custodian-layer.zip" \
+            -detailed-exitcode \
+            -out=tfplan \
+            -no-color 2>&1 | tee plan-output.txt
+          EXITCODE=$?
+          echo "exitcode=$EXITCODE" >> $GITHUB_OUTPUT
+          if [ $EXITCODE -eq 1 ]; then
+            exit 1
+          fi
+        continue-on-error: true
+
+      - name: Upload plan artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan-central
+          path: |
+            terraform/central/tfplan
+            terraform/central/plan-output.txt
+            terraform/central/lambda-function.zip
+            terraform/central/cloud-custodian-layer.zip
+          retention-days: 7
+
+      - name: Comment PR with plan
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('terraform/central/plan-output.txt', 'utf8');
+            const truncatedPlan = plan.length > 60000 ? plan.substring(0, 60000) + '\n...(truncated)' : plan;
+            
+            const exitCode = '${{ steps.plan.outputs.exitcode }}';
+            let status = '✅ No changes';
+            if (exitCode === '2') status = '⚠️ Changes detected';
+            if (exitCode === '1') status = '❌ Error';
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🏗️ Terraform Plan - Central Account\n\n**Status:** ${status}\n**Account:** \`${{ env.CENTRAL_ACCOUNT_ID }}\`\n**Region:** \`${{ env.AWS_REGION }}\`\n\n<details>\n<summary>Show Plan Output</summary>\n\n\`\`\`terraform\n${truncatedPlan}\n\`\`\`\n\n</details>`
+            })
+
+  # ============================================================================
+  # Job 4: Terraform Apply (Central Account)
+  # ============================================================================
+  terraform-apply:
+    name: Terraform Apply (Central)
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    if: |
+      (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
+    environment:
+      name: central-production
+      url: https://console.aws.amazon.com/lambda/home?region=${{ env.AWS_REGION }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download plan artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan-central
+          path: terraform/central/
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.CENTRAL_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: terraform/central
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
+            -backend-config="key=central/cloud-custodian/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=terraform-state-lock"
+
+      - name: Terraform Apply
+        working-directory: terraform/central
+        run: |
+          echo "🚀 Deploying Central Account infrastructure..."
+          terraform apply -auto-approve tfplan
+          echo "✅ Central Account infrastructure deployed!"
+
+      - name: Get Terraform outputs
+        id: outputs
+        working-directory: terraform/central
+        run: |
+          echo "lambda_function_name=$(terraform output -raw lambda_function_name 2>/dev/null || echo 'N/A')" >> $GITHUB_OUTPUT
+          echo "event_bus_arn=$(terraform output -raw event_bus_arn 2>/dev/null || echo 'N/A')" >> $GITHUB_OUTPUT
+
+      - name: Test Lambda invocation
+        if: steps.outputs.outputs.lambda_function_name != 'N/A'
+        run: |
+          echo "🧪 Testing Lambda function..."
+          aws lambda invoke \
+            --function-name ${{ steps.outputs.outputs.lambda_function_name }} \
+            --payload '{"test": true, "dryrun": true}' \
+            --region ${{ env.AWS_REGION }} \
+            --cli-binary-format raw-in-base64-out \
+            response.json
+          
+          echo "Response:"
+          cat response.json | jq . || cat response.json
+
+      - name: Deployment Summary
+        run: |
+          echo "## 🚀 Central Account Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Account ID | \`${{ env.CENTRAL_ACCOUNT_ID }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Region | \`${{ env.AWS_REGION }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Lambda Function | \`${{ steps.outputs.outputs.lambda_function_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Event Bus | \`${{ steps.outputs.outputs.event_bus_arn }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${GITHUB_SHA::7}\` |" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # Job 5: Terraform Destroy (Manual Only)
+  # ============================================================================
+  terraform-destroy:
+    name: Terraform Destroy (Central)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+    environment:
+      name: central-destroy
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.CENTRAL_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Terraform Init
+        working-directory: terraform/central
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
+            -backend-config="key=central/cloud-custodian/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=terraform-state-lock"
+
+      - name: Create dummy files for destroy
+        working-directory: terraform/central
+        run: |
+          echo "dummy" > lambda-function.zip
+          echo "dummy" > cloud-custodian-layer.zip
+
+      - name: Terraform Destroy
+        working-directory: terraform/central
+        run: |
+          echo "⚠️ Destroying Central Account infrastructure..."
+          terraform destroy -auto-approve \
+            -var="lambda_package_path=lambda-function.zip" \
+            -var="lambda_layer_path=cloud-custodian-layer.zip"
+          echo "✅ Central Account infrastructure destroyed!"
+
+      - name: Destroy Summary
+        run: |
+          echo "## ⚠️ Central Account Infrastructure Destroyed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Account: \`${{ env.CENTRAL_ACCOUNT_ID }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "Time: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY

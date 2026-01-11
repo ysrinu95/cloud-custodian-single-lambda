@@ -1,0 +1,148 @@
+AWS ALB listening on port 80 without redirect to HTTPS - realtime/periodic
+
+AWS Amazon Machine Image AMI is publicly accessible - realtime/periodic
+
+AWS Application Load Balancer ALB is not using the latest predefined security policy - periodic
+
+AWS CloudFront distribution is using insecure SSL protocols for HTTPS communication - periodic
+
+AWS CloudFront distribution with access logging Enabled but not to Central logging bucket - periodic
+
+Access Query:  config from cloud.resource where cloud.type = 'aws' AND api.name = 'aws-cloudfront-list-distributions'
+AND json.rule = logging.enabled is true and ( logging.bucket does not start with "lp-cl" or logging.prefix
+does not contain "service=cloudfront" )
+
+AWS CloudFront web distribution having TLS version 11 or lower - periodic
+
+AWS EBS snapshot is not encrypted - realtime/periodic
+
+AWS EBS snapshots are accessible to public - realtime/periodic
+
+AWS EC2 Instance is older than 30 days - periodic
+
+AWS ECR repository is exposed to public - realtime/periodic
+
+AWS EKS Cluster with excessive public connectivity - realtime/periodic
+
+AWS EKS control plane logging disabled - realtime/periodic
+
+AWS ELB access with access logging Enabled but not to Central logging bucket : config from cloud.resource where cloud.type = 'aws' AND api.name = 'aws-elb-describe-load-balancers'
+AND json.rule = attributes.accessLog.enabled is true and attributes.accessLog.s3BucketName does not start
+with "lp-cl"
+
+AWS ElastiCache Redis cluster with encryption for data at rest disabled - realtime/periodic
+
+AWS ElastiCache Redis cluster with in-transit encryption disabled Replication group - realtime/periodic
+
+AWS ElastiCache Redis with in-transit encryption disabled Non-replication group - realtime/periodic
+
+AWS Elastic File System EFS with encryption for data at rest is disabled - realtime/periodic
+
+AWS Elastic Load Balancer v2 ELBv2 with listener TLS is not configured - realtime/periodic
+
+AWS Elasticsearch domain Encryption for data at rest is disabled - realtime/periodic
+
+AWS IAM has expired SSL TLS certificates - periodic
+
+AWS IAM user has both Console access and Access keys - periodic
+
+AWS Kinesis streams are not encrypted using Server Side Encryption - periodic
+
+AWS Network Load Balancer NLB is not using the latest predefined security policy - periodic
+
+AWS Open CIFS 445 Security Group with Internet Gateway Route - periodic
+
+AWS Open RDP 3389 Security Group with Internet Gateway Route - periodic
+
+AWS RDS DB cluster encryption is disabled - realtime/periodic
+
+AWS RDS database instance is publicly accessible - realtime/periodic
+
+AWS RDS snapshots are accessible to public - realtime/periodic
+
+AWS Redshift instances are not encrypted - realtime/periodic
+
+AWS Redshift with audit logging enabled but not to Central bucket : config from cloud.resource where cloud.type = 'aws' AND api.name = 'aws-redshift-describe-clusters'
+AND json.rule = loggingStatus.loggingEnabled is true and loggingStatus.bucketName does not start with
+"lp-cl"
+
+AWS S3 Bucket has Global PUT Permissions enabled via bucket policy - realtime/periodic
+
+AWS S3 Bucket has Global Permissions enabled via bucket policy - realtime/periodic
+
+AWS S3 Buckets Block public access setting disabled - realtime/periodic
+
+AWS S3 bucket has global view ACL permissions enabled- realtime/periodic
+
+AWS S3 bucket not configured with secure data transport policy- realtime/periodic
+
+AWS S3 buckets are accessible to public via ACL- realtime/periodic
+
+AWS S3 buckets do not have server side encryption- realtime/periodic
+
+AWS SG allows internet port 80 without ALB configured for redirect to 443- periodic
+
+AWS SNS topic with server-side encryption disabled - periodic
+
+AWS Security Group allows all traffic on CIFS port 445 -  realtime/periodic
+
+AWS Security Group allows all traffic on DNS port 53 - realtime/periodic
+
+AWS Security Group allows all traffic on FTP-Data port 20 - realtime/periodic
+
+AWS Security Group allows all traffic on FTP port 21 - realtime/periodic
+
+AWS Security Group allows all traffic on MSQL port 4333 - realtime/periodic
+
+AWS Security Group allows all traffic on MYSQL port 3306 - realtime/periodic
+
+AWS Security Group allows all traffic on NetBIOS port 137 - realtime/periodic
+
+AWS Security Group allows all traffic on NetBIOS port 138 - realtime/periodic
+
+AWS Security Group allows all traffic on NetBIOS port 139 - realtime/periodic
+
+AWS Security Group allows all traffic on Oracle DB port 1521 - realtime/periodic
+
+AWS Security Group allows all traffic on POP3 port 110 - realtime/periodic
+
+AWS Security Group allows all traffic on PostgreSQL port 5432 - realtime/periodic
+
+AWS Security Group allows all traffic on RDP port 3389 - realtime/periodic
+
+AWS Security Group allows all traffic on SMTP port 25 - realtime/periodic
+
+AWS Security Group allows all traffic on SQL Server port 1433 - realtime/periodic
+
+AWS Security Group allows all traffic on SQL Server port 1434 - realtime/periodic
+
+AWS Security Group allows all traffic on SSH port 22 - realtime/periodic
+
+AWS Security Group allows all traffic on Telnet port 23 - realtime/periodic
+
+AWS Security Group allows all traffic on VNC Listener port 5500 - realtime/periodic
+
+AWS Security Group allows all traffic on VNC Server port 5900 - realtime/periodic
+
+AWS Security Group allows all traffic on Windows RPC port 135 - realtime/periodic
+
+AWS Security Groups allow internet traffic from internet to MongoDB port 27017 - realtime/periodic
+
+AWS Security Groups allow internet traffic from internet to port 23 - realtime/periodic
+
+AWS Security Groups allow internet traffic to ports which are not commonly used - realtime/periodic
+
+AWS Security Groups with Inbound rule overly permissive to All Traffic - realtime/periodic
+
+AWS access keys are not rotated for 365 days - periodic
+
+EC2 Instance Metadata Service v1 Search Enabled - periodic
+
+EC2 Instances with unencrypted EBS Volume - periodic
+
+WAF Classical Global with logging Enabled but not to Central logging stream - periodic
+config from cloud.resource where api.name = 'aws-waf-classic-global-web-acl-resource'
+as X; config from cloud.resource where api.name = 'aws-kinesis-firehose-delivery-stream'
+AND json.rule = destinations[?any( s3DestinationDescription.bucketARN exists and s3DestinationDescription.bucketARN
+contains "lp-cl" )] does not exist as Y; filter '$.X.loggingConfiguration does not exist or $.X.loggingConfiguration.logDestinationConfigs[*]
+equals $.Y.deliveryStreamARN'; show X;

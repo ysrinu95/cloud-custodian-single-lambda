@@ -1,0 +1,178 @@
+policies:
+  # CloudFront using insecure SSL protocols
+  - name: cloudfront-insecure-ssl-protocols
+    resource: aws.distribution
+    description: Detect CloudFront distributions using insecure SSL/TLS protocols (TLS 1.0/1.1)
+    
+    filters:
+      - type: value
+        key: DistributionConfig.ViewerCertificate.MinimumProtocolVersion
+        op: in
+        value:
+          - TLSv1
+          - TLSv1_2016
+          - TLSv1.1_2016
+          - SSLv3
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "2"
+        subject: "⚠️ CloudFront Using Insecure SSL Protocols - {{ account }} - {{ region }}"
+        violation_desc: |
+          **CloudFront Distribution Using Insecure TLS Version**
+          
+          **Distribution ID:** {{ resource.Id }}
+          **Domain Name:** {{ resource.DomainName }}
+          **Current TLS Version:** {{ resource.DistributionConfig.ViewerCertificate.MinimumProtocolVersion }}
+          **Recommended:** TLSv1.2_2021 or higher
+          **Created/Updated By:** {{ resource["c7n:CreatorName"] or "Unknown" }}
+          
+          **Risk:** TLS 1.0 and 1.1 have known vulnerabilities.
+          
+          **Remediation:**
+          
+          **Option 1: AWS CLI**
+          \`\`\`bash
+          # Step 1: Get current distribution config and ETag
+          aws cloudfront get-distribution-config \
+            --id {{ event.detail.responseElements.distribution.id or resource.Id }} \
+            --query '[DistributionConfig, ETag]' \
+            --output json > dist-config.json
+          
+          # Step 2: Extract config and ETag
+          ETAG=$(jq -r '.[1]' dist-config.json)
+          jq '.[0]' dist-config.json > config.json
+          
+          # Step 3: Update TLS version to TLSv1.2_2021 or higher
+          jq '.ViewerCertificate.MinimumProtocolVersion = "TLSv1.2_2021"' \
+            config.json > config-updated.json
+          
+          # Step 4: Apply updated configuration
+          aws cloudfront update-distribution \
+            --id {{ event.detail.responseElements.distribution.id or resource.Id }} \
+            --distribution-config file://config-updated.json \
+            --if-match "$ETAG"
+          \`\`\`
+          
+          **Option 2: Terraform**
+          \`\`\`hcl
+          resource "aws_cloudfront_distribution" "{{ resource.Id }}" {
+            # ... existing configuration ...
+            
+            viewer_certificate {
+              cloudfront_default_certificate = true
+              minimum_protocol_version       = "TLSv1.2_2021"  # Or TLSv1.2_2019, TLSv1.2_2018
+              ssl_support_method            = "sni-only"
+            }
+          }
+          \`\`\`
+          
+          **Recommended TLS Versions:**
+          - `TLSv1.2_2021` (Recommended - most secure)
+          - `TLSv1.2_2019` (Good compatibility)
+          - `TLSv1.2_2018` (Minimum acceptable)
+          
+          **Deprecated Versions (Do NOT use):**
+          - TLSv1, TLSv1_2016, TLSv1.1_2016, SSLv3
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+
+  # CloudFront access logging not to central bucket
+  - name: cloudfront-logging-not-central
+    resource: aws.distribution
+    description: Detect CloudFront distributions with logging disabled or not to central logging bucket
+    
+    filters:
+      # Match when logging is disabled OR bucket does not start with 'lp-cl'
+      - or:
+        - type: value
+          key: DistributionConfig.Logging.Enabled
+          value: false
+        - and:
+          - type: value
+            key: DistributionConfig.Logging.Enabled
+            value: true
+          - not:
+            - type: value
+              key: DistributionConfig.Logging.Bucket
+              op: regex
+              value: "^lp-cl.*"
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "3"
+        subject: "⚠️ CloudFront Logging Not to Central Bucket - {{ account }} - {{ region }}"
+        violation_desc: |
+          **CloudFront Access Logging Not to Central Bucket**
+          
+          **Distribution ID:** {{ resource.Id }}
+          **Logging Enabled:** {{ resource.DistributionConfig.Logging.Enabled }}
+          **Current Logging Bucket:** {{ resource.DistributionConfig.Logging.Bucket or 'Not configured' }}
+          **Current Logging Prefix:** {{ resource.DistributionConfig.Logging.Prefix or 'Not configured' }}
+          **Required Bucket Prefix:** lp-cl*
+          **Required Prefix Pattern:** service=cloudfront
+          **Created/Updated By:** {{ resource["c7n:CreatorName"] or "Unknown" }}
+          
+          **Remediation:**
+          
+          **Option 1: AWS CLI**
+          \`\`\`bash
+          # Step 1: Get current distribution config and ETag
+          aws cloudfront get-distribution-config \
+            --id {{ event.detail.responseElements.distribution.id or resource.Id }} \
+            --query '[DistributionConfig, ETag]' \
+            --output json > dist-config.json
+          
+          # Step 2: Extract config and ETag
+          ETAG=$(jq -r '.[1]' dist-config.json)
+          jq '.[0]' dist-config.json > config.json
+          
+          # Step 3: Update Logging configuration in config.json
+          # Set: "Enabled": true
+          #      "Bucket": "lp-cl-ACCOUNT.s3.amazonaws.com"
+          #      "Prefix": "source=aws/account=ACCOUNT/service=cloudfront/"
+          #      "IncludeCookies": false
+          
+          jq '.Logging = {
+            "Enabled": true,
+            "IncludeCookies": false,
+            "Bucket": "lp-cl-{{ account }}.s3.amazonaws.com",
+            "Prefix": "source=aws/account={{ account }}/service=cloudfront/"
+          }' config.json > config-updated.json
+          
+          # Step 4: Apply updated configuration
+          aws cloudfront update-distribution \
+            --id {{ event.detail.responseElements.distribution.id or resource.Id }} \
+            --distribution-config file://config-updated.json \
+            --if-match "$ETAG"
+          \`\`\`
+          
+          **Option 2: Terraform**
+          \`\`\`hcl
+          resource "aws_cloudfront_distribution" "example" {
+            # ... existing configuration ...
+            
+            logging_config {
+              include_cookies = false
+              bucket          = "lp-cl-{{ account }}.s3.amazonaws.com"
+              prefix          = "source=aws/account={{ account }}/service=cloudfront/"
+            }
+          }
+          \`\`\`
+          
+          **Central Logging Bucket Requirements:**
+          - Bucket name must start with `lp-cl`
+          - Prefix must include `service=cloudfront`
+          - Ensure bucket has appropriate ACL for CloudFront logging
+        to:
+          - srinivasula.yallala@optum.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+
+

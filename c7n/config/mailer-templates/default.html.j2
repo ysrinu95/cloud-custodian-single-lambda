@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #ff9900;
+            color: white;
+            padding: 20px;
+            border-radius: 5px 5px 0 0;
+        }
+        .content {
+            background-color: #f5f5f5;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+        }
+        .policy-info {
+            background-color: white;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 4px solid #ff9900;
+        }
+        .resources {
+            background-color: white;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .resource-item {
+            padding: 10px;
+            margin: 5px 0;
+            background-color: #f9f9f9;
+            border-left: 3px solid #ff9900;
+        }
+        .footer {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 12px;
+            color: #666;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #ff9900;
+            color: white;
+        }
+        .violation {
+            color: #d9534f;
+            font-weight: bold;
+        }
+        .action {
+            color: #5cb85c;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>☁️ Cloud Custodian Policy Alert</h1>
+        <p><strong>Account:</strong> {{ account }} | <strong>Region:</strong> {{ region }}</p>
+    </div>
+    
+    <div class="content">
+        <div class="policy-info">
+            <h2>📋 Policy Information</h2>
+            <p><strong>Policy Name:</strong> {{ policy.name }}</p>
+            <p><strong>Resource Type:</strong> {{ policy.resource }}</p>
+            {% if policy.description %}
+            <p><strong>Description:</strong> {{ policy.description }}</p>
+            {% endif %}
+        </div>
+
+        {% if action.violation_desc %}
+        <div class="policy-info">
+            <h3 class="violation">⚠️ Violation Details</h3>
+            <p>{{ action.violation_desc | safe }}</p>
+        </div>
+        {% endif %}
+
+        <div class="resources">
+            <h3>🔍 Affected Resources ({{ resources | length }})</h3>
+            {% if resources %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Resource ID</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for resource in resources[:50] %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>
+                            {% if resource.get('id') %}
+                                {{ resource.id }}
+                            {% elif resource.get('InstanceId') %}
+                                {{ resource.InstanceId }}
+                            {% elif resource.get('DBInstanceIdentifier') %}
+                                {{ resource.DBInstanceIdentifier }}
+                            {% elif resource.get('GroupId') %}
+                                {{ resource.GroupId }}
+                            {% elif resource.get('Name') %}
+                                {{ resource.Name }}
+                            {% elif resource.get('logGroupName') %}
+                                {{ resource.logGroupName }}
+                            {% elif resource.get('name') %}
+                                {{ resource.name }}
+                            {% else %}
+                                {{ resource.get('Arn', 'N/A') }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if resource.get('Tags') %}
+                                {% for tag in resource.Tags %}
+                                    <strong>{{ tag.Key }}:</strong> {{ tag.Value }}<br>
+                                {% endfor %}
+                            {% elif resource.get('name') %}
+                                Name: {{ resource.name }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if resources | length > 50 %}
+                    <tr>
+                        <td colspan="3"><em>... and {{ resources | length - 50 }} more resources</em></td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>No resources were affected by this policy execution.</p>
+            {% endif %}
+        </div>
+
+        {% if action.action_desc %}
+        <div class="policy-info">
+            <h3 class="action">✅ Actions Taken</h3>
+            <p>{{ action.action_desc | safe }}</p>
+        </div>
+        {% endif %}
+
+        <div class="policy-info">
+            <h3>📊 Execution Details</h3>
+            <p><strong>Policy File:</strong> {{ policy_file }}</p>
+            <p><strong>Execution Time:</strong> {{ execution_start }}</p>
+            <p><strong>Resources Matched:</strong> {{ resources | length }}</p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>
+            This is an automated notification from Cloud Custodian.<br>
+            <strong>Policy:</strong> {{ policy.name }}<br>
+            <strong>Account:</strong> {{ account }} ({{ region }})<br>
+            <strong>Generated:</strong> {{ execution_start }}
+        </p>
+        <p>
+            For more information about this policy or to request an exception, please contact the Cloud Platform Team.
+        </p>
+    </div>
+</body>
+</html>

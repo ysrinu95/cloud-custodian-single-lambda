@@ -1,0 +1,744 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/26.0.9 Chrome/128.0.6613.186 Electron/32.2.5 Safari/537.36" version="26.0.9" pages="4">
+  <diagram id="cross-account-iam-simple" name="Cross-Account IAM &amp; Event Forwarding">
+    <mxGraphModel dx="1482" dy="792" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="simple-title" value="Cloud Custodian Cross-Account IAM Trust &amp; Event Forwarding" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry x="200" y="20" width="1000" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-member-1" value="Member Account 1&#xa;Dev (813185901390)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;fontStyle=1;startSize=50;" parent="1" vertex="1">
+          <mxGeometry x="100" y="100" width="400" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="QcKxSbzBRH6Ebdx5o53N-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=light-dark(#b01c1c, #ededed);strokeWidth=3;" parent="simple-member-1" source="simple-m1-eventbridge" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="690" y="93" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="simple-m1-eventbridge" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.eventbridge;" parent="simple-member-1" vertex="1">
+          <mxGeometry x="50" y="63" width="60" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-m1-eventbridge-text" value="EventBridge&#xa;Forward Rule" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=1;" parent="simple-member-1" vertex="1">
+          <mxGeometry x="30" y="145" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-m1-role" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;fillColor=#C925D1;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.role;" parent="simple-member-1" vertex="1">
+          <mxGeometry x="240" y="153.2" width="60" height="33.6" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-m1-role-text" value="IAM Role&#xa;CloudCustodianExecutionRole&#xa;&#xa;Trust Policy:&#xa;- Principal: Central Account&#xa;- ExternalId: cloud-custodian-813185901390" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=0;" parent="simple-member-1" vertex="1">
+          <mxGeometry x="170" y="120" width="230" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-member-2" value="Member Account 2&lt;br&gt;Non Prod" style="swimlane;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;fontStyle=1;startSize=50;" parent="1" vertex="1">
+          <mxGeometry x="100" y="400" width="400" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-m2-eventbridge" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.eventbridge;" parent="simple-member-2" vertex="1">
+          <mxGeometry x="50" y="80" width="60" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-m2-eventbridge-text" value="EventBridge&#xa;Forward Rule" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=1;" parent="simple-member-2" vertex="1">
+          <mxGeometry x="30" y="145" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-m2-role" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;fillColor=#C925D1;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.role;" parent="simple-member-2" vertex="1">
+          <mxGeometry x="320" y="151.4" width="60" height="33.6" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-m2-role-text" value="IAM Role&#xa;CloudCustodianExecutionRole&#xa;&#xa;Trust Policy:&#xa;- Principal: Central Account&#xa;- ExternalId: cloud-custodian-123456789012" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=0;" parent="simple-member-2" vertex="1">
+          <mxGeometry x="165" y="123" width="230" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-label-m2-event" value="Event Forwarding&#xa;(events:PutEvents)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontColor=#E7157B;fontStyle=1;" parent="simple-member-2" vertex="1">
+          <mxGeometry x="250" y="70" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-central" value="Central Account&#xa;(172327596604)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontStyle=1;startSize=50;" parent="1" vertex="1">
+          <mxGeometry x="700" y="100" width="600" height="550" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-central-bus" value="" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.eventbridge;" parent="simple-central" vertex="1">
+          <mxGeometry x="95" y="90" width="60" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-central-bus-text" value="EventBridge&#xa;Custom Bus&#xa;&#xa;Bus Policy:&#xa;- Allow events:PutEvents&#xa;- From: Member Accounts" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=1;" parent="simple-central" vertex="1">
+          <mxGeometry x="20" y="155" width="170" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="AAE4bxAXZw0rrfxQ8B0o-2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="simple-central" source="simple-central-lambda" target="wJn5tmELRWtzyet_OAhQ-1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-central-lambda" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.lambda_function;" parent="simple-central" vertex="1">
+          <mxGeometry x="260" y="86" width="68" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-central-lambda-text" value="Executor Lambda&#xa;cloud-custodian-&#xa;cross-account-executor&#xa;&#xa;Permissions:&#xa;- sts:AssumeRole&#xa;- On: CloudCustodianExecutionRole&#xa;- In: All Member Accounts" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;" parent="simple-central" vertex="1">
+          <mxGeometry x="230" y="155" width="200" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-central-assume-box" value="AssumeRole Calls" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;fontSize=12;fontStyle=1;align=left;" parent="simple-central" vertex="1">
+          <mxGeometry x="70" y="320" width="480" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-central-assume-1" value="AssumeRole to Member 1&#xa;Role: arn:aws:iam::813185901390:role/CloudCustodianExecutionRole&#xa;ExternalId: cloud-custodian-813185901390" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;align=left;verticalAlign=top;fontColor=#333333;" parent="simple-central" vertex="1">
+          <mxGeometry x="90" y="350" width="440" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-central-assume-2" value="AssumeRole to Member 2&#xa;Role: arn:aws:iam::123456789012:role/CloudCustodianExecutionRole&#xa;ExternalId: cloud-custodian-123456789012" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;align=left;verticalAlign=top;fontColor=#333333;" parent="simple-central" vertex="1">
+          <mxGeometry x="90" y="430" width="440" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-central-bus-arrow" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#ED7100;strokeWidth=3;" parent="simple-central" source="simple-central-bus" target="simple-central-lambda" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-central-label-trigger" value="Trigger" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontColor=#ED7100;fontStyle=1;" parent="simple-central" vertex="1">
+          <mxGeometry x="170" y="120" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="wJn5tmELRWtzyet_OAhQ-1" value="" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sqs;" parent="simple-central" vertex="1">
+          <mxGeometry x="430" y="91" width="58" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="AAE4bxAXZw0rrfxQ8B0o-1" value="" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sns;" parent="simple-central" vertex="1">
+          <mxGeometry x="430" y="217" width="58" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-label-m1-event" value="Event Forwarding&#xa;(events:PutEvents)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontColor=#E7157B;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="530" y="160" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-arrow-m2-event" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#E7157B;strokeWidth=4;exitX=1;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.75;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="simple-m2-eventbridge" target="simple-central-bus" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="550" y="510" />
+              <mxPoint x="550" y="235" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="simple-arrow-assume-1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C925D1;strokeWidth=3;dashed=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;startArrow=classic;startFill=1;" parent="1" source="simple-central-assume-1" target="simple-m1-role" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="650" y="480" />
+              <mxPoint x="650" y="270" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="simple-label-assume-1" value="sts:AssumeRole&#xa;(with ExternalId)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontColor=#C925D1;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="560" y="280" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-arrow-assume-2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C925D1;strokeWidth=3;dashed=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;startArrow=classic;startFill=1;" parent="1" source="simple-central-assume-2" target="simple-m2-role" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="680" y="560" />
+              <mxPoint x="680" y="570" />
+              <mxPoint x="520" y="570" />
+              <mxPoint x="520" y="568" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="simple-label-assume-2" value="sts:AssumeRole&#xa;(with ExternalId)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontColor=#C925D1;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="560" y="530" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-legend-box" value="Key Components" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;verticalAlign=top;fontSize=13;fontStyle=1;align=left;fontColor=#333333;" parent="1" vertex="1">
+          <mxGeometry x="100" y="700" width="1200" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-legend-event" value="1. Event Forwarding (Member → Central)&#xa;   • EventBridge in member accounts forwards security events to central custom bus&#xa;   • Requires events:PutEvents permission on central bus&#xa;   • Bus policy in central account allows specific member account principals" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="120" y="730" width="550" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-legend-iam" value="2. IAM Trust Relationship (Central ← Member)&#xa;   • Each member account has CloudCustodianExecutionRole&#xa;   • Trust policy allows central account to assume role&#xa;   • ExternalId prevents confused deputy attack (unique per account)&#xa;   • Lambda in central account assumes role to execute remediation" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="700" y="730" width="550" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="simple-legend-flow" value="Flow: Member Events → EventBridge Forward Rule → Central Custom Bus → Lambda Executor → AssumeRole (Member IAM) → Execute Remediation" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=2;fontColor=#666666;" parent="1" vertex="1">
+          <mxGeometry x="300" y="810" width="800" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="sns-template-architecture" name="SNS Template-Based Architecture">
+    <mxGraphModel dx="1482" dy="792" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="sns-title" value="Cloud Custodian SNS Template-Based Email Architecture" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry x="100" y="10" width="1000" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-aws-account" value="AWS Account (172327596604)" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=12;fontStyle=0;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_account;strokeColor=#CD2264;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#CD2264;dashed=0;" parent="1" vertex="1">
+          <mxGeometry x="80" y="80" width="1240" height="740" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-region" value="Region (us-east-1)" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=12;fontStyle=0;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_region;strokeColor=#00A4A6;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#147EBA;dashed=1;" parent="sns-aws-account" vertex="1">
+          <mxGeometry x="40" y="40" width="1160" height="680" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-event-sources-box" value="&amp;nbsp; &amp;nbsp; Event Sources" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;fontSize=12;fontStyle=1;align=left;" parent="sns-region" vertex="1">
+          <mxGeometry x="40" y="40" width="200" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-cloudtrail" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;fillColor=#759C3E;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;aspect=fixed;shape=mxgraph.aws4.cloudtrail;" parent="sns-region" vertex="1">
+          <mxGeometry x="60" y="70" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-cloudtrail-text" value="CloudTrail&#xa;(API Events)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;" parent="sns-region" vertex="1">
+          <mxGeometry x="120" y="77.5" width="80" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-ec2-events" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.ec2_instance;" parent="sns-region" vertex="1">
+          <mxGeometry x="60" y="135" width="48" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-ec2-events-text" value="EC2 Events&#xa;(RunInstances)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;" parent="sns-region" vertex="1">
+          <mxGeometry x="120" y="141" width="100" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-s3-events" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#7AA116;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.bucket;" parent="sns-region" vertex="1">
+          <mxGeometry x="60" y="195" width="48" height="49.92" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-s3-events-text" value="S3 Events" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;" parent="sns-region" vertex="1">
+          <mxGeometry x="120" y="204.96" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-eventbridge-arrow1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;strokeWidth=2;" parent="sns-region" source="sns-cloudtrail" target="sns-eventbridge" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="280" y="95" />
+              <mxPoint x="280" y="180" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sns-eventbridge-arrow2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;strokeWidth=2;" parent="sns-region" source="sns-ec2-events" target="sns-eventbridge" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="280" y="159" />
+              <mxPoint x="280" y="180" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sns-eventbridge-arrow3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;strokeWidth=2;" parent="sns-region" source="sns-s3-events" target="sns-eventbridge" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="280" y="220" />
+              <mxPoint x="280" y="180" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sns-eventbridge" value="" style="points=[];aspect=fixed;html=1;align=center;shadow=0;dashed=0;fillColor=#FF6A00;strokeColor=none;shape=mxgraph.alibaba_cloud.eventbridge;" parent="sns-region" vertex="1">
+          <mxGeometry x="335" y="150" width="60" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-eventbridge-text" value="EventBridge&#xa;Custom Bus&#xa;Event Rule" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;" parent="sns-region" vertex="1">
+          <mxGeometry x="315" y="220" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-lambda-arrow" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#ED7100;strokeWidth=3;" parent="sns-region" source="sns-eventbridge" target="sns-lambda" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-lambda-arrow-text" value="1. Invoke" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontColor=#ED7100;fontStyle=1;" parent="sns-region" vertex="1">
+          <mxGeometry x="430" y="155" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-lambda" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.lambda_function;" parent="sns-region" vertex="1">
+          <mxGeometry x="560" y="146" width="68" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-lambda-text" value="Executor Lambda&#xa;cloud-custodian-&#xa;cross-account-executor&#xa;&#xa;• Validate events&#xa;• Execute policies&#xa;• Remediate resources" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;" parent="sns-region" vertex="1">
+          <mxGeometry x="514" y="225" width="160" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-s3-policy-arrow" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7AA116;strokeWidth=2;dashed=1;" parent="sns-region" source="sns-lambda" target="sns-s3-policies" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="820" y="180" />
+              <mxPoint x="820" y="180" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sns-s3-policy-arrow-text" value="2. Fetch policies" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontColor=#7AA116;fontStyle=1;" parent="sns-region" vertex="1">
+          <mxGeometry x="680" y="144" width="100" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-cloudwatch-arrow" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#759C3E;strokeWidth=2;dashed=1;" parent="sns-region" source="sns-lambda" target="sns-cloudwatch" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="594" y="40" />
+              <mxPoint x="1044" y="40" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sns-cloudwatch-arrow-text" value="Logs" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontColor=#759C3E;fontStyle=1;" parent="sns-region" vertex="1">
+          <mxGeometry x="790" y="15" width="40" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-s3-policies" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#7AA116;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.bucket_with_objects;" parent="sns-region" vertex="1">
+          <mxGeometry x="860" y="141" width="68" height="70.72" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-s3-policies-text" value="S3 Policies Bucket" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;" parent="sns-region" vertex="1">
+          <mxGeometry x="840" y="214.92" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-cloudwatch" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.cloudwatch_logs;" parent="sns-region" vertex="1">
+          <mxGeometry x="1010" y="20" width="68" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-cloudwatch-text" value="CloudWatch Logs" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;" parent="sns-region" vertex="1">
+          <mxGeometry x="979" y="77.5" width="130" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-sqs-queue" value="" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sqs;" parent="sns-region" vertex="1">
+          <mxGeometry x="565" y="407" width="58" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-sqs-text" value="SQS Queue&#xa;custodian-mailer-queue&#xa;(Compressed messages)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;" parent="sns-region" vertex="1">
+          <mxGeometry x="524" y="488" width="140" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-sqs-arrow" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#E7157B;strokeWidth=2;dashed=1;" parent="sns-region" source="sns-lambda" target="sns-sqs-queue" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="594" y="340" />
+              <mxPoint x="594" y="340" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sns-sqs-arrow-text" value="3. Publish&#xa;notifications" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontColor=#E7157B;fontStyle=1;" parent="sns-region" vertex="1">
+          <mxGeometry x="554" y="350" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-topic" value="" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sns;" parent="sns-region" vertex="1">
+          <mxGeometry x="359" y="407" width="58" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-topic-text" value="SNS Topic&#xa;custodian-mailer-&#xa;notifications&#xa;(Formatted HTML emails)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;" parent="sns-region" vertex="1">
+          <mxGeometry x="317" y="475" width="150" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-email-subscription" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#DD344C;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.email;" parent="sns-region" vertex="1">
+          <mxGeometry x="182" y="411" width="58" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-email-subscription-text" value="Email Subscriber&#xa;srinivasula.yallala@&#xa;optum.com" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;" parent="sns-region" vertex="1">
+          <mxGeometry x="160" y="465" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-email-arrow" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#DD344C;strokeWidth=2;dashed=1;" parent="sns-region" source="sns-topic" target="sns-email-subscription" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-email-arrow-text" value="5. Deliver email" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontColor=#DD344C;fontStyle=1;" parent="sns-region" vertex="1">
+          <mxGeometry x="250" y="407" width="90" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-template-box" value="&amp;nbsp; &amp;nbsp; &amp;nbsp;Template Engine (Mailer Lambda)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=top;fontSize=12;fontStyle=1;align=left;" parent="sns-region" vertex="1">
+          <mxGeometry x="780" y="390" width="340" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-template-process-1" value="1. c7n-mailer processes&#xa;SQS message" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;fontColor=#333333;" parent="sns-region" vertex="1">
+          <mxGeometry x="800" y="420" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-template-process-2" value="2. Jinja2 renders&#xa;aws-basic_email.html" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;fontColor=#333333;" parent="sns-region" vertex="1">
+          <mxGeometry x="800" y="470" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-template-process-3" value="3. SNSDelivery class&#xa;intercepts email.Message" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;fontColor=#333333;" parent="sns-region" vertex="1">
+          <mxGeometry x="800" y="520" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-template-process-4" value="4. Extracts HTML body&#xa;from MIME multipart" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;fontColor=#333333;" parent="sns-region" vertex="1">
+          <mxGeometry x="800" y="570" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-template-process-5" value="5. Publishes formatted&#xa;HTML to SNS topic" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontColor=#000000;fontStyle=1;" parent="sns-region" vertex="1">
+          <mxGeometry x="960" y="495" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-template-arrow-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;strokeWidth=2;dashed=1;" parent="sns-region" source="sns-template-process-1" target="sns-template-process-2" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-template-arrow-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;strokeWidth=2;dashed=1;" parent="sns-region" source="sns-template-process-2" target="sns-template-process-3" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-template-arrow-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;strokeWidth=2;dashed=1;" parent="sns-region" source="sns-template-process-3" target="sns-template-process-4" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-template-arrow-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6c8ebf;strokeWidth=2;" parent="sns-region" source="sns-template-process-4" target="sns-template-process-5" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="870" y="620" />
+              <mxPoint x="1030" y="620" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LbCX2WUV3ngZ8a5YPGUM-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#E7157B;strokeWidth=2;dashed=1;" parent="sns-region" source="sns-lambda" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="530" y="200" />
+              <mxPoint x="530" y="310" />
+              <mxPoint x="390" y="310" />
+              <mxPoint x="390" y="380" />
+              <mxPoint x="392" y="380" />
+            </Array>
+            <mxPoint x="604" y="224" as="sourcePoint" />
+            <mxPoint x="392" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sns-flow-box" value="&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; Event Flow" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;fontSize=13;fontStyle=1;align=left;" parent="1" vertex="1">
+          <mxGeometry x="80" y="850" width="620" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-flow-text" value="1. CloudTrail/EC2/S3 event → EventBridge custom bus matches pattern&#xa;2. EventBridge → Invokes Executor Lambda&#xa;3. Executor Lambda → Validates event, fetches policies from S3, executes remediation&#xa;4. Executor Lambda → Publishes notification to SQS queue (base64+gzip compressed)&#xa;5. SQS Event Source Mapping → Auto-triggers Mailer Lambda&#xa;6. Mailer Lambda → Decodes and decompresses SQS message&#xa;7. c7n-mailer → Renders Jinja2 template (aws-basic_email.html)&#xa;8. SNSDelivery (monkey-patched) → Intercepts email.Message object&#xa;9. SNSDelivery → Extracts formatted HTML from multipart MIME&#xa;10. SNSDelivery → Publishes formatted HTML to SNS topic&#xa;11. SNS → Delivers email to subscribed recipients" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="110" y="880" width="560" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-benefits-box" value="&amp;nbsp; &amp;nbsp; &amp;nbsp;Key Benefits" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;fontSize=13;fontStyle=1;align=left;" parent="1" vertex="1">
+          <mxGeometry x="730" y="850" width="590" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="sns-benefits-text" value="✓ No SES email verification required (uses SNS subscriptions)&#xa;✓ Preserves c7n-mailer&#39;s native Jinja2 template rendering&#xa;✓ Monkey-patching approach allows transparent delivery redirection&#xa;✓ Formatted HTML emails with proper template variable substitution&#xa;✓ Multi-part MIME parsing (prefers HTML, falls back to plain text)&#xa;✓ SNS provides built-in email delivery with no additional setup&#xa;✓ Easy to add/remove email subscribers via SNS subscriptions&#xa;✓ Comprehensive logging with base64+gzip message decoding&#xa;✓ SNS metrics tracking (publish attempts, success, failures, message IDs)&#xa;✓ Template files in msg-templates/ directory (aws-basic_email.html)&#xa;✓ SQS event source mapping ensures efficient triggering&#xa;✓ Clean architecture: SQS → Lambda (template rendering) → SNS → Email" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="759" y="880" width="550" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="_RnNVE2zh1A81J1t5WcX-1" value="&amp;nbsp; &amp;nbsp; Event Sources" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;fontSize=12;fontStyle=1;align=left;" parent="1" vertex="1">
+          <mxGeometry x="160" y="149" width="200" height="246" as="geometry" />
+        </mxCell>
+        <mxCell id="_RnNVE2zh1A81J1t5WcX-2" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;fillColor=#759C3E;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;aspect=fixed;shape=mxgraph.aws4.cloudtrail;" parent="1" vertex="1">
+          <mxGeometry x="180" y="174" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="_RnNVE2zh1A81J1t5WcX-3" value="CloudTrail&#xa;(API Events)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="240" y="181.5" width="80" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="_RnNVE2zh1A81J1t5WcX-4" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;fillColor=#C925D1;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;aspect=fixed;shape=mxgraph.aws4.guardduty;" parent="1" vertex="1">
+          <mxGeometry x="180" y="234" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="_RnNVE2zh1A81J1t5WcX-5" value="GuardDuty&#xa;(Findings)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="240" y="241.5" width="80" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="_RnNVE2zh1A81J1t5WcX-8" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;fillColor=#C925D1;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;aspect=fixed;shape=mxgraph.aws4.security_hub;" parent="1" vertex="1">
+          <mxGeometry x="180" y="310" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="_RnNVE2zh1A81J1t5WcX-9" value="Security Hub&#xa;(CSPM)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="240" y="325" width="90" height="35" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="cross-account-architecture" name="Cross-Account Architecture">
+    <mxGraphModel dx="1242" dy="911" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="ca-title" value="Cloud Custodian Cross-Account Security Architecture" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry x="100" y="10" width="1200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-account-1" value="Member Account 1 (Dev - 813185901390)" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=12;fontStyle=1;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_account;strokeColor=#CD2264;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#CD2264;dashed=0;" parent="1" vertex="1">
+          <mxGeometry x="60" y="80" width="480" height="390" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-region" value="Region (us-east-1)" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=11;fontStyle=0;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_region;strokeColor=#00A4A6;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#147EBA;dashed=1;" parent="ca-member-account-1" vertex="1">
+          <mxGeometry x="20" y="40" width="440" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-event-sources-box" value="Event Sources" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;fontSize=10;fontStyle=1;align=left;" parent="ca-member-1-region" vertex="1">
+          <mxGeometry x="30" y="20" width="140" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-cloudtrail" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;fillColor=#759C3E;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;aspect=fixed;shape=mxgraph.aws4.cloudtrail;" parent="ca-member-1-region" vertex="1">
+          <mxGeometry x="40" y="40" width="35" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-cloudtrail-text" value="CloudTrail" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=8;" parent="ca-member-1-region" vertex="1">
+          <mxGeometry x="80" y="47.5" width="70" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-guardduty" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;fillColor=#C925D1;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;aspect=fixed;shape=mxgraph.aws4.guardduty;" parent="ca-member-1-region" vertex="1">
+          <mxGeometry x="40" y="85" width="35" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-guardduty-text" value="GuardDuty" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=8;" parent="ca-member-1-region" vertex="1">
+          <mxGeometry x="80" y="92.5" width="70" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-securityhub" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;fillColor=#C925D1;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;aspect=fixed;shape=mxgraph.aws4.security_hub;" parent="ca-member-1-region" vertex="1">
+          <mxGeometry x="40" y="130" width="35" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-securityhub-text" value="SecurityHub" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=8;" parent="ca-member-1-region" vertex="1">
+          <mxGeometry x="80" y="137.5" width="80" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-resources-box" value="AWS Resources" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;verticalAlign=top;fontSize=10;fontStyle=1;align=left;" parent="ca-member-1-region" vertex="1">
+          <mxGeometry x="30" y="190" width="140" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-ec2" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.ec2_instance;" parent="ca-member-1-region" vertex="1">
+          <mxGeometry x="45" y="210" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-ec2-text" value="EC2" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=8;" parent="ca-member-1-region" vertex="1">
+          <mxGeometry x="80" y="215" width="40" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-s3" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#7AA116;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.bucket;" parent="ca-member-1-region" vertex="1">
+          <mxGeometry x="115" y="210" width="30" height="31.2" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-s3-text" value="S3" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=8;" parent="ca-member-1-region" vertex="1">
+          <mxGeometry x="80" y="245.6" width="30" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-alb" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#8C4FFF;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.application_load_balancer;" parent="ca-member-1-region" vertex="1">
+          <mxGeometry x="45" y="250" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-alb-text" value="ALB" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=8;" parent="ca-member-1-region" vertex="1">
+          <mxGeometry x="115" y="245.6" width="40" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-eventbridge-default" value="" style="points=[];aspect=fixed;html=1;align=center;shadow=0;dashed=0;fillColor=#FF6A00;strokeColor=none;shape=mxgraph.alibaba_cloud.eventbridge;" parent="ca-member-1-region" vertex="1">
+          <mxGeometry x="220" y="80" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-eventbridge-default-text" value="EventBridge&#xa;Default Bus" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=1;" parent="ca-member-1-region" vertex="1">
+          <mxGeometry x="205" y="135" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-eventbridge-rule" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.eventbridge;" parent="ca-member-1-region" vertex="1">
+          <mxGeometry x="350" y="80" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-eventbridge-rule-text" value="Forward Rule&#xa;(All Security Events)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=1;" parent="ca-member-1-region" vertex="1">
+          <mxGeometry x="325" y="135" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-iam-role" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;fillColor=#C925D1;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.role;" parent="ca-member-1-region" vertex="1">
+          <mxGeometry x="220" y="230" width="50" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-arrow-ct-to-eb" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;strokeWidth=2;" parent="ca-member-1-region" source="ca-member-1-cloudtrail" target="ca-member-1-eventbridge-default" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="180" y="57" />
+              <mxPoint x="180" y="105" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ca-member-1-arrow-gd-to-eb" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;strokeWidth=2;" parent="ca-member-1-region" source="ca-member-1-guardduty" target="ca-member-1-eventbridge-default" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="180" y="102" />
+              <mxPoint x="180" y="105" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ca-member-1-arrow-sh-to-eb" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;strokeWidth=2;" parent="ca-member-1-region" source="ca-member-1-securityhub" target="ca-member-1-eventbridge-default" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="180" y="147" />
+              <mxPoint x="180" y="105" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ca-member-1-arrow-eb-to-rule" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#ED7100;strokeWidth=3;" parent="ca-member-1-region" source="ca-member-1-eventbridge-default" target="ca-member-1-eventbridge-rule" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-arrow-label" value="1. Events" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=8;fontColor=#ED7100;fontStyle=1;" parent="ca-member-1-region" vertex="1">
+          <mxGeometry x="285" y="90" width="60" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-member-1-iam-role-text" value="IAM Role&#xa;CloudCustodian&#xa;ExecutionRole&#xa;(Assumable by Central)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=8;fontStyle=1;" parent="ca-member-account-1" vertex="1">
+          <mxGeometry x="210" y="340" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-account" value="Central Account (172327596604)" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=12;fontStyle=1;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_account;strokeColor=#CD2264;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#CD2264;dashed=0;" parent="1" vertex="1">
+          <mxGeometry x="620" y="80" width="970" height="384.36" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-region" value="Region (us-east-1)" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=11;fontStyle=0;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_region;strokeColor=#00A4A6;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#147EBA;dashed=1;" parent="ca-central-account" vertex="1">
+          <mxGeometry x="20" y="40" width="940" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-custom-bus" value="" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.eventbridge;" parent="ca-central-region" vertex="1">
+          <mxGeometry x="30" y="100" width="58" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-custom-bus-text" value="EventBridge&#xa;Custom Bus&#xa;(Cross-Account)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=1;" parent="ca-central-region" vertex="1">
+          <mxGeometry x="14" y="165" width="90" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-lambda" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.lambda_function;" parent="ca-central-region" vertex="1">
+          <mxGeometry x="200" y="100" width="58" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-lambda-text" value="Executor Lambda&#xa;cloud-custodian-&#xa;cross-account-executor" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=1;" parent="ca-central-region" vertex="1">
+          <mxGeometry x="169" y="165" width="120" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-s3-policies" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#7AA116;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.bucket_with_objects;" parent="ca-central-region" vertex="1">
+          <mxGeometry x="380" y="100" width="58" height="60.32" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-s3-policies-text" value="S3 Policies Bucket&#xa;aikyam-cloud-&#xa;custodian-data" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=1;" parent="ca-central-region" vertex="1">
+          <mxGeometry x="349" y="165" width="120" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-sqs" value="" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sqs;" parent="ca-central-region" vertex="1">
+          <mxGeometry x="530" y="103" width="52" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-sqs-text" value="SQS Queue&#xa;custodian-mailer" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=1;" parent="ca-central-region" vertex="1">
+          <mxGeometry x="506" y="165" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-mailer-lambda" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.lambda_function;" parent="ca-central-region" vertex="1">
+          <mxGeometry x="670" y="100" width="58" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-mailer-lambda-text" value="Mailer Lambda&#xa;c7n-mailer" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=1;" parent="ca-central-region" vertex="1">
+          <mxGeometry x="649" y="165" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="wsCKiyzKcIWGtAnxLVY2-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="ca-central-region" source="ca-central-sns" target="wsCKiyzKcIWGtAnxLVY2-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-sns" value="" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sns;" parent="ca-central-region" vertex="1">
+          <mxGeometry x="800" y="103" width="52" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-cloudwatch" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.cloudwatch_logs;" parent="ca-central-region" vertex="1">
+          <mxGeometry x="390" y="244.36" width="58" height="42.64" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-cloudwatch-text" value="CloudWatch Logs" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=1;" parent="ca-central-region" vertex="1">
+          <mxGeometry x="239" y="244.36" width="110" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-arrow-bus-to-lambda" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#ED7100;strokeWidth=3;" parent="ca-central-region" source="ca-central-custom-bus" target="ca-central-lambda" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-arrow-lambda-to-s3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7AA116;strokeWidth=2;dashed=1;" parent="ca-central-region" source="ca-central-lambda" target="ca-central-s3-policies" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-arrow-lambda-to-sqs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#E7157B;strokeWidth=2;dashed=1;" parent="ca-central-region" source="ca-central-lambda" target="ca-central-sqs" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="229" y="30" />
+              <mxPoint x="556" y="30" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ca-central-arrow-sqs-to-mailer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#E7157B;strokeWidth=3;" parent="ca-central-region" source="ca-central-sqs" target="ca-central-mailer-lambda" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-arrow-mailer-to-sns" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#E7157B;strokeWidth=3;" parent="ca-central-region" source="ca-central-mailer-lambda" target="ca-central-sns" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-arrow-lambda-to-logs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#759C3E;strokeWidth=2;dashed=1;" parent="ca-central-region" source="ca-central-lambda" target="ca-central-cloudwatch" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="229" y="200" />
+              <mxPoint x="229" y="200" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ca-central-label-1" value="3. Invoke" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=8;fontColor=#ED7100;fontStyle=1;" parent="ca-central-region" vertex="1">
+          <mxGeometry x="120" y="108" width="60" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-label-2" value="4. Fetch policies" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=8;fontColor=#7AA116;fontStyle=1;" parent="ca-central-region" vertex="1">
+          <mxGeometry x="274" y="108" width="90" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-label-3" value="6. Notify" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=8;fontColor=#E7157B;fontStyle=1;" parent="ca-central-region" vertex="1">
+          <mxGeometry x="360" y="10" width="60" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-label-4" value="periodic mode" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=8;fontColor=#E7157B;fontStyle=1;" parent="ca-central-region" vertex="1">
+          <mxGeometry x="595" y="108" width="70" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-label-5" value="Publish" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=8;fontColor=#E7157B;fontStyle=1;" parent="ca-central-region" vertex="1">
+          <mxGeometry x="735" y="108" width="50" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-assume-role-label" value="5. AssumeRole&#xa;CloudCustodianExecutionRole&#xa;(with ExternalId)&#xa;Execute Remediation" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontColor=#C925D1;fontStyle=1;" parent="ca-central-region" vertex="1">
+          <mxGeometry y="205" width="150" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="NrjrymvDRnF9zbtjUw3e-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.25;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="ca-central-region" source="ca-central-lambda" target="ca-central-sns">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="210" y="10" />
+              <mxPoint x="813" y="10" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="wsCKiyzKcIWGtAnxLVY2-1" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#DD344C;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.email;" vertex="1" parent="ca-central-region">
+          <mxGeometry x="797" y="244.36" width="58" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="mWh9lMBGMT6frBNBb4I2-1" value="Email Subscriber&#xa;srinivasula.yallala@&#xa;optum.com" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;" vertex="1" parent="ca-central-region">
+          <mxGeometry x="655" y="244.36" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-central-sns-text" value="SNS Topic&#xa;custodian-mailer-&#xa;notifications" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontStyle=1;" parent="ca-central-account" vertex="1">
+          <mxGeometry x="850" y="145.16" width="120" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-cross-account-arrow" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#E7157B;strokeWidth=4;exitX=1;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;" parent="1" source="ca-member-1-eventbridge-rule" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="520" y="220" as="sourcePoint" />
+            <mxPoint x="670" y="260" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="670" y="260" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ca-cross-account-label" value="2. Cross-Account&#xa;Event Forwarding" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontColor=#E7157B;fontStyle=1;rotation=0;" parent="1" vertex="1">
+          <mxGeometry x="510" y="220" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-assume-role-arrow" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C925D1;strokeWidth=3;dashed=1;startArrow=classic;startFill=1;" parent="1" source="ca-central-lambda" target="ca-member-1-iam-role" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="820" y="258" as="sourcePoint" />
+            <mxPoint x="380" y="410" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="800" y="260" />
+              <mxPoint x="800" y="408" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ca-flow-box" value="Cross-Account Event Flow" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;fontSize=13;fontStyle=1;align=left;" parent="1" vertex="1">
+          <mxGeometry x="60" y="500" width="700" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="ca-flow-text" value="1. CloudTrail/GuardDuty/SecurityHub log events and findings in Member Account&#xa;2. EventBridge Default Bus receives events → Forward Rule matches pattern&#xa;3. EventBridge forwards events to Central Account Custom Bus (cross-account)&#xa;4. Central Custom Bus triggers Executor Lambda&#xa;5. Executor Lambda fetches policies from S3 bucket&#xa;6. Executor Lambda assumes CloudCustodianExecutionRole in Member Account (with ExternalId)&#xa;7. Lambda executes remediation actions in Member Account (stop instances, modify SG, etc.)&#xa;8. Lambda publishes notifications to SQS queue&#xa;9. SQS Event Source triggers Mailer Lambda&#xa;10. Mailer Lambda renders templates and publishes to SNS&#xa;11. SNS delivers formatted emails to subscribers" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="80" y="530" width="650" height="160" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="periodic-policy-execution" name="Periodic Policy Execution (CI/CD)">
+    <mxGraphModel dx="1691" dy="792" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="periodic-title" value="Cloud Custodian Periodic Policy Execution via CI/CD Pipeline" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="100" y="10" width="1200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-cicd-box" value="&amp;nbsp; &amp;nbsp; CI/CD Pipeline (Jenkins/GitHub Actions)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;verticalAlign=top;fontSize=13;fontStyle=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="100" y="80" width="350" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-cron" value="" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#759C3E;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.generic;" vertex="1" parent="1">
+          <mxGeometry x="130" y="120" width="58" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-cron-text" value="Cron Trigger&#xa;(Every 6 hours)" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="109" y="183" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-cli" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#232F3E;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.command_line_interface;" vertex="1" parent="1">
+          <mxGeometry x="130" y="250" width="58" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-cli-text" value="Cloud Custodian CLI&#xa;custodian run" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="94" y="313" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-arrow-cron-to-cli" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;strokeWidth=2;" edge="1" parent="1" source="periodic-cron" target="periodic-cli">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-pipeline-steps" value="Pipeline Steps:&#xa;1. Checkout repository&#xa;2. pip install c7n c7n-mailer&#xa;3. Configure AWS credentials&#xa;4. Fetch policies from S3&#xa;5. Loop through accounts&#xa;6. Assume IAM role per account&#xa;7. custodian run -s output/ policy.yml" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="230" y="120" width="200" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-s3-policies" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#7AA116;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.bucket_with_objects;" vertex="1" parent="1">
+          <mxGeometry x="550" y="80" width="74" height="77" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-s3-policies-text" value="S3 Policies Bucket&#xa;mode: periodic" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="527" y="162" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-arrow-cli-to-s3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7AA116;strokeWidth=2;dashed=1;" edge="1" parent="1" source="periodic-cli" target="periodic-s3-policies">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="500" y="279" />
+              <mxPoint x="500" y="119" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="periodic-label-1" value="1. Fetch policies" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontColor=#7AA116;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="450" y="216" width="100" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-accounts-box" value="Member Accounts (Cross-Account Execution)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;verticalAlign=top;fontSize=12;fontStyle=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="700" y="80" width="350" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-account-1" value="Account 1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="730" y="120" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-account-2" value="Account 2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="850" y="120" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-account-3" value="Account N" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="730" y="190" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-cli-exec-text" value="• CLI assumes CloudCustodianExecutionRole&#xa;• Scans resources per policy&#xa;• Applies actions (tag, stop, etc.)&#xa;• Publishes results to SQS" style="text;html=1;align=left;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="730" y="260" width="250" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-arrow-s3-to-accounts" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#ED7100;strokeWidth=2;" edge="1" parent="1" source="periodic-s3-policies" target="periodic-accounts-box">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="650" y="119" />
+              <mxPoint x="650" y="180" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="periodic-label-2" value="2. Execute policies" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontColor=#ED7100;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="650" y="140" width="110" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-sqs-queue" value="" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sqs;" vertex="1" parent="1">
+          <mxGeometry x="1150" y="149" width="62" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-sqs-text" value="SQS Queue&#xa;custodian-mailer-queue" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1111" y="216" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-arrow-accounts-to-sqs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#E7157B;strokeWidth=2;" edge="1" parent="1" source="periodic-accounts-box" target="periodic-sqs-queue">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1100" y="180" />
+              <mxPoint x="1100" y="180" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="periodic-label-3" value="3. Publish results" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontColor=#E7157B;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="160" width="100" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-realtime-notifier" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.lambda_function;" vertex="1" parent="1">
+          <mxGeometry x="1143" y="320" width="74" height="74" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-realtime-notifier-text" value="c7n-emailer Lambda&lt;br&gt;&lt;br&gt;• Decode messages&lt;br&gt;• Render templates&lt;br&gt;• Filter resources" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1125" y="399" width="110" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-arrow-sqs-to-notifier" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#E7157B;strokeWidth=3;" edge="1" parent="1" source="periodic-sqs-queue" target="periodic-realtime-notifier">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-label-4" value="4. Event source" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontColor=#E7157B;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1127" y="271" width="100" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-sns-topic" value="" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sns;" vertex="1" parent="1">
+          <mxGeometry x="1363" y="326" width="62" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-sns-text" value="SNS Topic" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1349" y="393" width="90" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-arrow-notifier-to-sns" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#E7157B;strokeWidth=3;" edge="1" parent="1" source="periodic-realtime-notifier" target="periodic-sns-topic">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-label-5" value="5. Publish HTML" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontColor=#E7157B;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="337" width="100" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-email" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#DD344C;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.email;" vertex="1" parent="1">
+          <mxGeometry x="1363" y="480" width="62" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-email-text" value="Email Subscribers" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1334" y="539" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-arrow-sns-to-email" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#DD344C;strokeWidth=3;" edge="1" parent="1" source="periodic-sns-topic" target="periodic-email">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-label-6" value="6. Email alerts" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;fontColor=#DD344C;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1347" y="428" width="90" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="periodic-description" value="&lt;b&gt;CI/CD-Based Periodic Policy Execution:&lt;/b&gt;&lt;br&gt;• Jenkins/GitHub Actions cron job triggers every 6 hours&lt;br&gt;• Cloud Custodian CLI fetches mode:periodic policies from S3&lt;br&gt;• CLI assumes CloudCustodianExecutionRole in each member account&lt;br&gt;• Executes custodian run, scans resources, applies actions&lt;br&gt;• Publishes results to SQS → Realtime Notifier → SNS → Email&lt;br&gt;&lt;br&gt;&lt;b&gt;Benefits:&lt;/b&gt; No Lambda executor needed, easier testing, version control integration" style="text;html=1;strokeColor=#82b366;fillColor=#d5e8d4;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontSize=9;spacingLeft=5;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="100" y="420" width="550" height="150" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

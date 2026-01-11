@@ -1,0 +1,108 @@
+{
+    "version": "0",
+    "id": "24e4c19d-e222-d49d-c752-867f7d3220d9",
+    "detail-type": "Security Hub Findings - Imported",
+    "source": "aws.securityhub",
+    "account": "813185901390",
+    "time": "2025-12-23T01:49:05Z",
+    "region": "us-east-1",
+    "resources": [
+        "arn:aws:securityhub:us-west-2::product/aws/securityhub/arn:aws:securityhub:us-west-2:813185901390:subscription/aws-foundational-security-best-practices/v/1.0.0/Config.1/finding/b57ca89c-9df2-4ace-9194-3177a262d4d3"
+    ],
+    "detail": {
+        "findings": [
+            {
+                "ProductArn": "arn:aws:securityhub:us-west-2::product/aws/securityhub",
+                "Types": [
+                    "Software and Configuration Checks/Industry and Regulatory Standards/AWS-Foundational-Security-Best-Practices"
+                ],
+                "Description": "This control checks whether AWS Config is enabled in your account in the current AWS Region, records all resources that correspond to controls that are enabled in the current Region, and uses the service-linked AWS Config role.",
+                "Compliance": {
+                    "Status": "FAILED",
+                    "StatusReasons": [
+                        {
+                            "Description": "AWS Config isn't enabled with the configuration recorder turned on.",
+                            "ReasonCode": "CONFIG_RECORDER_DISABLED"
+                        }
+                    ],
+                    "SecurityControlId": "Config.1",
+                    "AssociatedStandards": [
+                        {
+                            "StandardsId": "standards/aws-foundational-security-best-practices/v/1.0.0"
+                        }
+                    ],
+                    "SecurityControlParameters": [
+                        {
+                            "Value": [
+                                "true"
+                            ],
+                            "Name": "includeConfigServiceLinkedRoleCheck"
+                        }
+                    ]
+                },
+                "ProductName": "Security Hub",
+                "FirstObservedAt": "2022-03-29T19:05:28.619Z",
+                "CreatedAt": "2022-03-29T19:05:28.619Z",
+                "LastObservedAt": "2025-12-23T01:48:41.869Z",
+                "CompanyName": "AWS",
+                "FindingProviderFields": {
+                    "Types": [
+                        "Software and Configuration Checks/Industry and Regulatory Standards/AWS-Foundational-Security-Best-Practices"
+                    ],
+                    "Severity": {
+                        "Normalized": 90,
+                        "Label": "CRITICAL",
+                        "Product": 90,
+                        "Original": "CRITICAL"
+                    }
+                },
+                "ProductFields": {
+                    "StandardsArn": "arn:aws:securityhub:::standards/aws-foundational-security-best-practices/v/1.0.0",
+                    "StandardsSubscriptionArn": "arn:aws:securityhub:us-west-2:813185901390:subscription/aws-foundational-security-best-practices/v/1.0.0",
+                    "ControlId": "Config.1",
+                    "RecommendationUrl": "https://docs.aws.amazon.com/console/securityhub/Config.1/remediation",
+                    "StandardsControlArn": "arn:aws:securityhub:us-west-2:813185901390:control/aws-foundational-security-best-practices/v/1.0.0/Config.1",
+                    "aws/securityhub/ProductName": "Security Hub",
+                    "aws/securityhub/CompanyName": "AWS",
+                    "Resources:0/Id": "arn:aws:iam::813185901390:root",
+                    "aws/securityhub/FindingId": "arn:aws:securityhub:us-west-2::product/aws/securityhub/arn:aws:securityhub:us-west-2:813185901390:subscription/aws-foundational-security-best-practices/v/1.0.0/Config.1/finding/b57ca89c-9df2-4ace-9194-3177a262d4d3",
+                    "PreviousComplianceStatus": "FAILED"
+                },
+                "Remediation": {
+                    "Recommendation": {
+                        "Text": "For information on how to correct this issue, consult the AWS Security Hub controls documentation.",
+                        "Url": "https://docs.aws.amazon.com/console/securityhub/Config.1/remediation"
+                    }
+                },
+                "SchemaVersion": "2018-10-08",
+                "GeneratorId": "aws-foundational-security-best-practices/v/1.0.0/Config.1",
+                "RecordState": "ACTIVE",
+                "Title": "Config.1 AWS Config should be enabled and use the service-linked role for resource recording",
+                "Workflow": {
+                    "Status": "NEW"
+                },
+                "Severity": {
+                    "Normalized": 90,
+                    "Label": "CRITICAL",
+                    "Product": 90,
+                    "Original": "CRITICAL"
+                },
+                "UpdatedAt": "2025-12-23T01:48:41.869Z",
+                "WorkflowState": "NEW",
+                "AwsAccountName": "aikyam-engg",
+                "AwsAccountId": "813185901390",
+                "Region": "us-west-2",
+                "Id": "arn:aws:securityhub:us-west-2:813185901390:subscription/aws-foundational-security-best-practices/v/1.0.0/Config.1/finding/b57ca89c-9df2-4ace-9194-3177a262d4d3",
+                "Resources": [
+                    {
+                        "Partition": "aws",
+                        "Type": "AwsAccount",
+                        "Region": "us-west-2",
+                        "Id": "AWS::::Account:813185901390"
+                    }
+                ],
+                "ProcessedAt": "2025-12-23T01:49:00.957Z"
+            }
+        ]
+    }
+}
