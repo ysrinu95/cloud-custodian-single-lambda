@@ -20,11 +20,10 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "ysr95-cloud-custodian-tf-bkt"
-    key            = "member/cloud-custodian/terraform.tfstate"
-    dynamodb_table = "terraform-state-lock"
-    encrypt        = "true"
-    region         = "us-east-1"
+    bucket  = "ysr95-cloud-custodian-tf-bkt"
+    key     = "member/cloud-custodian/terraform.tfstate"
+    encrypt = "true"
+    region  = "us-east-1"
   }
 }
 
