@@ -20,7 +20,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  S3_BUCKET: ysr95-cloud-custodian-data
+  S3_BUCKET: ysr95-custodian-policies
   CENTRAL_ACCOUNT_ID: "172327596604"
 
 jobs:
