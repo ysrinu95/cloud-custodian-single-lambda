@@ -296,14 +296,6 @@ resource "aws_iam_role" "custodian_execution" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "AllowServiceUserAssume"
-        Effect = "Allow"
-        Principal = {
-          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/AWS_${data.aws_caller_identity.current.account_id}_service_user"
-        }
-        Action = "sts:AssumeRole"
-      },
-      {
         Sid    = "AllowCentralAccountLambdaAssume"
         Effect = "Allow"
         Principal = {
@@ -315,6 +307,14 @@ resource "aws_iam_role" "custodian_execution" {
             "sts:ExternalId" = "cloud-custodian-${data.aws_caller_identity.current.account_id}"
           }
         }
+      },
+      {
+        Sid    = "AllowMemberAccountRootAssume"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action = "sts:AssumeRole"
       }
     ]
   })
