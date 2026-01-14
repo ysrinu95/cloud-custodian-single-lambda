@@ -1,0 +1,456 @@
+Policy,Severity,Category,Checkov ID
+"AWS IAM policies that allow full ""*-*"" administrative privileges are created",CRITICAL,AWS IAM Policies,CKV_AWS_62
+"Bucket ACL grants WRITE permission to AWS users",CRITICAL,AWS S3 Policies,Unknown ID
+"AWS Access key enabled on root account",HIGH,AWS IAM Policies,CKV_AWS_348
+"AWS AdministratorAccess policy is used by IAM roles, users, or groups",HIGH,AWS IAM Policies,CKV_AWS_274
+"AWS GitHub Actions OIDC authorization policies allow for unsafe claims or claim order",HIGH,AWS IAM Policies,CKV_AWS_358
+"AWS IAM password policy does allow password reuse",HIGH,AWS IAM Policies,CKV_AWS_13
+"AWS IAM policy allows all principals used by any AWS service from target account to assume role",HIGH,AWS IAM Policies,CKV_AWS_61
+"AWS IAM policy documents allow * (asterisk) as a statement's action",HIGH,AWS IAM Policies,CKV_AWS_63
+"AWS IAM policy documents do not allow * (asterisk) as a statement's action",HIGH,AWS IAM Policies,CKV_AWS_49
+"AWS IAM role allows all services or principals to be assumed",HIGH,AWS IAM Policies,CKV_AWS_60
+"Data source IAM policy document allows all resources with restricted actions",HIGH,AWS IAM Policies,CKV_AWS_356
+"IAM policies allow data exfiltration",HIGH,AWS IAM Policies,CKV_AWS_288
+"IAM policies allow exposure of credentials",HIGH,AWS IAM Policies,CKV_AWS_287
+"IAM policies allow permissions management or resource exposure without constraints",HIGH,AWS IAM Policies,CKV_AWS_289
+"IAM policies allow write access without constraints",HIGH,AWS IAM Policies,CKV_AWS_290
+"IAM Policy Document Allows All or Any AWS Principal Permissions to Resources",HIGH,AWS IAM Policies,CKV_AWS_283
+"IAM policy document allows all resources with restricted actions",HIGH,AWS IAM Policies,CKV_AWS_355
+"IAM policy uses the AWS AdministratorAccess policy",HIGH,AWS IAM Policies,CKV_AWS_275
+"Permissions delegated to AWS services for AWS Lambda functions are not limited by SourceArn or SourceAccount",HIGH,AWS IAM Policies,CKV_AWS_364
+"The AWS Managed IAMFullAccess IAM policy should not be used",HIGH,AWS IAM Policies,CKV2_AWS_56
+"AWS EC2 instances with public IP and associated with security groups have Internet access",HIGH,AWS Public Policies,CKV_AWS_88
+"Amazon Redshift clusters do not have automatic snapshots enabled",HIGH,AWS General Policies,CKV_AWS_343
+"API Gateway method setting is not set to encrypted caching",HIGH,AWS General Policies,CKV_AWS_308
+"AWS EBS volumes are not encrypted",HIGH,AWS General Policies,CKV_AWS_3
+"AWS EC2 instance not configured with Instance Metadata Service v2 (IMDSv2)",HIGH,AWS General Policies,CKV_AWS_79
+"AWS Glue security configuration encryption is not enabled",HIGH,AWS General Policies,CKV_AWS_99
+"AWS Lambda function is not configured to validate code-signing",HIGH,AWS General Policies,CKV_AWS_272
+"AWS Load Balancer is not using TLS 1.2",HIGH,AWS General Policies,CKV_AWS_103
+"AWS provisioned resources are manually modified",HIGH,AWS General Policies,N/A
+"AWS SageMaker endpoint data encryption at rest not configured",HIGH,AWS General Policies,CKV_AWS_98
+"CodeBuild S3 logs are not encrypted",HIGH,AWS General Policies,CKV_AWS_311
+"Comprehend Entity Recognizer's model is not encrypted by KMS using a customer managed Key (CMK)",HIGH,AWS General Policies,CKV_AWS_267
+"Comprehend Entity Recognizer's volume is not encrypted by KMS using a customer managed Key (CMK)",HIGH,AWS General Policies,CKV_AWS_268
+"DataSync Location Object Storage exposes secrets",HIGH,AWS General Policies,CKV_AWS_295
+"DMS endpoint is not using a Customer Managed Key (CMK)",HIGH,AWS General Policies,CKV_AWS_296
+"DocDB Global Cluster is not encrypted at rest",HIGH,AWS General Policies,CKV_AWS_292
+"DynamoDB PITR is disabled",HIGH,AWS General Policies,CKV_AWS_28
+"DynamoDB table replica does not use CMK KMS encryption",HIGH,AWS General Policies,CKV_AWS_271
+"ECR image scan on push is not enabled",HIGH,AWS General Policies,CKV_AWS_163
+"EFS Access Points are not enforcing a root directory",HIGH,AWS General Policies,CKV_AWS_329
+"EFS volumes in ECS task definitions do not have encryption in transit enabled",HIGH,AWS General Policies,CKV_AWS_97
+"Elastic Beanstalk environments do not have enhanced health reporting enabled",HIGH,AWS General Policies,CKV_AWS_312
+"Elastic load balancers do not use SSL Certificates provided by AWS Certificate Manager",HIGH,AWS General Policies,CKV_AWS_127
+"EventBridge Scheduler Schedule is not using a Customer Managed Key (CMK)",HIGH,AWS General Policies,CKV_AWS_297
+"Glue Data Catalog encryption is not enabled",HIGH,AWS General Policies,CKV_AWS_94
+"MemoryDB snapshot is not encrypted by KMS using a customer managed Key (CMK)",HIGH,AWS General Policies,CKV_AWS_278
+"Neptune cluster instance is publicly available",HIGH,AWS General Policies,CKV_AWS_102
+"Neptune is not encrypted with KMS using a customer managed Key (CMK)",HIGH,AWS General Policies,CKV_AWS_347
+"Neptune snapshot is encrypted by KMS using a customer managed Key (CMK)",HIGH,AWS General Policies,CKV_AWS_280
+"Neptune snapshot is not securely encrypted",HIGH,AWS General Policies,CKV_AWS_279
+"Network firewall encryption does not use a CMK",HIGH,AWS General Policies,CKV_AWS_345
+"Network Firewall Policy does not define an encryption configuration that uses a CMK",HIGH,AWS General Policies,CKV_AWS_346
+"Network firewalls do not have deletion protection enabled",HIGH,AWS General Policies,CKV_AWS_344
+"Not all data stored in Aurora is securely encrypted at rest",HIGH,AWS General Policies,CKV_AWS_96
+"RDS Performance Insights are not encrypted using KMS CMKs",HIGH,AWS General Policies,CKV_AWS_354
+"Redshift Serverless namespace is not encrypted by KMS using a customer managed key (CMK)",HIGH,AWS General Policies,CKV_AWS_282
+"RedShift snapshot copy is not encrypted by KMS using a customer managed Key (CMK)",HIGH,AWS General Policies,CKV_AWS_281
+"Secrets Manager secrets are not rotated within 90 days",HIGH,AWS General Policies,CKV_AWS_304
+"Security configuration of the EMR Cluster does not ensure the encryption of EBS disks",HIGH,AWS General Policies,CKV_AWS_350
+"SQS queue policy is public and access is not restricted to specific services or principals",HIGH,AWS General Policies,CKV_AWS_168
+"SSM parameters are not utilizing KMS CMK",HIGH,AWS General Policies,CKV_AWS_337
+"The Connect Instance S3 Storage Configuration utilizes Customer Managed Key",HIGH,AWS General Policies,CKV_AWS_270
+"The DMS S3 does not use a Customer Managed Key (CMK)",HIGH,AWS General Policies,CKV_AWS_298
+"Transfer server does not force secure protocols",HIGH,AWS General Policies,CKV_AWS_357
+"ALB is not configured with the defensive or strictest desync mitigation mode",HIGH,AWS Networking Policies,CKV_AWS_328
+"Domain Name System Security Extensions (DNSSEC) signing is not enabled for Amazon Route 53 public hosted zones",HIGH,AWS Networking Policies,CKV2_AWS_38
+"MSK nodes are not private",HIGH,AWS Networking Policies,CKV_AWS_291
+"MWAA environment is publicly accessible",HIGH,AWS Networking Policies,CKV2_AWS_66
+"NACL ingress allows all ports",HIGH,AWS Networking Policies,CKV_AWS_352
+"WAF enables message lookup in Log4j2",HIGH,AWS Networking Policies,CKV_AWS_192
+"AWS EKS node group have implicit SSH access from 0.0.0.0/0",HIGH,AWS Kubernetes Policies,CKV_AWS_100
+"EKS clusters are not running on a supported Kubernetes version",HIGH,AWS Kubernetes Policies,CKV_AWS_339
+"Neptune logging is not enabled",HIGH,AWS Logging Policies,CKV_AWS_101
+"AWS S3 bucket ACL grants READ permission to everyone",HIGH,AWS S3 Policies,CKV_AWS_20
+"AWS S3 Bucket has an ACL defined which allows public WRITE access",HIGH,AWS S3 Policies,CKV_AWS_57
+"AWS access keys and secrets are hard coded in infrastructure",HIGH,AWS Secrets Policies,CKV_AWS_41
+"EC2 user data exposes secrets",HIGH,AWS Secrets Policies,CKV_AWS_46
+"A Policy is not Defined for KMS Key",MEDIUM,AWS IAM Policies,CKV2_AWS_64
+"Authorization type for API GatewayV2 routes is not specified",MEDIUM,AWS IAM Policies,CKV_AWS_309
+"AWS Cognito identity pool allows unauthenticated guest access",MEDIUM,AWS IAM Policies,CKV_AWS_366
+"AWS IAM policy allows full administrative privileges",MEDIUM,AWS IAM Policies,CKV2_AWS_40
+"AWS IAM Policy permission may cause privilege escalation",MEDIUM,AWS IAM Policies,CKV_AWS_286
+"AWS KMS Key policy overly permissive",MEDIUM,AWS IAM Policies,CKV_AWS_33
+"AWS S3 buckets are accessible to any authenticated user",MEDIUM,AWS IAM Policies,CKV2_AWS_43
+"IAM policies allow privilege escalation",MEDIUM,AWS IAM Policies,CKV_AWS_110
+"IAM User has access to the console",MEDIUM,AWS IAM Policies,CKV2_AWS_22
+"RDS database does not have IAM authentication enabled",MEDIUM,AWS IAM Policies,CKV_AWS_161
+"AWS Private ECR repository policy is overly permissive",MEDIUM,AWS Public Policies,CKV_AWS_32
+"AWS RDS database instance is publicly accessible",MEDIUM,AWS Public Policies,CKV_AWS_17
+"AWS Redshift cluster instance with public access setting enabled",MEDIUM,AWS Public Policies,CKV_AWS_87
+"Athena Database is not encrypted at rest",MEDIUM,AWS General Policies,CKV_AWS_77
+"Athena workgroup does not prevent disabling encryption",MEDIUM,AWS General Policies,CKV_AWS_82
+"Athena Workgroup is not encrypted",MEDIUM,AWS General Policies,CKV_AWS_159
+"AWS Auto Scaling group launch configuration configured with Instance Metadata Service hop count greater than 1",MEDIUM,AWS General Policies,CKV_AWS_341
+"AWS CloudFront attached WAFv2 WebACL is not configured with AMR for Log4j Vulnerability",MEDIUM,AWS General Policies,CKV2_AWS_47
+"AWS CloudFront distributions does not have a default root object configured",MEDIUM,AWS General Policies,CKV_AWS_305
+"AWS CodeBuild project environment privileged mode is enabled",MEDIUM,AWS General Policies,CKV_AWS_316
+"AWS database instances do not have deletion protection enabled",MEDIUM,AWS General Policies,CKV_AWS_293
+"AWS ECS task definition elevated privileges enabled",MEDIUM,AWS General Policies,CKV_AWS_334
+"AWS Lambda function URL AuthType set to NONE",MEDIUM,AWS General Policies,CKV_AWS_258
+"AWS MSK cluster encryption in transit is not enabled",MEDIUM,AWS General Policies,CKV_AWS_81
+"AWS RDS PostgreSQL exposed to local file read vulnerability",MEDIUM,AWS General Policies,CKV_AWS_250
+"AWS RDS snapshots are accessible to public",MEDIUM,AWS General Policies,CKV_AWS_302
+"AWS SageMaker Notebook Instance allows for IMDSv1",MEDIUM,AWS General Policies,CKV_AWS_371
+"AWS SNS topic has SSE disabled",MEDIUM,AWS General Policies,CKV_AWS_26
+"AWS SSM documents are public",MEDIUM,AWS General Policies,CKV_AWS_303
+"Backup Vault is not encrypted at rest using KMS CMK",MEDIUM,AWS General Policies,CKV_AWS_166
+"Bedrock Agent not encrypted with Customer Master Key (CMK)",MEDIUM,AWS General Policies,CKV_AWS_373
+"CloudFront distributions do not have origin failover configured",MEDIUM,AWS General Policies,CKV_AWS_310
+"CloudWatch alarm actions are not enabled",MEDIUM,AWS General Policies,CKV_AWS_319
+"CodeBuild project encryption is disabled",MEDIUM,AWS General Policies,CKV_AWS_78
+"CodeBuild projects are not encrypted",MEDIUM,AWS General Policies,CKV_AWS_147
+"Connect Instance Kinesis Video Stream Storage Config is not using CMK for encryption",MEDIUM,AWS General Policies,CKV_AWS_269
+"Deletion protection disabled for load balancer",MEDIUM,AWS General Policies,CKV_AWS_113
+"DocumentDB is not encrypted at rest",MEDIUM,AWS General Policies,CKV_AWS_74
+"Dynamodb point in time recovery is not enabled for global tables",MEDIUM,AWS General Policies,CKV_AWS_165
+"EC2 Auto Scaling groups are not utilizing EC2 launch templates",MEDIUM,AWS General Policies,CKV_AWS_315
+"ECS Fargate services are not ensured to run on the latest Fargate platform version",MEDIUM,AWS General Policies,CKV_AWS_332
+"ECS task definitions have their own unique process namespace or share the host's process namespace",MEDIUM,AWS General Policies,CKV_AWS_335
+"Elasticsearch domains are not configured with a minimum of three dedicated master nodes",MEDIUM,AWS General Policies,CKV_AWS_318
+"Glacier Vault access policy is public and not restricted to specific services or principals",MEDIUM,AWS General Policies,CKV_AWS_167
+"Hard-coded secrets found in Parameter Store values",MEDIUM,AWS General Policies,CKV_AWS_384
+"Neptune storage is not securely encrypted",MEDIUM,AWS General Policies,CKV_AWS_44
+"Not all data stored in the EBS snapshot is securely encrypted",MEDIUM,AWS General Policies,CKV_AWS_CUSTOM_3
+"QLDB ledger permissions mode is not set to STANDARD",MEDIUM,AWS General Policies,CKV_AWS_170
+"RDS Aurora Clusters do not have backtracking enabled",MEDIUM,AWS General Policies,CKV_AWS_326
+"Redshift clusters are not using enhanced VPC routing",MEDIUM,AWS General Policies,CKV_AWS_321
+"Redshift clusters are not using the default database name",MEDIUM,AWS General Policies,CKV_AWS_320
+"Route53 A Record does not have Attached Resource",MEDIUM,AWS General Policies,CKV2_AWS_23
+"Runtime of Lambda is deprecated",MEDIUM,AWS General Policies,CKV_AWS_363
+"S3 lifecycle configuration does not set a period for aborting failed uploads",MEDIUM,AWS General Policies,CKV_AWS_300
+"Session Manager data is not encrypted in transit",MEDIUM,AWS General Policies,CKV_AWS_112
+"SNS topic policy is public and access is not restricted to specific services or principals",MEDIUM,AWS General Policies,CKV_AWS_169
+"Timestream database is not encrypted with KMS CMK",MEDIUM,AWS General Policies,CKV_AWS_160
+"User identity should be enforced by EFS access points",MEDIUM,AWS General Policies,CKV_AWS_330
+"Workspace root volumes are not encrypted",MEDIUM,AWS General Policies,CKV_AWS_156
+"Workspace user volumes are not encrypted",MEDIUM,AWS General Policies,CKV_AWS_155
+"ALB does not drop HTTP headers",MEDIUM,AWS Networking Policies,CKV_AWS_131
+"AWS API Gateway method lacking authorization or API keys",MEDIUM,AWS Networking Policies,CKV2_AWS_70
+"AWS CloudFront distribution is using insecure SSL protocols for HTTPS communication",MEDIUM,AWS Networking Policies,CKV2_AWS_54
+"AWS CloudFront origin protocol policy does not enforce HTTPS-only",MEDIUM,AWS Networking Policies,CKV2_AWS_72
+"AWS CloudFront viewer protocol policy is not configured with HTTPS",MEDIUM,AWS Networking Policies,CKV_AWS_34
+"AWS Elastic Load Balancer v2 (ELBv2) listener that allow connection requests over HTTP",MEDIUM,AWS Networking Policies,CKV_AWS_2
+"AWS Lambda function URL having overly permissive cross-origin resource sharing permissions",MEDIUM,AWS Networking Policies,CKV2_AWS_75
+"AWS Load Balancer uses HTTP protocol",MEDIUM,AWS Networking Policies,CKV_AWS_378
+"AWS RDS database instance not configured with encryption in transit",MEDIUM,AWS Networking Policies,CKV2_AWS_69
+"AWS S3 bucket not configured with secure data transport policy",MEDIUM,AWS Networking Policies,CKV_AWS_379
+"AWS SageMaker model does not use network isolation",MEDIUM,AWS Networking Policies,CKV_AWS_370
+"AWS SageMaker notebook instance IAM policy is overly permissive",MEDIUM,AWS Networking Policies,CKV2_AWS_68
+"AWS Security Group allows all traffic on all ports",MEDIUM,AWS Networking Policies,CKV_AWS_277
+"AWS Transfer Server is publicly exposed",MEDIUM,AWS Networking Policies,CKV_AWS_164
+"DocDB TLS is disabled",MEDIUM,AWS Networking Policies,CKV_AWS_90
+"Public API gateway not configured with AWS Web Application Firewall v2 (AWS WAFv2)",MEDIUM,AWS Networking Policies,CKV2_AWS_29
+"TLS not enforced in SES configuration set",MEDIUM,AWS Networking Policies,CKV_AWS_365
+"AWS EKS cluster does not have secrets encryption enabled",MEDIUM,AWS Kubernetes Policies,CKV_AWS_58
+"Amazon MQ Broker logging is not enabled",MEDIUM,AWS Logging Policies,CKV_AWS_48
+"Amazon MSK cluster logging is not enabled",MEDIUM,AWS Logging Policies,CKV_AWS_80
+"An S3 bucket must have a lifecycle configuration",MEDIUM,AWS Logging Policies,CKV2_AWS_61
+"AWS config is not enabled in all regions",MEDIUM,AWS Logging Policies,CKV_AWS_121
+"AWS DocumentDB logging is not enabled",MEDIUM,AWS Logging Policies,CKV_AWS_85
+"AWS EC2 instance detailed monitoring disabled",MEDIUM,AWS Logging Policies,CKV_AWS_126
+"Elasticsearch Domain Audit Logging is disabled",MEDIUM,AWS Logging Policies,CKV_AWS_317
+"Execution history logging is not enabled on the State Machine",MEDIUM,AWS Logging Policies,CKV_AWS_285
+"RDS Cluster log capture is disabled",MEDIUM,AWS Logging Policies,CKV_AWS_324
+"AWS Elasticsearch does not have node-to-node encryption enabled",MEDIUM,AWS Elasticsearch Policies,CKV_AWS_6
+"AWS Elasticsearch domain is not configured with HTTPS",MEDIUM,AWS Elasticsearch Policies,CKV_AWS_83
+"AWS Elasticsearch domain logging is not enabled",MEDIUM,AWS Elasticsearch Policies,CKV_AWS_84
+"AWS S3 Bucket BlockPublicPolicy is not set to True",MEDIUM,AWS S3 Policies,CKV_AWS_54
+"AWS S3 bucket IgnorePublicAcls is not set to True",MEDIUM,AWS S3 Policies,CKV_AWS_55
+"AWS S3 bucket policy overly permissive to any principal",MEDIUM,AWS S3 Policies,CKV_AWS_70
+"AWS S3 bucket RestrictPublicBucket is not set to True",MEDIUM,AWS S3 Policies,CKV_AWS_56
+"AWS S3 Buckets has block public access setting disabled",MEDIUM,AWS S3 Policies,CKV_AWS_53
+"S3 bucket policy allows lockout all but root user",MEDIUM,AWS S3 Policies,CKV_AWS_93
+"Lambda function's environment variables expose secrets",MEDIUM,AWS Secrets Policies,CKV_AWS_45
+"Access is not controlled through Single Sign-On (SSO)",LOW,AWS IAM Policies,CKV_AWS_273
+"AWS Cloudfront Distribution with S3 have Origin Access set to disabled",LOW,AWS IAM Policies,CKV2_AWS_46
+"AWS Execution Role ARN and Task Role ARN are different in ECS Task definitions",LOW,AWS IAM Policies,CKV_AWS_249
+"AWS IAM password policy does not have a number",LOW,AWS IAM Policies,CKV_AWS_12
+"AWS IAM policies that allow full administrative privileges are created",LOW,AWS IAM Policies,CKV_AWS_1
+"AWS IAM policy attached to users",LOW,AWS IAM Policies,CKV_AWS_40
+"AWS Neptune Cluster not configured with IAM authentication",LOW,AWS IAM Policies,CKV_AWS_359
+"AWS OpenSearch Fine-grained access control is disabled",LOW,AWS IAM Policies,CKV2_AWS_52
+"AWS RDS cluster not configured with IAM authentication",LOW,AWS IAM Policies,CKV_AWS_162
+"Credentials exposure actions return credentials in an API response",LOW,AWS IAM Policies,CKV_AWS_107
+"Data exfiltration allowed without resource constraints",LOW,AWS IAM Policies,CKV_AWS_108
+"IAM authentication for Amazon RDS clusters is disabled",LOW,AWS IAM Policies,CKV_AWS_128
+"Not all IAM users are members of at least one IAM group",LOW,AWS IAM Policies,CKV2_AWS_21
+"Resource exposure allows modification of policies and exposes resources",LOW,AWS IAM Policies,CKV_AWS_109
+"Respective logs of Amazon RDS are disabled",LOW,AWS IAM Policies,CKV_AWS_129
+"Write access allowed without constraint",LOW,AWS IAM Policies,CKV_AWS_111
+"AWS API gateway methods are publicly accessible",LOW,AWS Public Policies,CKV_AWS_59
+"AWS DMS replication instance is publicly accessible",LOW,AWS Public Policies,CKV_AWS_89
+"AWS MQ is publicly accessible",LOW,AWS Public Policies,CKV_AWS_69
+"Alibaba Cloud MongoDB is not deployed inside a VPC",LOW,AWS General Policies,CKV_ALI_41
+"Amazon EFS does not have an AWS Backup backup plan",LOW,AWS General Policies,CKV2_AWS_18
+"Autoscaling groups did not supply tags to launch configurations",LOW,AWS General Policies,CKV_AWS_153
+"AWS ACM certificates does not have logging preference",LOW,AWS General Policies,CKV_AWS_234
+"AWS all data stored in the Elasticsearch domain is not encrypted using a Customer Managed Key (CMK)",LOW,AWS General Policies,CKV_AWS_247
+"AWS AMI copying does not use a Customer Managed Key (CMK)",LOW,AWS General Policies,CKV_AWS_236
+"AWS AMI launch permissions are not limited",LOW,AWS General Policies,CKV_AWS_205
+"AWS AMIs are not encrypted by Key Management Service (KMS) using Customer Managed Keys (CMKs)",LOW,AWS General Policies,CKV_AWS_204
+"AWS API deployments do not enable Create before Destroy",LOW,AWS General Policies,CKV_AWS_217
+"AWS API Gateway caching is disabled",LOW,AWS General Policies,CKV_AWS_120
+"AWS API Gateway Domain does not use a modern security policy",LOW,AWS General Policies,CKV_AWS_206
+"AWS API Gateway endpoints without client certificate authentication",LOW,AWS General Policies,CKV2_AWS_51
+"AWS API Gateway method settings do not enable caching",LOW,AWS General Policies,CKV_AWS_225
+"AWS API gateway request parameter is not validated",LOW,AWS General Policies,CKV2_AWS_53
+"AWS App Flow connector profile does not use Customer Managed Keys (CMKs)",LOW,AWS General Policies,CKV_AWS_264
+"AWS App Flow flow does not use Customer Managed Keys (CMKs)",LOW,AWS General Policies,CKV_AWS_263
+"AWS Appsync API Cache is not encrypted at rest",LOW,AWS General Policies,CKV_AWS_214
+"AWS Appsync API Cache is not encrypted in transit",LOW,AWS General Policies,CKV_AWS_215
+"AWS AppSync is not protected by WAF",LOW,AWS General Policies,CKV2_AWS_33
+"AWS AppSync's logging is disabled",LOW,AWS General Policies,CKV_AWS_193
+"AWS Batch Job is defined as a privileged container",LOW,AWS General Policies,CKV_AWS_210
+"AWS Bedrock agent is not associated with Bedrock guardrails",LOW,AWS General Policies,CKV_AWS_383
+"AWS Cloudfront distribution is disabled",LOW,AWS General Policies,CKV_AWS_216
+"AWS CloudFront response header policy does not enforce Strict Transport Security",LOW,AWS General Policies,CKV_AWS_259
+"AWS Cloudsearch does not use HTTPs",LOW,AWS General Policies,CKV_AWS_220
+"AWS Cloudsearch does not use the latest (Transport Layer Security) TLS",LOW,AWS General Policies,CKV_AWS_218
+"AWS CloudTrail does not define an SNS Topic",LOW,AWS General Policies,CKV_AWS_252
+"AWS CloudWatch Log groups encrypted using default encryption key instead of KMS CMK",LOW,AWS General Policies,CKV_AWS_158
+"AWS cluster logging is not enabled or client to container communication not encrypted using a Customer Managed Key (CMK)",LOW,AWS General Policies,CKV_AWS_224
+"AWS Code Artifact Domain is not encrypted by KMS using a Customer Managed Key (CMK)",LOW,AWS General Policies,CKV_AWS_221
+"AWS Codecommit branch changes has less than 2 approvals",LOW,AWS General Policies,CKV_AWS_257
+"AWS Codecommit is not associated with an approval rule",LOW,AWS General Policies,CKV2_AWS_37
+"AWS CodeGuru Reviewer repository association does not use a Customer Managed Key (CMK)",LOW,AWS General Policies,CKV_AWS_381
+"AWS CodePipeline artifactStore is not encrypted by Key Management Service (KMS) using a Customer Managed Key (CMK)",LOW,AWS General Policies,CKV_AWS_219
+"AWS copied AMIs are not encrypted",LOW,AWS General Policies,CKV_AWS_235
+"AWS DAX cluster endpoint does not use TLS (Transport Layer Security)",LOW,AWS General Policies,CKV_AWS_239
+"AWS DB instance does not get all minor upgrades automatically",LOW,AWS General Policies,CKV_AWS_226
+"AWS DLM cross-region events are not encrypted",LOW,AWS General Policies,CKV_AWS_253
+"AWS DLM cross-region events are not encrypted with a Customer Managed Key (CMK)",LOW,AWS General Policies,CKV_AWS_254
+"AWS DLM cross-region schedules are not encrypted using a Customer Managed Key (CMK)",LOW,AWS General Policies,CKV_AWS_256
+"AWS DLM-cross region schedules are not encrypted",LOW,AWS General Policies,CKV_AWS_255
+"AWS DMS replication instance automatic version upgrade disabled",LOW,AWS General Policies,CKV_AWS_222
+"AWS Doc DB not encrypted using Customer Managed Key",LOW,AWS General Policies,CKV_AWS_182
+"AWS DocumentDB clusters have backup retention period less than 7 days",LOW,AWS General Policies,CKV_AWS_360
+"AWS EBS Snapshot Copy not encrypted using Customer Managed Key",LOW,AWS General Policies,CKV_AWS_183
+"AWS EBS Volume is not encrypted by Key Management Service (KMS) using a Customer Managed Key (CMK)",LOW,AWS General Policies,CKV_AWS_212
+"AWS EBS Volume not encrypted using Customer Managed Key",LOW,AWS General Policies,CKV_AWS_189
+"AWS EBS volume region with encryption is disabled",LOW,AWS General Policies,CKV_AWS_106
+"AWS ECS Cluster does not enable logging of ECS Exec",LOW,AWS General Policies,CKV_AWS_223
+"AWS Elastic File System (EFS) is not encrypted using Customer Managed Key",LOW,AWS General Policies,CKV_AWS_184
+"AWS Elastic File System (EFS) with encryption for data at rest is disabled",LOW,AWS General Policies,CKV_AWS_42
+"AWS Elastic Load Balancer v2 with deletion protection feature disabled",LOW,AWS General Policies,CKV_AWS_150
+"AWS ElastiCache Redis cluster with encryption for data at rest disabled",LOW,AWS General Policies,CKV_AWS_29
+"AWS ElastiCache Redis cluster with in-transit encryption disabled (Replication group)",LOW,AWS General Policies,CKV_AWS_30
+"AWS ElastiCache Redis cluster with Redis AUTH feature disabled",LOW,AWS General Policies,CKV_AWS_31
+"AWS Elasticache replication group not configured with CMK key",LOW,AWS General Policies,CKV_AWS_191
+"AWS Elasticsearch domain does not use an updated TLS policy",LOW,AWS General Policies,CKV_AWS_228
+"AWS Elasticsearch domain has Dedicated master set to disabled",LOW,AWS General Policies,CKV2_AWS_59
+"AWS EMR cluster is not configured with Kerberos Authentication",LOW,AWS General Policies,CKV_AWS_114
+"AWS EMR cluster is not configured with SSE KMS for data at rest encryption (Amazon S3 with EMRFS)",LOW,AWS General Policies,CKV_AWS_171
+"AWS EMR cluster is not enabled with data encryption in transit",LOW,AWS General Policies,CKV_AWS_351
+"AWS EMR cluster is not enabled with local disk encryption",LOW,AWS General Policies,CKV_AWS_349
+"AWS Execution Role ARN and Task Role ARN are different in ECS Task definitions",LOW,AWS General Policies,CKV_AWS_249
+"AWS FSX openzfs is not encrypted by AWS' Key Management Service (KMS) using a Customer Managed Key (CMK)",LOW,AWS General Policies,CKV_AWS_203
+"AWS FSX Windows filesystem not encrypted using Customer Managed Key",LOW,AWS General Policies,CKV_AWS_179
+"AWS fx ontap file system not encrypted using Customer Managed Key",LOW,AWS General Policies,CKV_AWS_178
+"AWS Glue component is not associated with a security configuration",LOW,AWS General Policies,CKV_AWS_195
+"AWS HTTP and HTTPS target groups do not define health check",LOW,AWS General Policies,CKV_AWS_261
+"AWS Image Builder component not encrypted using Customer Managed Key",LOW,AWS General Policies,CKV_AWS_180
+"AWS Image Builder Distribution Configuration is not encrypting AMI by Key Management Service (KMS) using a Customer Managed Key (CMK)",LOW,AWS General Policies,CKV_AWS_199
+"AWS Image Recipe EBS Disk are not encrypted using a Customer Managed Key (CMK)",LOW,AWS General Policies,CKV_AWS_200
+"AWS Kendra index Server side encryption does not use Customer Managed Keys (CMKs)",LOW,AWS General Policies,CKV_AWS_262
+"AWS Key Management Service (KMS) key is disabled",LOW,AWS General Policies,CKV_AWS_227
+"AWS Keyspace Table does not use Customer Managed Keys (CMKs)",LOW,AWS General Policies,CKV_AWS_265
+"AWS Kinesis Firehose Delivery Streams are not encrypted with CMK",LOW,AWS General Policies,CKV_AWS_241
+"AWS Kinesis Firehose's delivery stream is not encrypted",LOW,AWS General Policies,CKV_AWS_240
+"AWS Kinesis streams are not encrypted using Server Side Encryption",LOW,AWS General Policies,CKV_AWS_43
+"AWS Kinesis streams encryption is using default KMS keys instead of Customer's Managed Master Keys",LOW,AWS General Policies,CKV_AWS_185
+"AWS Kinesis Video Stream not encrypted using Customer Managed Key",LOW,AWS General Policies,CKV_AWS_177
+"AWS Lambda Function is not assigned to access within VPC",LOW,AWS General Policies,CKV_AWS_117
+"AWS Lambda function is not configured for a DLQ",LOW,AWS General Policies,CKV_AWS_116
+"AWS Lambda function is not configured for function-level concurrent execution Limit",LOW,AWS General Policies,CKV_AWS_115
+"AWS Lambda Function resource-based policy is overly permissive",LOW,AWS General Policies,CKV_AWS_301
+"AWS lustre file system not configured with CMK key",LOW,AWS General Policies,CKV_AWS_190
+"AWS MemoryDB data is not encrypted in transit",LOW,AWS General Policies,CKV_AWS_202
+"AWS MemoryDB is not encrypted at rest by AWS' Key Management Service KMS using CMKs",LOW,AWS General Policies,CKV_AWS_201
+"AWS MQ Broker is not encrypted by Customer Managed Key (CMK)",LOW,AWS General Policies,CKV_AWS_209
+"AWS MQBroker audit logging is disabled",LOW,AWS General Policies,CKV_AWS_197
+"AWS MQBroker version is not up to date",LOW,AWS General Policies,CKV_AWS_208
+"AWS MQBroker's minor version updates are disabled",LOW,AWS General Policies,CKV_AWS_207
+"AWS MWAA environment has scheduler logs disabled",LOW,AWS General Policies,CKV_AWS_242
+"AWS MWAA environment has webserver logs disabled",LOW,AWS General Policies,CKV_AWS_244
+"AWS MWAA environment has worker logs disabled",LOW,AWS General Policies,CKV_AWS_243
+"AWS Postgres RDS have Query Logging disabled",LOW,AWS General Policies,CKV2_AWS_30
+"AWS QLDB ledger has deletion protection is disabled",LOW,AWS General Policies,CKV_AWS_172
+"AWS RDS Cluster activity streams are not encrypted by Key Management Service (KMS) using Customer Managed Keys (CMKs)",LOW,AWS General Policies,CKV_AWS_246
+"AWS RDS DB cluster encryption is disabled",LOW,AWS General Policies,CKV_AWS_16
+"AWS RDS DB snapshot does not use Customer Managed Keys (CMKs)",LOW,AWS General Policies,CKV_AWS_266
+"AWS RDS DB snapshot is not encrypted",LOW,AWS General Policies,CKV_AWS_146
+"AWS RDS does not use a modern CaCert",LOW,AWS General Policies,CKV_AWS_211
+"AWS RDS instance without Automatic Backup setting",LOW,AWS General Policies,CKV_AWS_133
+"AWS Redshift does not have require_ssl configured",LOW,AWS General Policies,CKV_AWS_105
+"AWS Redshift instances are not encrypted",LOW,AWS General Policies,CKV_AWS_64
+"AWS replicated backups are not encrypted at rest by Key Management Service (KMS) using a Customer Managed Key (CMK)",LOW,AWS General Policies,CKV_AWS_245
+"AWS resources that support tags do not have Tags",LOW,AWS General Policies,CKV_AWS_CUSTOM_1
+"AWS S3 bucket access control lists (ACLs) in use",LOW,AWS General Policies,CKV2_AWS_65
+"AWS S3 bucket Object not encrypted using Customer Managed Key",LOW,AWS General Policies,CKV_AWS_186
+"AWS S3 Object Copy not encrypted using Customer Managed Key",LOW,AWS General Policies,CKV_AWS_181
+"AWS Sagemaker Data Quality Job not encrypting communications between instances used for monitoring jobs",LOW,AWS General Policies,CKV_AWS_369
+"AWS Sagemaker data quality job not encrypting model artifacts with KMS",LOW,AWS General Policies,CKV_AWS_367
+"AWS Sagemaker Data Quality Job not using KMS to encrypt data on attached storage volume",LOW,AWS General Policies,CKV_AWS_368
+"AWS Sagemaker domain not encrypted using Customer Managed Key",LOW,AWS General Policies,CKV_AWS_187
+"AWS SageMaker Flow Definition does not use KMS for output configurations",LOW,AWS General Policies,CKV_AWS_372
+"AWS SageMaker notebook instance not configured with data encryption at rest using KMS key",LOW,AWS General Policies,CKV_AWS_22
+"AWS Secret Manager Automatic Key Rotation is not enabled",LOW,AWS General Policies,CKV2_AWS_57
+"AWS Secrets Manager secret not encrypted by Customer Managed Key (CMK)",LOW,AWS General Policies,CKV_AWS_149
+"AWS SQS Queue not configured with server side encryption",LOW,AWS General Policies,CKV_AWS_27
+"AWS SSM Parameter is not encrypted",LOW,AWS General Policies,CKV2_AWS_34
+"AWS Terraform sends SSM secrets to untrusted domains over HTTP",LOW,AWS General Policies,CKV2_AWS_36
+"AWS Transit Gateway auto accept vpc attachment is enabled",LOW,AWS General Policies,CKV_AWS_331
+"Clusters of Neptune DB do not replicate tags to snapshots",LOW,AWS General Policies,CKV_AWS_362
+"DocDB does not have audit logs enabled",LOW,AWS General Policies,CKV_AWS_104
+"EBS does not have an AWS Backup backup plan",LOW,AWS General Policies,CKV2_AWS_9
+"EC2 EBS is not optimized",LOW,AWS General Policies,CKV_AWS_135
+"ECR image tags are not immutable",LOW,AWS General Policies,CKV_AWS_51
+"Ensure AWS API gateway enables Create before Destroy",LOW,AWS General Policies,CKV_AWS_237
+"GuardDuty is not enabled to specific org/region",LOW,AWS General Policies,CKV2_AWS_3
+"Not only encrypted EBS volumes are attached to EC2 instances",LOW,AWS General Policies,CKV2_AWS_2
+"RDS cluster is not configured to copy tags to snapshots",LOW,AWS General Policies,CKV_AWS_313
+"RDS clusters do not have an AWS Backup backup plan",LOW,AWS General Policies,CKV2_AWS_8
+"RDS instances do not have Multi-AZ enabled",LOW,AWS General Policies,CKV_AWS_157
+"Redshift clusters version upgrade is not default",LOW,AWS General Policies,CKV_AWS_141
+"S3 bucket cross-region replication disabled",LOW,AWS General Policies,CKV_AWS_144
+"S3 bucket lock configuration disabled",LOW,AWS General Policies,CKV_AWS_143
+"S3 buckets are not encrypted with KMS",LOW,AWS General Policies,CKV_AWS_145
+"Unencrypted ECR repositories",LOW,AWS General Policies,CKV_AWS_136
+"Unencrypted RDS global clusters",LOW,AWS General Policies,CKV_AWS_140
+"WAF rule does not have any actions",LOW,AWS General Policies,CKV_AWS_342
+"ALB does not redirect HTTP requests into HTTPS ones",LOW,AWS Networking Policies,CKV2_AWS_20
+"Amazon EMR clusters' security groups are open to the world",LOW,AWS Networking Policies,CKV2_AWS_7
+"Auto scaling groups associated with a load balancer do not use elastic load balancing health checks",LOW,AWS Networking Policies,CKV2_AWS_15
+"AWS ACM certificate does not enable Create before Destroy",LOW,AWS Networking Policies,CKV_AWS_233
+"AWS ACM Certificate with wildcard domain name",LOW,AWS Networking Policies,CKV2_AWS_71
+"AWS Application Load Balancer (ALB) not configured with AWS Web Application Firewall v2 (AWS WAFv2)",LOW,AWS Networking Policies,CKV2_AWS_28
+"AWS CloudFront distribution does not have a strict security headers policy attached",LOW,AWS Networking Policies,CKV2_AWS_32
+"AWS CloudFront web distribution using insecure TLS version",LOW,AWS Networking Policies,CKV_AWS_174
+"AWS CloudFront web distribution with default SSL certificate",LOW,AWS Networking Policies,CKV2_AWS_42
+"AWS CloudFront web distribution with geo restriction disabled",LOW,AWS Networking Policies,CKV_AWS_374
+"AWS Database Migration Service endpoint do not have SSL configured",LOW,AWS Networking Policies,CKV2_AWS_49
+"AWS Default Security Group does not restrict all traffic",LOW,AWS Networking Policies,CKV2_AWS_12
+"AWS Elastic Load Balancer (Classic) with cross-zone load balancing disabled",LOW,AWS Networking Policies,CKV_AWS_138
+"AWS Elastic Load Balancer with listener TLS/SSL is not configured",LOW,AWS Networking Policies,CKV_AWS_376
+"AWS Elasticache security groups are not defined",LOW,AWS Networking Policies,CKV_AWS_196
+"AWS Elasticsearch is not configured inside a VPC",LOW,AWS Networking Policies,CKV_AWS_137
+"AWS Elasticsearch uses the default security group",LOW,AWS Networking Policies,CKV_AWS_248
+"AWS ELB Policy uses some unsecure protocols",LOW,AWS Networking Policies,CKV_AWS_213
+"AWS Load Balancers do not use strong ciphers",LOW,AWS Networking Policies,CKV2_AWS_74
+"AWS NACL allows ingress from 0.0.0.0/0 to port 20",LOW,AWS Networking Policies,CKV_AWS_230
+"AWS NACL allows ingress from 0.0.0.0/0 to port 21",LOW,AWS Networking Policies,CKV_AWS_229
+"AWS NACL allows ingress from 0.0.0.0/0 to port 22",LOW,AWS Networking Policies,CKV_AWS_232
+"AWS NACL allows ingress from 0.0.0.0/0 to port 3389",LOW,AWS Networking Policies,CKV_AWS_231
+"AWS NAT Gateways are not utilized for the default route",LOW,AWS Networking Policies,CKV2_AWS_35
+"AWS RDS security groups are not defined",LOW,AWS Networking Policies,CKV_AWS_198
+"AWS Redshift cluster is publicly accessible",LOW,AWS Networking Policies,CKV_AWS_87
+"AWS route table with VPC peering overly permissive to all traffic",LOW,AWS Networking Policies,CKV2_AWS_44
+"AWS S3 bucket has global view ACL permissions enabled",LOW,AWS Networking Policies,CKV_AWS_375
+"AWS SageMaker notebook instance configured with direct internet access feature",LOW,AWS Networking Policies,CKV_AWS_122
+"AWS Security Group allows unrestricted egress traffic",LOW,AWS Networking Policies,CKV_AWS_382
+"AWS security groups allow ingress from 0.0.0.0/0 to port 80",LOW,AWS Networking Policies,CKV_AWS_260
+"AWS Transfer Server not using latest Security Policy",LOW,AWS Networking Policies,CKV_AWS_380
+"AWS VPC subnets should not allow automatic public IP assignment",LOW,AWS Networking Policies,CKV_AWS_130
+"AWS WAF does not have associated rules",LOW,AWS Networking Policies,CKV_AWS_175
+"Default VPC is planned to be provisioned",LOW,AWS Networking Policies,CKV_AWS_148
+"ElastiCache cluster is using the default subnet group",LOW,AWS Networking Policies,CKV_AWS_323
+"Not all EIP addresses allocated to a VPC are attached to EC2 instances",LOW,AWS Networking Policies,CKV2_AWS_19
+"Not every Security Group rule has a description",LOW,AWS Networking Policies,CKV_AWS_23
+"Redshift is deployed outside of a VPC",LOW,AWS Networking Policies,CKV_AWS_154
+"Route 53 domains do not have transfer lock protection",LOW,AWS Networking Policies,CKV_AWS_377
+"S3 Bucket does not have public access blocks",LOW,AWS Networking Policies,CKV2_AWS_6
+"Security Groups are not attached to EC2 instances or ENIs",LOW,AWS Networking Policies,CKV2_AWS_5
+"VPC endpoint service is not configured for manual acceptance",LOW,AWS Networking Policies,CKV_AWS_123
+"AWS EKS cluster endpoint access publicly enabled",LOW,AWS Kubernetes Policies,CKV_AWS_39
+"AWS EKS cluster security group overly permissive to all traffic",LOW,AWS Kubernetes Policies,CKV_AWS_38
+"API Gateway does not have access logging enabled",LOW,AWS Logging Policies,CKV_AWS_76
+"API Gateway does not have X-Ray tracing enabled",LOW,AWS Logging Policies,CKV_AWS_73
+"API Gateway stage does not have logging level defined appropriately",LOW,AWS Logging Policies,CKV2_AWS_4
+"AWS Amazon RDS instances Enhanced Monitoring is disabled",LOW,AWS Logging Policies,CKV_AWS_118
+"AWS API Gateway V2 has Access Logging is disabled",LOW,AWS Logging Policies,CKV_AWS_95
+"AWS CloudFormation stack configured without SNS topic",LOW,AWS Logging Policies,CKV_AWS_124
+"AWS CloudTrail log validation is not enabled in all regions",LOW,AWS Logging Policies,CKV_AWS_36
+"AWS CloudWatch Log groups not configured with definite retention days",LOW,AWS Logging Policies,CKV_AWS_66
+"AWS ECS cluster with container insights feature disabled",LOW,AWS Logging Policies,CKV_AWS_65
+"AWS ECS services have automatic public IP address assignment enabled",LOW,AWS Logging Policies,CKV_AWS_333
+"AWS Postgres RDS have Query Logging disabled",LOW,AWS Logging Policies,CKV2_AWS_30
+"AWS WAF Web Access Control Lists logging is disabled",LOW,AWS Logging Policies,CKV_AWS_176
+"AWS WAF2 does not have a Logging Configuration",LOW,AWS Logging Policies,CKV2_AWS_31
+"Data Trace is not enabled in the API Gateway Method Settings",LOW,AWS Logging Policies,CKV_AWS_276
+"Domain Name System (DNS) query logging is not enabled for Amazon Route 53 hosted zones",LOW,AWS Logging Policies,CKV2_AWS_39
+"Global Accelerator does not have Flow logs enabled",LOW,AWS Logging Policies,CKV_AWS_75
+"RDS Cluster audit logging for MySQL engine is disabled",LOW,AWS Logging Policies,CKV_AWS_325
+"RDS instances have performance insights disabled",LOW,AWS Logging Policies,CKV_AWS_353
+"S3 buckets do not have event notifications enabled",LOW,AWS Logging Policies,CKV2_AWS_62
+"State machine does not have X-ray tracing enabled",LOW,AWS Logging Policies,CKV_AWS_284
+"AWS Elasticsearch domain Encryption for data at rest is disabled",LOW,AWS Elasticsearch Policies,CKV_AWS_5
+"AWS S3 buckets do not have server side encryption",LOW,AWS S3 Policies,CKV_AWS_19
+"AWS S3 Object Versioning is disabled",LOW,AWS S3 Policies,CKV_AWS_21
+"AWS Lambda encryption settings environmental variable is not set properly",LOW,AWS Serverless Policies,CKV_AWS_173
+"AWS Lambda functions with tracing not enabled",LOW,AWS Serverless Policies,CKV_AWS_50
+"AWS EC2 Instance IAM Role not enabled",INFO,AWS IAM Policies,CKV2_AWS_41
+"AWS IAM group not in use",INFO,AWS IAM Policies,CKV2_AWS_14
+"AWS IAM password policy does not expire in 90 days",INFO,AWS IAM Policies,CKV_AWS_9
+"AWS IAM password policy does not have a lowercase character",INFO,AWS IAM Policies,CKV_AWS_11
+"AWS IAM password policy does not have a minimum of 14 characters",INFO,AWS IAM Policies,CKV_AWS_10
+"AWS IAM password policy does not have a symbol",INFO,AWS IAM Policies,CKV_AWS_14
+"AWS IAM password policy does not have an uppercase character",INFO,AWS IAM Policies,CKV_AWS_15
+"SQS policy allows all actions",INFO,AWS IAM Policies,CKV_AWS_72
+"AWS AppSync has field-level logging disabled",INFO,AWS General Policies,CKV_AWS_194
+"AWS CloudFront web distribution with AWS Web Application Firewall (AWS WAF) service disabled",INFO,AWS General Policies,CKV_AWS_68
+"AWS CloudTrail logging is disabled",INFO,AWS General Policies,CKV_AWS_251
+"AWS Config must record all possible resources",INFO,AWS General Policies,CKV2_AWS_48
+"AWS Config Recording is disabled",INFO,AWS General Policies,CKV2_AWS_45
+"AWS DAX cluster not configured with encryption at rest",INFO,AWS General Policies,CKV_AWS_47
+"AWS DynamoDB encrypted using AWS owned CMK instead of AWS managed CMK",INFO,AWS General Policies,CKV_AWS_119
+"AWS DynamoDB table Auto Scaling not enabled",INFO,AWS General Policies,CKV2_AWS_16
+"AWS EC2 Auto Scaling Launch Configuration is not using encrypted EBS volumes",INFO,AWS General Policies,CKV_AWS_8
+"AWS ECS task definition is not configured with read-only access to container root filesystems",INFO,AWS General Policies,CKV_AWS_336
+"AWS Elastic Beanstalk environment managed platform updates are not enabled",INFO,AWS General Policies,CKV_AWS_340
+"AWS ElastiCache Redis cluster automatic version upgrade disabled",INFO,AWS General Policies,CKV_AWS_322
+"AWS ElastiCache Redis cluster is not configured with automatic backup",INFO,AWS General Policies,CKV_AWS_134
+"AWS ElastiCache Redis cluster with Multi-AZ Automatic Failover feature set to disabled",INFO,AWS General Policies,CKV2_AWS_50
+"AWS EMR cluster is not configured with security configuration",INFO,AWS General Policies,CKV2_AWS_55
+"AWS GuardDuty detector is not enabled",INFO,AWS General Policies,CKV_AWS_238
+"AWS Neptune cluster deletion protection is disabled",INFO,AWS General Policies,CKV2_AWS_58
+"AWS Neptune DB clusters have backup retention period less than 7 days",INFO,AWS General Policies,CKV_AWS_361
+"AWS RDS cluster delete protection is disabled",INFO,AWS General Policies,CKV_AWS_139
+"AWS RDS DB cluster is encrypted using default KMS key instead of CMK",INFO,AWS General Policies,CKV_AWS_327
+"AWS RDS instance with copy tags to snapshots disabled",INFO,AWS General Policies,CKV2_AWS_60
+"AWS RDS Postgres Cluster does not have query logging enabled",INFO,AWS General Policies,CKV2_AWS_27
+"AWS Redshift Cluster not encrypted using Customer Managed Key",INFO,AWS General Policies,CKV_AWS_142
+"AWS SageMaker notebook instance with root access enabled",INFO,AWS General Policies,CKV_AWS_307
+"AWS SQS queue access policy is overly permissive",INFO,AWS General Policies,CKV_AWS_387
+"AWS SQS queue encryption using default KMS key instead of CMK",INFO,AWS General Policies,CKV2_AWS_73
+"CloudTrail Event Data Store does not use Customer Managed Keys (CMKs)",INFO,AWS General Policies,CKV_AWS_294
+"AWS Elastic Load Balancer v2 (ELBv2) with cross-zone load balancing disabled",INFO,AWS Networking Policies,CKV_AWS_152
+"AWS Network ACL is not in use",INFO,AWS Networking Policies,CKV2_AWS_1
+"AWS SageMaker notebook instance is not placed in VPC",INFO,AWS Networking Policies,CKV_AWS_306
+"AWS Security Group allows all traffic on RDP port (3389)",INFO,AWS Networking Policies,CKV_AWS_25
+"AWS Security Group allows all traffic on SSH port (22)",INFO,AWS Networking Policies,CKV_AWS_24
+"AWS EKS control plane logging disabled",INFO,AWS Kubernetes Policies,CKV_AWS_37
+"AWS CloudFront distribution with access logging disabled",INFO,AWS Logging Policies,CKV_AWS_86
+"AWS CloudTrail is not enabled with multi trail and not capturing all management events",INFO,AWS Logging Policies,CKV_AWS_67
+"AWS CloudTrail logs are not encrypted using Customer Master Keys (CMKs)",INFO,AWS Logging Policies,CKV_AWS_35
+"AWS CloudTrail trail logs is not integrated with CloudWatch Log",INFO,AWS Logging Policies,CKV2_AWS_10
+"AWS CloudWatch log groups retention set to less than 365 days",INFO,AWS Logging Policies,CKV_AWS_338
+"AWS CodeBuild project not configured with logging configuration",INFO,AWS Logging Policies,CKV_AWS_314
+"AWS Customer Master Key (CMK) rotation is not enabled",INFO,AWS Logging Policies,CKV_AWS_7
+"AWS Elastic Load Balancer (Classic) with access log disabled",INFO,AWS Logging Policies,CKV_AWS_92
+"AWS Elastic Load Balancer v2 (ELBv2) with access log disabled",INFO,AWS Logging Policies,CKV_AWS_91
+"AWS Network Firewall is not configured with logging configuration",INFO,AWS Logging Policies,CKV2_AWS_63
+"AWS Redshift database does not have audit logging enabled",INFO,AWS Logging Policies,CKV_AWS_71
+"AWS VPC Flow Logs not enabled",INFO,AWS Logging Policies,CKV2_AWS_11
+"AWS Access logging not enabled on S3 buckets",INFO,AWS S3 Policies,CKV_AWS_18

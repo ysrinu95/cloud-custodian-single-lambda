@@ -56,7 +56,7 @@ policies:
           **Best Practice:** Always enable both at-rest and in-transit encryption for ElastiCache Redis clusters.
           {% endif %}
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -135,7 +135,7 @@ policies:
           **Best Practice:** Always enable both at-rest and in-transit encryption for ElastiCache Redis clusters.
           {% endif %}
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -184,7 +184,7 @@ policies:
           aws efs delete-file-system --file-system-id {{ resource.FileSystemId }}
           ```
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -238,7 +238,7 @@ policies:
           aws es delete-elasticsearch-domain --domain-name {{ resource.DomainName }}
           ```
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -281,7 +281,7 @@ policies:
             --key-id <kms-key-id>
           ```
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -336,7 +336,7 @@ policies:
             --snapshot-identifier {{ resource.ClusterIdentifier }}-encrypted
           ```
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -376,7 +376,7 @@ policies:
             --s3-key-prefix service=redshift/{{ resource.ClusterIdentifier }}/
           ```
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -413,7 +413,7 @@ policies:
             --attribute-value <kms-key-id>
           ```
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications

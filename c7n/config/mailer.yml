@@ -10,7 +10,7 @@ lambda_schedule: "rate(5 minutes)"
 # lambda function settings
 lambda_tags:
   # Contact and identification tags
-  contact: srinivasula.yallala@optum.com
+  contact: ysrinu95@gmail.com
   environment: engg
   repo: aikyam-everything-as-code
   

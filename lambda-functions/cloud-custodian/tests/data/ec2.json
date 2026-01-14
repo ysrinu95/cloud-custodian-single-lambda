@@ -34,7 +34,7 @@
                 "subject": "🚨 Public EC2 Instance Launched - Terminated - {{ account }} - {{ region }}",
                 "violation_desc": "**EC2 Instance Launched in Public Subnet - Automatically Terminated**\n\n**Instance ID:** {{ resource.InstanceId }}\n**Instance Type:** {{ resource.InstanceType }}\n**Public IP:** {{ resource.PublicIpAddress or \"N/A\" }}\n**Private IP:** {{ resource.PrivateIpAddress or \"N/A\" }}\n**VPC ID:** {{ resource.VpcId or \"N/A\" }}\n**Subnet ID:** {{ resource.SubnetId or \"N/A\" }}\n**Account:** {{ account }}\n**Region:** {{ region }}\n**Launch Time:** {{ resource.LaunchTime or \"N/A\" }}\n**State:** {{ resource.State.Name or \"terminated\" }}\n\n**Created By:** {% set creator = namespace(found=false, name='Unknown') %}{% for tag in resource.Tags %}{% if tag.Key == 'c7n:CreatorName' and not creator.found %}{% set creator.name = tag.Value %}{% set creator.found = true %}{% endif %}{% endfor %}{{ creator.name }}\n\n**Tags:**\n{% for tag in resource.Tags %}\n- {{ tag.Key }}: {{ tag.Value }}\n{% endfor %}\n\n**Risk:** EC2 instances with public IPs are directly accessible from the internet and increase attack surface.\n\n**Action Taken:** The instance has been automatically terminated.\n\n**Remediation:**\nTo expose an application or service publicly, use a load balancer in a public subnet that routes traffic internally.\n\n**Documentation:** https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-standards-fsbp-controls.html#ec2-9-remediation\n",
                 "to": [
-                    "srinivasula.yallala@optum.com"
+                    "ysrinu95@gmail.com"
                 ],
                 "transport": {
                     "type": "sqs",
@@ -294,7 +294,7 @@
         "subject": "🚨 Public EC2 Instance Launched - Terminated - {{ account }} - {{ region }}",
         "violation_desc": "**EC2 Instance Launched in Public Subnet - Automatically Terminated**\n\n**Instance ID:** {{ resource.InstanceId }}\n**Instance Type:** {{ resource.InstanceType }}\n**Public IP:** {{ resource.PublicIpAddress or \"N/A\" }}\n**Private IP:** {{ resource.PrivateIpAddress or \"N/A\" }}\n**VPC ID:** {{ resource.VpcId or \"N/A\" }}\n**Subnet ID:** {{ resource.SubnetId or \"N/A\" }}\n**Account:** {{ account }}\n**Region:** {{ region }}\n**Launch Time:** {{ resource.LaunchTime or \"N/A\" }}\n**State:** {{ resource.State.Name or \"terminated\" }}\n\n**Created By:** {% set creator = namespace(found=false, name='Unknown') %}{% for tag in resource.Tags %}{% if tag.Key == 'c7n:CreatorName' and not creator.found %}{% set creator.name = tag.Value %}{% set creator.found = true %}{% endif %}{% endfor %}{{ creator.name }}\n\n**Tags:**\n{% for tag in resource.Tags %}\n- {{ tag.Key }}: {{ tag.Value }}\n{% endfor %}\n\n**Risk:** EC2 instances with public IPs are directly accessible from the internet and increase attack surface.\n\n**Action Taken:** The instance has been automatically terminated.\n\n**Remediation:**\nTo expose an application or service publicly, use a load balancer in a public subnet that routes traffic internally.\n\n**Documentation:** https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-standards-fsbp-controls.html#ec2-9-remediation\n",
         "to": [
-            "srinivasula.yallala@optum.com"
+            "ysrinu95@gmail.com"
         ],
         "transport": {
             "type": "sqs",

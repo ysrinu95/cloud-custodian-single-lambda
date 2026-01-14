@@ -116,7 +116,7 @@ policies:
           Manual review required to determine if deletions are authorized.
         to:
           - cloud-custodian-alerts@company.com
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -290,7 +290,7 @@ policies:
         to:
           - cloud-custodian-alerts@company.com
           - billing-team@company.com
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -448,7 +448,7 @@ policies:
           Automated Response: Security team alerted for investigation.
         to:
           - cloud-custodian-alerts@company.com
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications

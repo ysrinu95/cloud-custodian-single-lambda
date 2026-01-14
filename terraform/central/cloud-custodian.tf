@@ -202,7 +202,7 @@ variable "mailer_layer_path" {
 variable "mailer_contact_email" {
   description = "Email address for mailer notifications (recipient)"
   type        = string
-  default     = "srinivasula.yallala@optum.com"
+  default     = "ysrinu95@gmail.com"
 }
 
 variable "mailer_from_address" {
@@ -900,7 +900,7 @@ resource "aws_lambda_function" "custodian_cross_account_executor" {
       service-tier     = "p1"
       
       # Contact and management tags
-      contact          = "srinivasula.yallala@optum.com"
+      contact          = "ysrinu95@gmail.com"
       environment      = var.environment
       managed-by       = "terraform"
       

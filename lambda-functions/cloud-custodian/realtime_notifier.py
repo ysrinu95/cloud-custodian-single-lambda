@@ -37,8 +37,8 @@ s3 = boto3.client('s3')
 REALTIME_QUEUE_URL = os.getenv('REALTIME_QUEUE_URL', '')
 SNS_TOPIC_ARN = os.getenv('SNS_TOPIC_ARN', 'arn:aws:sns:us-east-1:172327596604:custodian-mailer-notifications')
 NOTIFICATION_METHOD = os.getenv('NOTIFICATION_METHOD', 'sns')  # Options: 'sns', 'ses', 'both'
-FROM_ADDRESS = os.getenv('FROM_ADDRESS', 'c7n@central.ctkube.com')
-TO_ADDRESSES = os.getenv('TO_ADDRESSES', 'srinivasula.yallala@optum.com').split(',')
+FROM_ADDRESS = os.getenv('FROM_ADDRESS', 'ysrinu95@gmail.com')
+TO_ADDRESSES = os.getenv('TO_ADDRESSES', 'ysrinu95@gmail.com').split(',')
 TEMPLATES_BUCKET = os.getenv('TEMPLATES_BUCKET', '')
 SES_REGION = os.getenv('REGION', 'us-east-1')
 

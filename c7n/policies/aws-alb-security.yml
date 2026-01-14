@@ -41,7 +41,7 @@ policies:
           ```
           3. Then modify HTTP listener to redirect to HTTPS
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -101,7 +101,7 @@ policies:
             --default-actions Type=redirect,RedirectConfig='{Protocol=HTTPS,Port=443,StatusCode=HTTP_301}'
           ```
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -140,7 +140,7 @@ policies:
           ```
           {% endfor %}
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -259,7 +259,7 @@ policies:
             --default-actions Type=forward,TargetGroupArn=<target-group-arn>
           ```
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -300,7 +300,7 @@ policies:
             --ssl-policy ELBSecurityPolicy-TLS13-1-2-2021-06
           ```
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications

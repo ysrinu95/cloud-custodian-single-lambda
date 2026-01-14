@@ -76,7 +76,7 @@ policies:
           **Deprecated Versions (Do NOT use):**
           - TLSv1, TLSv1_2016, TLSv1.1_2016, SSLv3
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -170,7 +170,7 @@ policies:
           - Prefix must include `service=cloudfront`
           - Ensure bucket has appropriate ACL for CloudFront logging
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -249,7 +249,7 @@ policies:
           - `TLSv1.2_2019`
           - `TLSv1.2_2018` (Minimum)
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications

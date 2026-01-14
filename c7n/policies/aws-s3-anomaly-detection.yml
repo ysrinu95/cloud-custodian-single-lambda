@@ -65,7 +65,7 @@ policies:
           - Review AWS Backup for restore points
           
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -143,7 +143,7 @@ policies:
           6. Consider adding bucket policy IP restrictions
           
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -217,7 +217,7 @@ policies:
           
         to:
           - finops-team@example.com
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -279,7 +279,7 @@ policies:
           - Implement least privilege IAM policies
           
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications

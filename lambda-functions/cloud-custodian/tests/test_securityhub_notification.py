@@ -329,7 +329,7 @@ class TestSecurityHubNotification:
             print("\n" + "="*80)
             print("✅ LAMBDA INVOCATION SUCCESSFUL!")
             print("="*80)
-            print("\n📧 Check your email (srinivasula.yallala@optum.com) for the Security Hub notification")
+            print("\n📧 Check your email (ysrinu95@gmail.com) for the Security Hub notification")
             print("🔍 Check CloudWatch Logs: /aws/lambda/cloud-custodian-cross-account-executor")
             print("📊 Check SQS Queue: aikyam-cloud-custodian-realtime-notifications")
             print("\n" + "="*80 + "\n")

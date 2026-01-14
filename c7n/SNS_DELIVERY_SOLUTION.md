@@ -65,7 +65,7 @@ actions:
     template: default.html
     subject: "Security Alert"
     to:
-      - srinivasula.yallala@optum.com  # ❌ Direct email
+      - ysrinu95@gmail.com  # ❌ Direct email
     transport:
       type: sqs
       queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue

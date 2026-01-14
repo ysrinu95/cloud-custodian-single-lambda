@@ -50,7 +50,7 @@ policies:
           
           **Best Practice:** Always enable both at-rest and in-transit encryption for ElastiCache Redis clusters.
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications
@@ -111,7 +111,7 @@ policies:
           
           **Best Practice:** Always enable both at-rest and in-transit encryption for ElastiCache Redis clusters.
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications
@@ -172,7 +172,7 @@ policies:
           
           **Best Practice:** Always enable both at-rest and in-transit encryption for ElastiCache Redis clusters.
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications

@@ -1,0 +1,296 @@
+{
+  "Comment": "S3 Ransomware Incident Response State Machine - Orchestrates automated incident response through 5 phases",
+  "StartAt": "Phase1_DetectionTriage",
+  "States": {
+    "Phase1_DetectionTriage": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${detection_lambda_arn}",
+        "Payload.$": "$"
+      },
+      "ResultPath": "$",
+      "ResultSelector": {
+        "Payload.$": "$.Payload"
+      },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "NotifyFailure"
+        }
+      ],
+      "Next": "EvaluateSeverity"
+    },
+    
+    "EvaluateSeverity": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.severity",
+          "StringEquals": "CRITICAL",
+          "Next": "Phase2_Containment"
+        },
+        {
+          "Variable": "$.severity",
+          "StringEquals": "HIGH",
+          "Next": "Phase2_Containment"
+        },
+        {
+          "Variable": "$.status",
+          "StringEquals": "failed",
+          "Next": "NotifyFailure"
+        }
+      ],
+      "Default": "ManualReviewRequired"
+    },
+    
+    "ManualReviewRequired": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${sns_topic_arn}",
+        "Subject": "Manual Review Required for Incident",
+        "Message.$": "States.Format('Incident {} requires manual review.\nSeverity: {}\nBucket: {}\nRecommendation: {}', $.incidentId, $.severity, $.bucketName, $.recommendation)"
+      },
+      "ResultPath": "$.notificationResult",
+      "Next": "Phase2_Containment"
+    },
+    
+    "Phase2_Containment": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${containment_lambda_arn}",
+        "Payload.$": "$"
+      },
+      "ResultPath": "$",
+      "ResultSelector": {
+        "Payload.$": "$.Payload"
+      },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "NotifyFailure"
+        }
+      ],
+      "Next": "WaitForContainmentVerification"
+    },
+    
+    "WaitForContainmentVerification": {
+      "Type": "Wait",
+      "Seconds": 60,
+      "Comment": "Wait 60 seconds for containment actions to take effect",
+      "Next": "Phase3_Eradication"
+    },
+    
+    "Phase3_Eradication": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${eradication_lambda_arn}",
+        "Payload.$": "$"
+      },
+      "ResultPath": "$",
+      "ResultSelector": {
+        "Payload.$": "$.Payload"
+      },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "NotifyFailure"
+        }
+      ],
+      "Next": "CheckEradicationSuccess"
+    },
+    
+    "CheckEradicationSuccess": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.status",
+          "StringEquals": "failed",
+          "Next": "NotifyFailure"
+        },
+        {
+          "Variable": "$.status",
+          "StringEquals": "completed",
+          "Next": "Phase4_Recovery"
+        }
+      ],
+      "Default": "Phase4_Recovery"
+    },
+    
+    "Phase4_Recovery": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${recovery_lambda_arn}",
+        "Payload.$": "$"
+      },
+      "ResultPath": "$",
+      "ResultSelector": {
+        "Payload.$": "$.Payload"
+      },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "NotifyFailure"
+        }
+      ],
+      "Next": "CheckRecoveryStatus"
+    },
+    
+    "CheckRecoveryStatus": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.status",
+          "StringEquals": "blocked",
+          "Next": "ManualRecoveryRequired"
+        },
+        {
+          "Variable": "$.status",
+          "StringEquals": "failed",
+          "Next": "NotifyFailure"
+        }
+      ],
+      "Default": "Phase5_PostIncidentAnalysis"
+    },
+    
+    "ManualRecoveryRequired": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${sns_topic_arn}",
+        "Subject": "Manual Recovery Required",
+        "Message.$": "States.Format('Incident {} requires manual recovery intervention.\nReason: {}\nBucket: {}', $.incidentId, $.error, $.bucketName)"
+      },
+      "ResultPath": "$.notificationResult",
+      "Next": "NotifyFailure"
+    },
+    
+    "Phase5_PostIncidentAnalysis": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${post_incident_lambda_arn}",
+        "Payload.$": "$"
+      },
+      "ResultPath": "$",
+      "ResultSelector": {
+        "Payload.$": "$.Payload"
+      },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "NotifyFailure"
+        }
+      ],
+      "Next": "IncidentResponseComplete"
+    },
+    
+    "IncidentResponseComplete": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${sns_topic_arn}",
+        "Subject": "Incident Response Complete",
+        "Message.$": "States.Format('Incident {} has been successfully resolved.\nBucket: {}\nSeverity: {}\nAll phases completed:\n✅ Detection & Triage\n✅ Containment\n✅ Eradication\n✅ Recovery\n✅ Post-Incident Analysis\n\nFull report: s3://ysr95-cloud-custodian-policies/incident-response/reports/{}-report.json', $.incidentId, $.bucketName, $.severity, $.incidentId)"
+      },
+      "ResultPath": "$.finalNotification",
+      "Next": "Success"
+    },
+    
+    "Success": {
+      "Type": "Succeed"
+    },
+    
+    "NotifyFailure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${sns_topic_arn}",
+        "Subject": "Incident Response Workflow Failed",
+        "Message.$": "States.Format('Incident response workflow failed for incident {}.\nBucket: {}\nPhase: {}\nError: {}', $.incidentId, $.bucketName, $.phase, $.error)"
+      },
+      "ResultPath": "$.failureNotification",
+      "Next": "Fail"
+    },
+    
+    "Fail": {
+      "Type": "Fail",
+      "Error": "IncidentResponseFailed",
+      "Cause": "One or more phases of the incident response workflow failed"
+    }
+  }
+}

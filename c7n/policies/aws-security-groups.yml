@@ -43,7 +43,7 @@ policies:
             --cidr <corporate-ip-range>/32
           ```
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -78,7 +78,7 @@ policies:
             --protocol tcp --port 3389 --cidr 0.0.0.0/0
           ```
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -112,7 +112,7 @@ policies:
             --protocol tcp --port 445 --cidr 0.0.0.0/0
           ```
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -146,7 +146,7 @@ policies:
             --protocol tcp --port 3306 --cidr 0.0.0.0/0
           ```
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -180,7 +180,7 @@ policies:
             --protocol tcp --port 5432 --cidr 0.0.0.0/0
           ```
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -214,7 +214,7 @@ policies:
             --protocol tcp --port 1433 --cidr 0.0.0.0/0
           ```
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -248,7 +248,7 @@ policies:
             --protocol tcp --port 1521 --cidr 0.0.0.0/0
           ```
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -282,7 +282,7 @@ policies:
             --protocol tcp --port 27017 --cidr 0.0.0.0/0
           ```
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -316,7 +316,7 @@ policies:
             --protocol tcp --port 23 --cidr 0.0.0.0/0
           ```
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -374,7 +374,7 @@ policies:
           
           **Action Required:** Review and restrict access immediately.
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -412,7 +412,7 @@ policies:
             --ip-permissions IpProtocol=-1,IpRanges='[{CidrIp=0.0.0.0/0}]'
           ```
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -446,7 +446,7 @@ policies:
           
           **Immediate Action Required:** Remove rule immediately.
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
@@ -480,7 +480,7 @@ policies:
           
           **Immediate Action Required:** Remove rule immediately.
         to:
-          - srinivasula.yallala@optum.com
+          - ysrinu95@gmail.com
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications

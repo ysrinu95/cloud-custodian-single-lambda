@@ -18,10 +18,10 @@ The Cloud Custodian infrastructure has been updated to use **email identity veri
 ### 2. Configuration File Updates
 
 **File: `c7n/config/mailer.yml`**
-- Changed `from_address` from `c7n@central.ctkube.com` to `ysrinu95@gmail.com`
+- Changed `from_address` from `ysrinu95@gmail.com` to `ysrinu95@gmail.com`
 
 **File: `terraform/central/cloud-custodian.tf`**
-- Changed `mailer_from_address` variable default from `c7n@central.ctkube.com` to `ysrinu95@gmail.com`
+- Changed `mailer_from_address` variable default from `ysrinu95@gmail.com` to `ysrinu95@gmail.com`
 
 ## Gmail Domain Verification - NOT Required
 

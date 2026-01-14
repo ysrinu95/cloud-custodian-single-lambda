@@ -1,0 +1,363 @@
+policies:
+  # ============================================================================
+  # S3 Ransomware Detection Policies
+  # ============================================================================
+
+  # Policy 1: Detect Unusual S3 Delete Operations via CloudWatch Metrics
+  - name: s3-unusual-delete-operations
+    resource: s3
+    description: Detect buckets with unusual delete operations that may indicate ransomware
+    mode:
+      type: cloudwatch-event
+      events:
+        - source: aws.s3
+          event: PutBucketMetricsConfiguration
+          ids: "detail.requestParameters.bucketName"
+    filters:
+      # Check for buckets with delete operations exceeding threshold
+      - type: metrics
+        name: NumberOfObjects
+        statistics: Average
+        days: 1
+        period: 3600
+        op: percent-change
+        value: -20  # 20% decrease in objects in 1 hour
+      - type: metrics
+        name: BucketSizeBytes
+        statistics: Average
+        days: 1
+        period: 3600
+        op: percent-change
+        value: -20  # 20% size decrease
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "CRITICAL: S3 Ransomware Alert - Unusual Delete Operations Detected"
+        violation_desc: |
+          Unusual delete operations detected on S3 bucket. 
+          This may indicate ransomware activity or unauthorized bulk deletion.
+        action_desc: |
+          1. Bucket versioning has been enabled
+          2. Object Lock has been activated
+          3. Incident response workflow initiated
+        to:
+          - security@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+      - type: invoke-sfn
+        state-machine: arn:aws:states:us-east-1:172327596604:stateMachine:s3-ransomware-incident-response
+        async: true
+
+  # Policy 2: Detect Mass S3 Object Deletions
+  - name: s3-mass-deletion-detected
+    resource: s3
+    description: Detect mass deletion of S3 objects via CloudTrail events
+    mode:
+      type: cloudtrail
+      events:
+        - DeleteObject
+        - DeleteObjects
+      role: arn:aws:iam::172327596604:role/CloudCustodianExecutionRole
+    filters:
+      # Detect if more than 100 objects deleted in 5 minutes
+      - type: event
+        key: "detail.requestParameters.delete.object"
+        op: gt
+        value: 100
+    actions:
+      - type: post-finding
+        severity: 90
+        severity_label: CRITICAL
+        types:
+          - "Software and Configuration Checks/AWS Security Best Practices"
+        compliance_status: FAILED
+        title: "S3 Mass Deletion Event Detected"
+        description: |
+          Mass deletion of S3 objects detected. Over 100 objects deleted in a short time frame.
+          This pattern is consistent with ransomware behavior.
+      - type: invoke-sfn
+        state-machine: arn:aws:states:us-east-1:172327596604:stateMachine:s3-ransomware-incident-response
+        async: true
+
+  # Policy 3: Detect S3 Bucket Encryption Changes (Ransomware Indicator)
+  - name: s3-encryption-tampering
+    resource: s3
+    description: Detect unauthorized changes to S3 bucket encryption settings
+    mode:
+      type: cloudtrail
+      events:
+        - PutBucketEncryption
+        - DeleteBucketEncryption
+      role: arn:aws:iam::172327596604:role/CloudCustodianExecutionRole
+    filters:
+      - type: event
+        key: "detail.userIdentity.type"
+        op: ne
+        value: "AssumedRole"  # Flag if not from trusted role
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "CRITICAL: S3 Encryption Tampering Detected"
+        violation_desc: |
+          Unauthorized change to S3 bucket encryption settings detected.
+          This may be a precursor to a ransomware attack.
+        to:
+          - security@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+      - type: invoke-sfn
+        state-machine: arn:aws:states:us-east-1:172327596604:stateMachine:s3-ransomware-incident-response
+        async: true
+
+  # Policy 4: GuardDuty S3 Exfiltration Detection
+  - name: guardduty-s3-exfiltration-detected
+    resource: account
+    description: Detect GuardDuty findings related to S3 data exfiltration
+    mode:
+      type: cloudwatch-event
+      events:
+        - source: aws.guardduty
+          event: GuardDuty Finding
+          ids: "detail.id"
+      role: arn:aws:iam::172327596604:role/CloudCustodianExecutionRole
+    filters:
+      - type: event
+        key: "detail.type"
+        op: in
+        value:
+          - "Exfiltration:S3/ObjectRead.Unusual"
+          - "Exfiltration:S3/AnomalousBehavior"
+          - "Impact:S3/MaliciousIPCaller.Custom"
+          - "Impact:S3/ObjectDelete.Unusual"
+          - "Impact:S3/MaliciousIPCaller"
+      - type: event
+        key: "detail.severity"
+        op: gte
+        value: 7.0  # High or Critical severity
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "CRITICAL: GuardDuty S3 Threat Detected - {{ event.detail.type }}"
+        violation_desc: |
+          GuardDuty has detected suspicious S3 activity that may indicate ransomware or data exfiltration.
+          Finding Type: {{ event.detail.type }}
+          Severity: {{ event.detail.severity }}
+          Description: {{ event.detail.description }}
+        to:
+          - security@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+      - type: invoke-sfn
+        state-machine: arn:aws:states:us-east-1:172327596604:stateMachine:s3-ransomware-incident-response
+        async: true
+
+  # Policy 5: Detect S3 Bucket Policy Changes (Privilege Escalation)
+  - name: s3-bucket-policy-tampering
+    resource: s3
+    description: Detect unauthorized S3 bucket policy modifications
+    mode:
+      type: cloudtrail
+      events:
+        - PutBucketPolicy
+        - DeleteBucketPolicy
+      role: arn:aws:iam::172327596604:role/CloudCustodianExecutionRole
+    filters:
+      # Check if policy allows public access or unusual principals
+      - or:
+          - type: has-statement
+            statement_ids:
+              - "*"
+          - type: has-statement
+            statements:
+              - Effect: Allow
+                Principal: "*"
+    actions:
+      - type: remove-statements
+        statement_ids:
+          - "*"
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "CRITICAL: S3 Bucket Policy Tampering Detected"
+        violation_desc: |
+          Unauthorized or suspicious S3 bucket policy change detected.
+          Public access or wildcard principals detected.
+        action_desc: |
+          Malicious policy statements have been automatically removed.
+          Incident response workflow initiated.
+        to:
+          - security@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+      - type: invoke-sfn
+        state-machine: arn:aws:states:us-east-1:172327596604:stateMachine:s3-ransomware-incident-response
+        async: true
+
+  # Policy 6: Detect Rapid S3 Object Modifications (Encryption by Ransomware)
+  - name: s3-rapid-object-modifications
+    resource: s3
+    description: Detect rapid modifications to S3 objects indicating encryption activity
+    mode:
+      type: cloudtrail
+      events:
+        - PutObject
+        - CopyObject
+      role: arn:aws:iam::172327596604:role/CloudCustodianExecutionRole
+    filters:
+      # Detect if same bucket has >50 put operations in 5 minutes
+      - type: event
+        key: "detail.requestParameters.bucketName"
+        value_type: swap
+      - type: event-count
+        count: 50
+        period: 300  # 5 minutes
+    actions:
+      - type: set-bucket-versioning
+        enabled: true
+        mfa_delete: false
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "CRITICAL: S3 Rapid Modification Pattern Detected"
+        violation_desc: |
+          Rapid object modifications detected on S3 bucket.
+          Pattern consistent with ransomware encryption activity.
+        action_desc: |
+          Bucket versioning has been enabled to preserve original objects.
+          Incident response workflow initiated.
+        to:
+          - security@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+      - type: invoke-sfn
+        state-machine: arn:aws:states:us-east-1:172327596604:stateMachine:s3-ransomware-incident-response
+        async: true
+
+  # Policy 7: Monitor S3 Access from Suspicious IPs
+  - name: s3-access-from-suspicious-ips
+    resource: s3
+    description: Detect S3 access from known malicious IPs
+    mode:
+      type: cloudtrail
+      events:
+        - GetObject
+        - PutObject
+        - DeleteObject
+      role: arn:aws:iam::172327596604:role/CloudCustodianExecutionRole
+    filters:
+      - type: event
+        key: "detail.sourceIPAddress"
+        op: in
+        value_from:
+          url: s3://ysr95-cloud-custodian-policies/threat-intel/malicious-ips.txt
+          format: txt
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "CRITICAL: S3 Access from Malicious IP Detected"
+        violation_desc: |
+          S3 bucket accessed from known malicious IP address.
+          Source IP: {{ event.detail.sourceIPAddress }}
+          Action: {{ event.detail.eventName }}
+        to:
+          - security@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+      - type: invoke-sfn
+        state-machine: arn:aws:states:us-east-1:172327596604:stateMachine:s3-ransomware-incident-response
+        async: true
+
+  # Policy 8: Detect S3 Bucket Replication Configuration Changes
+  - name: s3-replication-tampering
+    resource: s3
+    description: Detect unauthorized changes to S3 replication configuration
+    mode:
+      type: cloudtrail
+      events:
+        - PutBucketReplication
+        - DeleteBucketReplication
+      role: arn:aws:iam::172327596604:role/CloudCustodianExecutionRole
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "WARNING: S3 Replication Configuration Changed"
+        violation_desc: |
+          S3 bucket replication configuration has been modified.
+          This could be an attempt to exfiltrate data or disrupt backups.
+        to:
+          - security@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue
+
+  # Policy 9: Detect Missing S3 Object Lock (Ransomware Protection)
+  - name: s3-object-lock-not-enabled
+    resource: s3
+    description: Identify critical S3 buckets without Object Lock enabled
+    mode:
+      type: periodic
+      schedule: "rate(12 hours)"
+      role: arn:aws:iam::172327596604:role/CloudCustodianExecutionRole
+    filters:
+      - type: value
+        key: "Name"
+        op: regex
+        value: ".*-backup$|.*-archive$|.*-critical$"
+      - not:
+          - type: object-lock-enabled
+    actions:
+      - type: notify
+        template: default.html
+        subject: "S3 Critical Bucket Missing Object Lock Protection"
+        violation_desc: |
+          Critical S3 bucket does not have Object Lock enabled.
+          This leaves the bucket vulnerable to ransomware attacks.
+        action_desc: |
+          Please enable Object Lock on this bucket to protect against ransomware.
+        to:
+          - security@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications
+
+  # Policy 10: Detect S3 Bucket Versioning Disabled
+  - name: s3-versioning-disabled
+    resource: s3
+    description: Alert when bucket versioning is disabled on critical buckets
+    mode:
+      type: cloudtrail
+      events:
+        - PutBucketVersioning
+      role: arn:aws:iam::172327596604:role/CloudCustodianExecutionRole
+    filters:
+      - type: event
+        key: "detail.requestParameters.VersioningConfiguration.Status"
+        value: "Suspended"
+    actions:
+      - type: set-bucket-versioning
+        enabled: true
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "CRITICAL: S3 Bucket Versioning Disabled"
+        violation_desc: |
+          Bucket versioning was disabled on S3 bucket.
+          This removes protection against ransomware and accidental deletions.
+        action_desc: |
+          Versioning has been automatically re-enabled.
+        to:
+          - security@example.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/custodian-mailer-queue

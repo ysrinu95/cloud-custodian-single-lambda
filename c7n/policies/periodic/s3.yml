@@ -2,9 +2,9 @@ vars:
   email-notify: &email-notify
     template: default.html
     priority_header: "1"
-    from: c7n@central.ctkube.com
+    from: ysrinu95@gmail.com
     to:
-      - srinivasula.yallala@optum.com
+      - ysrinu95@gmail.com
     transport:
       type: sqs
       queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications
