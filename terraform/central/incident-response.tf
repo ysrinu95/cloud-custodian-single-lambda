@@ -20,6 +20,12 @@ variable "incident_response_sns_topic" {
   default     = ""
 }
 
+variable "common_tags" {
+  description = "Common tags to apply to all resources"
+  type        = map(string)
+  default     = {}
+}
+
 # ============================================================================
 # SNS Topic for Security Alerts
 # ============================================================================
