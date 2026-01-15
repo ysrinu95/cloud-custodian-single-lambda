@@ -236,7 +236,7 @@ policies:
         value: not-null
    
     actions:
-      - type: terminate
+      #- type: terminate
       
       - type: notify
         template: default.html
