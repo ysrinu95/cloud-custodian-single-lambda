@@ -843,14 +843,16 @@ resource "aws_lambda_layer_version" "custodian_layer_external" {
 
 # Lambda Function - Cross-account Cloud Custodian executor
 resource "aws_lambda_function" "custodian_cross_account_executor" {
-  filename         = "${path.module}/${local.lambda_zip_name}"
+  # Use pre-built artifact if available (from GitHub Actions), otherwise use Terraform-built package
+  filename         = fileexists("${path.module}/${var.lambda_package_path}") ? "${path.module}/${var.lambda_package_path}" : "${path.module}/${local.lambda_zip_name}"
   function_name    = "cloud-custodian-cross-account-executor"
   role             = aws_iam_role.lambda_execution.arn
   handler          = "lambda_function.handler"
   runtime          = "python3.11"
   timeout          = var.lambda_timeout
   memory_size      = var.lambda_memory_size
-  source_code_hash = null_resource.lambda_function_build.id
+  # Use artifact hash if available, otherwise use build resource ID
+  source_code_hash = fileexists("${path.module}/${var.lambda_package_path}") ? filebase64sha256("${path.module}/${var.lambda_package_path}") : null_resource.lambda_function_build.id
 
   # Code signing configuration for security compliance (required)
   code_signing_config_arn = var.code_signing_config_arn != "" ? var.code_signing_config_arn : aws_lambda_code_signing_config.lambda_config.arn
