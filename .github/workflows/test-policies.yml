@@ -1069,14 +1069,14 @@ jobs:
           echo "🧪 Testing Lambda function with policy..."
           
           # Create JSON payload file
-          cat > payload.json <<'JSON_END'
-{
-  "policy_source": "file",
-  "policy_path": "/var/task/policies/aws-ec2-security.yml",
-  "dryrun": true,
-  "region": "us-east-1"
-}
-JSON_END
+          cat > payload.json << 'PAYLOAD_EOF'
+          {
+            "policy_source": "file",
+            "policy_path": "/var/task/policies/aws-ec2-security.yml",
+            "dryrun": true,
+            "region": "us-east-1"
+          }
+          PAYLOAD_EOF
           
           echo "Payload:"
           cat payload.json
