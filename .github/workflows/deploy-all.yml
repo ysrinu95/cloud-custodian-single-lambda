@@ -96,7 +96,18 @@ jobs:
         run: |
           echo "📦 Building Lambda function..."
           mkdir -p lambda-package
-          cp lambda-functions/cloud-custodian/*.py lambda-package/
+          
+          # Copy and rename lambda_handler.py to lambda_function.py (Lambda expects this name)
+          cp lambda-functions/cloud-custodian/lambda_handler.py lambda-package/lambda_function.py
+          
+          # Copy other Python files
+          for file in lambda-functions/cloud-custodian/*.py; do
+            filename=$(basename "$file")
+            if [ "$filename" != "lambda_handler.py" ]; then
+              cp "$file" lambda-package/
+            fi
+          done
+          
           cd lambda-package && zip -r ../lambda-function.zip . -q
 
       - name: Upload artifacts
