@@ -478,9 +478,33 @@ jobs:
             echo "✅ Instance is now running"
             
             # Additional wait to ensure instance is fully initialized
-            echo "⏳ Waiting 10 seconds for instance to fully initialize..."
-            sleep 10
+            echo "⏳ Waiting 30 seconds for instance to fully initialize..."
+            sleep 30
+            
+            # Verify instance state before creating AMI
+            INSTANCE_STATE=$(aws ec2 describe-instances \
+              --instance-ids $INSTANCE_ID \
+              --query 'Reservations[0].Instances[0].State.Name' \
+              --output text \
+              --region ${{ env.AWS_REGION }})
+            echo "📊 Current instance state: $INSTANCE_STATE"
+            
+            if [ "$INSTANCE_STATE" != "running" ]; then
+              echo "❌ Instance is not in running state, waiting longer..."
+              aws ec2 wait instance-running \
+                --instance-ids $INSTANCE_ID \
+                --region ${{ env.AWS_REGION }}
+              sleep 15
+            fi
           fi
+          
+          # Verify final instance state before AMI creation
+          FINAL_STATE=$(aws ec2 describe-instances \
+            --instance-ids $INSTANCE_ID \
+            --query 'Reservations[0].Instances[0].State.Name' \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+          echo "🔍 Final instance state before AMI creation: $FINAL_STATE"
           
           # Create AMI
           AMI_ID=$(aws ec2 create-image \
