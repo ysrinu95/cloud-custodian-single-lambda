@@ -68,6 +68,13 @@
             "source_file": "aws-ec2-security.yml",
             "enforcement_level": "notify",
             "description": "Notify when EC2 instances are launched for review"
+          },
+          {
+            "policy_name": "ec2-unencrypted-ebs-volume",
+            "resource": "aws.ebs",
+            "source_file": "aws-ec2-security.yml",
+            "enforcement_level": "notify",
+            "description": "Detect unencrypted EBS volumes attached to newly launched instances"
           }
         ],
         "GuardDuty Finding": [
