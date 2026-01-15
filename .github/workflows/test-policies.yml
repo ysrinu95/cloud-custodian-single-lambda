@@ -467,11 +467,19 @@ jobs:
             
             TEMP_INSTANCE=true
             echo "temp_instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+            echo "Created temporary instance: $INSTANCE_ID"
             
-            # Wait for instance
+            # Wait for instance to be running
+            echo "⏳ Waiting for instance to be in running state..."
             aws ec2 wait instance-running \
               --instance-ids $INSTANCE_ID \
               --region ${{ env.AWS_REGION }}
+            
+            echo "✅ Instance is now running"
+            
+            # Additional wait to ensure instance is fully initialized
+            echo "⏳ Waiting 10 seconds for instance to fully initialize..."
+            sleep 10
           fi
           
           # Create AMI
