@@ -224,7 +224,8 @@ policies:
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
       
       - type: set-metadata-access
-        enforce-imdsv2: true
+        tokens: required
+        hop-limit: 1
 
   # EC2 instances launched in public subnet - realtime
   - name: ec2-stop-instances-on-launch
