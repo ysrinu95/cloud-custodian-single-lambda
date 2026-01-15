@@ -3,11 +3,19 @@ name: Test Cloud Custodian Policies
 on:
   workflow_dispatch:
     inputs:
-      policy_file:
-        description: 'Policy file to test (e.g., sample-policies.yml, test-policy.yml)'
+      policies_to_test:
+        description: 'Select EC2 policies to test'
         required: true
-        type: string
-        default: 'test-policy.yml'
+        type: choice
+        options:
+          - all
+          - ami-publicly-accessible
+          - ebs-snapshot-unencrypted
+          - ebs-snapshot-public
+          - ec2-unencrypted-ebs-volume
+          - ec2-imdsv1-enabled
+          - ec2-stop-instances-on-launch
+        default: 'all'
       test_action:
         description: 'Test action to perform'
         required: true
@@ -17,14 +25,6 @@ on:
           - dry-run
           - live-test
         default: 'validate-only'
-      environment:
-        description: 'Environment for live testing'
-        required: false
-        type: choice
-        options:
-          - dev
-          - staging
-        default: 'dev'
 
 env:
   AWS_REGION: us-east-1
@@ -41,7 +41,7 @@ jobs:
   # Job 1: Validate Policy Syntax
   # ======================================================================
   validate-policy:
-    name: Validate Policy - ${{ inputs.policy_file }}
+    name: Validate Policy - aws-ec2-security.yml
     runs-on: ubuntu-latest
     
     steps:
@@ -63,7 +63,7 @@ jobs:
         run: |
           echo "🔍 Validating YAML syntax..."
           
-          POLICY_PATH="policies/${{ inputs.policy_file }}"
+          POLICY_PATH="c7n/policies/aws-ec2-security.yml"
           
           if [ ! -f "$POLICY_PATH" ]; then
             echo "::error::Policy file not found: $POLICY_PATH"
@@ -78,58 +78,61 @@ jobs:
         run: |
           echo "🔍 Validating Cloud Custodian policy..."
           
-          POLICY_PATH="policies/${{ inputs.policy_file }}"
+          POLICY_PATH="c7n/policies/aws-ec2-security.yml"
           
           # Validate policy structure
           custodian validate "$POLICY_PATH"
           echo "✅ Policy validation successful!"
       
-      - name: Analyze policy
+      - name: Extract selected policy details
         run: |
-          echo "📊 Analyzing policy structure..."
+          echo "📊 Analyzing selected policy: ${{ inputs.policies_to_test }}"
           
-          POLICY_PATH="policies/${{ inputs.policy_file }}"
+          POLICY_PATH="c7n/policies/aws-ec2-security.yml"
+          SELECTED_POLICY="${{ inputs.policies_to_test }}"
           
-          # Extract policy names
-          echo "Policies in file:"
-          python <<EOF
+          if [ "$SELECTED_POLICY" == "all" ]; then
+            echo "Testing ALL policies in file:"
+            python <<EOF
           import yaml
           with open('$POLICY_PATH') as f:
               data = yaml.safe_load(f)
               for policy in data.get('policies', []):
                   print(f"  - {policy['name']}: {policy['resource']}")
-                  print(f"    Filters: {len(policy.get('filters', []))}")
-                  print(f"    Actions: {len(policy.get('actions', []))}")
           EOF
+          else
+            echo "Testing SINGLE policy: $SELECTED_POLICY"
+            python <<EOF
+          import yaml
+          with open('$POLICY_PATH') as f:
+              data = yaml.safe_load(f)
+              for policy in data.get('policies', []):
+                  if policy['name'] == '$SELECTED_POLICY':
+                      print(f"  - Name: {policy['name']}")
+                      print(f"  - Resource: {policy['resource']}")
+                      print(f"  - Filters: {len(policy.get('filters', []))}")
+                      print(f"  - Actions: {len(policy.get('actions', []))}")
+                      break
+          EOF
+          fi
       
       - name: Generate validation report
         run: |
           cat <<EOF > validation-report.md
           ## ✅ Policy Validation Report
           
-          **Policy File:** \`${{ inputs.policy_file }}\`
+          **Policy File:** \`aws-ec2-security.yml\`
+          **Selected Policy:** \`${{ inputs.policies_to_test }}\`
           **Test Action:** \`${{ inputs.test_action }}\`
           **Validation Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
           **Triggered by:** ${{ github.actor }}
+          **Target Account:** Member Account (${{ env.MEMBER_ACCOUNT_ID }})
           
           ### Validation Results
           
           - ✅ YAML syntax: PASSED
           - ✅ Cloud Custodian schema: PASSED
           - ✅ Policy structure: VALID
-          
-          ### Policy Details
-          
-          $(python -c "
-          import yaml
-          with open('policies/${{ inputs.policy_file }}') as f:
-              data = yaml.safe_load(f)
-              for policy in data.get('policies', []):
-                  print(f\"- **{policy['name']}**\")
-                  print(f\"  - Resource: {policy['resource']}\")
-                  print(f\"  - Filters: {len(policy.get('filters', []))}\")
-                  print(f\"  - Actions: {len(policy.get('actions', []))}\")
-          ")
           
           EOF
           
@@ -138,7 +141,7 @@ jobs:
       - name: Upload validation report
         uses: actions/upload-artifact@v4
         with:
-          name: validation-report-${{ inputs.policy_file }}
+          name: validation-report-ec2-security
           path: validation-report.md
           retention-days: 30
 
@@ -146,7 +149,7 @@ jobs:
   # Job 2: Create Test EC2 Instance
   # ======================================================================
   create-test-ec2:
-    name: Create Test EC2 Instance
+    name: Create Test Resources - ${{ inputs.policies_to_test }}
     runs-on: ubuntu-latest
     needs: validate-policy
     if: inputs.test_action == 'live-test'
@@ -154,6 +157,8 @@ jobs:
     outputs:
       instance_id: ${{ steps.create.outputs.instance_id }}
       volume_id: ${{ steps.attach.outputs.volume_id }}
+      ami_id: ${{ steps.create_ami.outputs.ami_id }}
+      snapshot_id: ${{ steps.create_snapshot.outputs.snapshot_id }}
     
     steps:
       - name: Checkout code
@@ -304,8 +309,22 @@ jobs:
       
       - name: Create EC2 instance with non-encrypted boot volume
         id: create
+        if: |
+          inputs.policies_to_test == 'all' ||
+          inputs.policies_to_test == 'ec2-unencrypted-ebs-volume' ||
+          inputs.policies_to_test == 'ec2-imdsv1-enabled' ||
+          inputs.policies_to_test == 'ec2-stop-instances-on-launch'
         run: |
-          echo "🚀 Launching EC2 instance with non-encrypted boot volume..."
+          echo "🚀 Launching EC2 instance for policy: ${{ inputs.policies_to_test }}..."
+          
+          # Determine IMDSv1 setting based on policy
+          if [ "${{ inputs.policies_to_test }}" == "ec2-imdsv1-enabled" ] || [ "${{ inputs.policies_to_test }}" == "all" ]; then
+            IMDS_TOKENS="optional"
+            echo "Setting IMDSv1 enabled (HttpTokens=optional)"
+          else
+            IMDS_TOKENS="required"
+            echo "Setting IMDSv2 only (HttpTokens=required)"
+          fi
           
           INSTANCE_ID=$(aws ec2 run-instances \
             --image-id ${{ steps.ami.outputs.ami_id }} \
@@ -314,8 +333,8 @@ jobs:
             --security-group-ids ${{ steps.vpc.outputs.sg_id }} \
             --associate-public-ip-address \
             --block-device-mappings "[{\"DeviceName\":\"/dev/xvda\",\"Ebs\":{\"VolumeSize\":8,\"VolumeType\":\"gp3\",\"DeleteOnTermination\":true,\"Encrypted\":false}}]" \
-            --metadata-options "HttpTokens=optional,HttpPutResponseHopLimit=1" \
-            --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=custodian-test-instance},{Key=Environment,Value=test},{Key=CustodianTest,Value=true}]" \
+            --metadata-options "HttpTokens=$IMDS_TOKENS,HttpPutResponseHopLimit=1" \
+            --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=custodian-test-${{ inputs.policies_to_test }}},{Key=Environment,Value=test},{Key=CustodianTest,Value=true},{Key=Policy,Value=${{ inputs.policies_to_test }}}]" \
             --query 'Instances[0].InstanceId' \
             --output text \
             --region ${{ env.AWS_REGION }})
@@ -332,19 +351,29 @@ jobs:
           # Get instance details
           aws ec2 describe-instances \
             --instance-ids $INSTANCE_ID \
-            --query 'Reservations[0].Instances[0].{InstanceId:InstanceId,State:State.Name,PublicIP:PublicIpAddress,PrivateIP:PrivateIpAddress}' \
+            --query 'Reservations[0].Instances[0].{InstanceId:InstanceId,State:State.Name,PublicIP:PublicIpAddress,PrivateIP:PrivateIpAddress,IMDSv2:MetadataOptions.HttpTokens}' \
             --region ${{ env.AWS_REGION }}
           
           echo "✅ Instance is running"
       
       - name: Create and attach non-encrypted EBS volume
         id: attach
+        if: |
+          inputs.policies_to_test == 'all' ||
+          inputs.policies_to_test == 'ec2-unencrypted-ebs-volume'
         run: |
-          echo "💾 Creating non-encrypted EBS volume..."
+          echo "💾 Creating non-encrypted EBS volume for policy: ${{ inputs.policies_to_test }}..."
+          
+          # Check if instance was created
+          INSTANCE_ID="${{ steps.create.outputs.instance_id }}"
+          if [ -z "$INSTANCE_ID" ]; then
+            echo "::warning::No instance created, skipping volume creation"
+            exit 0
+          fi
           
           # Get instance availability zone
           AZ=$(aws ec2 describe-instances \
-            --instance-ids ${{ steps.create.outputs.instance_id }} \
+            --instance-ids $INSTANCE_ID \
             --query 'Reservations[0].Instances[0].Placement.AvailabilityZone' \
             --output text \
             --region ${{ env.AWS_REGION }})
@@ -357,7 +386,7 @@ jobs:
             --size 10 \
             --volume-type gp3 \
             --encrypted false \
-            --tag-specifications "ResourceType=volume,Tags=[{Key=Name,Value=custodian-test-volume},{Key=Environment,Value=test},{Key=CustodianTest,Value=true}]" \
+            --tag-specifications "ResourceType=volume,Tags=[{Key=Name,Value=custodian-test-volume-${{ inputs.policies_to_test }}},{Key=Environment,Value=test},{Key=CustodianTest,Value=true},{Key=Policy,Value=${{ inputs.policies_to_test }}}]" \
             --query 'VolumeId' \
             --output text \
             --region ${{ env.AWS_REGION }})
@@ -374,7 +403,7 @@ jobs:
           # Attach volume to instance
           aws ec2 attach-volume \
             --volume-id $VOLUME_ID \
-            --instance-id ${{ steps.create.outputs.instance_id }} \
+            --instance-id $INSTANCE_ID \
             --device /dev/sdf \
             --region ${{ env.AWS_REGION }}
           
@@ -389,6 +418,154 @@ jobs:
             --query 'Volumes[0].{VolumeId:VolumeId,State:State,Encrypted:Encrypted,Attachments:Attachments}' \
             --region ${{ env.AWS_REGION }}
       
+      - name: Create public AMI
+        id: create_ami
+        if: |
+          inputs.policies_to_test == 'all' ||
+          inputs.policies_to_test == 'ami-publicly-accessible'
+        run: |
+          echo "📸 Creating public AMI for policy: ${{ inputs.policies_to_test }}..."
+          
+          # Use an existing instance or create a temporary one
+          INSTANCE_ID="${{ steps.create.outputs.instance_id }}"
+          TEMP_INSTANCE=false
+          
+          if [ -z "$INSTANCE_ID" ]; then
+            echo "No instance available, creating temporary instance for AMI..."
+            INSTANCE_ID=$(aws ec2 run-instances \
+              --image-id ${{ steps.ami.outputs.ami_id }} \
+              --instance-type t3.micro \
+              --subnet-id ${{ steps.vpc.outputs.subnet_id }} \
+              --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=temp-ami-instance},{Key=Temporary,Value=true}]" \
+              --query 'Instances[0].InstanceId' \
+              --output text \
+              --region ${{ env.AWS_REGION }})
+            
+            TEMP_INSTANCE=true
+            echo "temp_instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+            
+            # Wait for instance
+            aws ec2 wait instance-running \
+              --instance-ids $INSTANCE_ID \
+              --region ${{ env.AWS_REGION }}
+          fi
+          
+          # Create AMI
+          AMI_ID=$(aws ec2 create-image \
+            --instance-id $INSTANCE_ID \
+            --name "custodian-test-ami-${{ github.run_number }}" \
+            --description "Test AMI for Cloud Custodian policy testing" \
+            --no-reboot \
+            --tag-specifications "ResourceType=image,Tags=[{Key=Name,Value=custodian-test-ami},{Key=CustodianTest,Value=true},{Key=Policy,Value=${{ inputs.policies_to_test }}}]" \
+            --query 'ImageId' \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+          
+          echo "ami_id=$AMI_ID" >> $GITHUB_OUTPUT
+          echo "✅ Created AMI: $AMI_ID"
+          
+          # Wait for AMI to be available
+          echo "⏳ Waiting for AMI to be available..."
+          aws ec2 wait image-available \
+            --image-ids $AMI_ID \
+            --region ${{ env.AWS_REGION }}
+          
+          # Make AMI public
+          echo "🌐 Making AMI publicly accessible..."
+          aws ec2 modify-image-attribute \
+            --image-id $AMI_ID \
+            --launch-permission "Add=[{Group=all}]" \
+            --region ${{ env.AWS_REGION }}
+          
+          echo "✅ AMI is now public"
+          
+          # Terminate temporary instance if created
+          if [ "$TEMP_INSTANCE" == "true" ]; then
+            echo "Terminating temporary instance..."
+            aws ec2 terminate-instances \
+              --instance-ids $INSTANCE_ID \
+              --region ${{ env.AWS_REGION }}
+          fi
+      
+      - name: Create unencrypted EBS snapshot
+        id: create_snapshot
+        if: |
+          inputs.policies_to_test == 'all' ||
+          inputs.policies_to_test == 'ebs-snapshot-unencrypted' ||
+          inputs.policies_to_test == 'ebs-snapshot-public'
+        run: |
+          echo "📸 Creating unencrypted EBS snapshot for policy: ${{ inputs.policies_to_test }}..."
+          
+          # Get or create a volume
+          VOLUME_ID="${{ steps.attach.outputs.volume_id }}"
+          TEMP_VOLUME=false
+          
+          if [ -z "$VOLUME_ID" ]; then
+            echo "No volume available, creating temporary volume for snapshot..."
+            
+            # Get first AZ in region
+            AZ=$(aws ec2 describe-availability-zones \
+              --query 'AvailabilityZones[0].ZoneName' \
+              --output text \
+              --region ${{ env.AWS_REGION }})
+            
+            VOLUME_ID=$(aws ec2 create-volume \
+              --availability-zone $AZ \
+              --size 1 \
+              --volume-type gp3 \
+              --encrypted false \
+              --tag-specifications "ResourceType=volume,Tags=[{Key=Name,Value=temp-snapshot-volume},{Key=Temporary,Value=true}]" \
+              --query 'VolumeId' \
+              --output text \
+              --region ${{ env.AWS_REGION }})
+            
+            TEMP_VOLUME=true
+            echo "temp_volume_id=$VOLUME_ID" >> $GITHUB_OUTPUT
+            
+            # Wait for volume
+            aws ec2 wait volume-available \
+              --volume-ids $VOLUME_ID \
+              --region ${{ env.AWS_REGION }}
+          fi
+          
+          # Create snapshot
+          SNAPSHOT_ID=$(aws ec2 create-snapshot \
+            --volume-id $VOLUME_ID \
+            --description "Test snapshot for Cloud Custodian policy testing" \
+            --tag-specifications "ResourceType=snapshot,Tags=[{Key=Name,Value=custodian-test-snapshot},{Key=CustodianTest,Value=true},{Key=Policy,Value=${{ inputs.policies_to_test }}}]" \
+            --query 'SnapshotId' \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+          
+          echo "snapshot_id=$SNAPSHOT_ID" >> $GITHUB_OUTPUT
+          echo "✅ Created snapshot: $SNAPSHOT_ID"
+          
+          # Wait for snapshot to complete
+          echo "⏳ Waiting for snapshot to complete (this may take a few minutes)..."
+          aws ec2 wait snapshot-completed \
+            --snapshot-ids $SNAPSHOT_ID \
+            --region ${{ env.AWS_REGION }}
+          
+          # Make snapshot public if testing public snapshot policy
+          if [ "${{ inputs.policies_to_test }}" == "ebs-snapshot-public" ] || [ "${{ inputs.policies_to_test }}" == "all" ]; then
+            echo "🌐 Making snapshot publicly accessible..."
+            aws ec2 modify-snapshot-attribute \
+              --snapshot-id $SNAPSHOT_ID \
+              --attribute createVolumePermission \
+              --operation-type add \
+              --group-names all \
+              --region ${{ env.AWS_REGION }}
+            echo "✅ Snapshot is now public"
+          fi
+          
+          # Delete temporary volume if created
+          if [ "$TEMP_VOLUME" == "true" ]; then
+            echo "Deleting temporary volume..."
+            aws ec2 delete-volume \
+              --volume-id $VOLUME_ID \
+              --region ${{ env.AWS_REGION }}
+          fi
+      
       - name: Summary
         run: |
           cat <<EOF
@@ -397,27 +574,39 @@ jobs:
           🎉 Test Resources Created Successfully!
           ========================================
           
-          EC2 Instance ID: ${{ steps.create.outputs.instance_id }}
-          EBS Volume ID: ${{ steps.attach.outputs.volume_id }}
-          VPC ID: ${{ steps.vpc.outputs.vpc_id }}
-          Security Group ID: ${{ steps.vpc.outputs.sg_id }}
+          Policy Being Tested: ${{ inputs.policies_to_test }}
+          Target Account: Member Account (${{ env.MEMBER_ACCOUNT_ID }})
           
-          ⚠️  Test Configuration:
-          - ✅ Public IP assigned
-          - ✅ Security group allows 0.0.0.0/0
-          - ✅ Boot volume: NON-ENCRYPTED
-          - ✅ Additional EBS volume: NON-ENCRYPTED
-          - ✅ IMDSv1 enabled (HttpTokens=optional)
-          
-          These resources will trigger Cloud Custodian policies!
-          
+          Resources Created:
           EOF
+          
+          if [ -n "${{ steps.create.outputs.instance_id }}" ]; then
+            echo "  ✅ EC2 Instance: ${{ steps.create.outputs.instance_id }}"
+          fi
+          
+          if [ -n "${{ steps.attach.outputs.volume_id }}" ]; then
+            echo "  ✅ EBS Volume: ${{ steps.attach.outputs.volume_id }}"
+          fi
+          
+          if [ -n "${{ steps.create_ami.outputs.ami_id }}" ]; then
+            echo "  ✅ Public AMI: ${{ steps.create_ami.outputs.ami_id }}"
+          fi
+          
+          if [ -n "${{ steps.create_snapshot.outputs.snapshot_id }}" ]; then
+            echo "  ✅ EBS Snapshot: ${{ steps.create_snapshot.outputs.snapshot_id }}"
+          fi
+          
+          echo ""
+          echo "VPC ID: ${{ steps.vpc.outputs.vpc_id }}"
+          echo "Security Group ID: ${{ steps.vpc.outputs.sg_id }}"
+          echo ""
+          echo "These resources will trigger Cloud Custodian policies!"
 
   # ======================================================================
   # Job 3: Dry Run Policy (No Actions Executed)
   # ======================================================================
   dry-run-policy:
-    name: Dry Run - ${{ inputs.policy_file }}
+    name: Dry Run - ${{ inputs.policies_to_test }}
     runs-on: ubuntu-latest
     needs: validate-policy
     if: inputs.test_action == 'dry-run' || inputs.test_action == 'live-test'
@@ -426,12 +615,29 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (Central Account)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          # Option 1: OIDC (Recommended)
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
+          role-to-assume: arn:aws:iam::${{ env.CENTRAL_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
           aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Assume role in Member Account
+        run: |
+          echo "🔐 Assuming OrganizationAccountAccessRole in member account..."
+          
+          CREDENTIALS=$(aws sts assume-role \
+            --role-arn "arn:aws:iam::${{ env.MEMBER_ACCOUNT_ID }}:role/OrganizationAccountAccessRole" \
+            --role-session-name "github-actions-dry-run" \
+            --duration-seconds 3600 \
+            --output json)
+          
+          echo "AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId')" >> $GITHUB_ENV
+          echo "AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey')" >> $GITHUB_ENV
+          echo "AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r '.Credentials.SessionToken')" >> $GITHUB_ENV
+          
+          # Verify we're in the member account
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "✅ Assumed role in account: $ACCOUNT_ID"
       
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -443,12 +649,44 @@ jobs:
           pip install c7n c7n-org pyyaml boto3
           custodian version
       
+      - name: Create filtered policy file
+        if: inputs.policies_to_test != 'all'
+        run: |
+          echo "📝 Creating filtered policy file for: ${{ inputs.policies_to_test }}"
+          
+          python <<EOF
+          import yaml
+          
+          with open('c7n/policies/aws-ec2-security.yml') as f:
+              data = yaml.safe_load(f)
+          
+          # Filter for selected policy
+          filtered_policies = [p for p in data['policies'] if p['name'] == '${{ inputs.policies_to_test }}']
+          
+          if not filtered_policies:
+              print(f"Error: Policy '${{ inputs.policies_to_test }}' not found")
+              exit(1)
+          
+          filtered_data = {'policies': filtered_policies}
+          
+          with open('filtered-policy.yml', 'w') as f:
+              yaml.dump(filtered_data, f, default_flow_style=False)
+          
+          print(f"✅ Filtered policy file created with {len(filtered_policies)} policy(ies)")
+          EOF
+      
       - name: Run policy in dry-run mode
         id: dryrun
         run: |
           echo "🧪 Running policy in dry-run mode (no actions executed)..."
+          echo "Target Account: ${{ env.MEMBER_ACCOUNT_ID }}"
           
-          POLICY_PATH="policies/${{ inputs.policy_file }}"
+          if [ "${{ inputs.policies_to_test }}" == "all" ]; then
+            POLICY_FILE="c7n/policies/aws-ec2-security.yml"
+          else
+            POLICY_FILE="filtered-policy.yml"
+          fi
+          
           OUTPUT_DIR="test-output/$(date +%Y%m%d-%H%M%S)"
           
           mkdir -p "$OUTPUT_DIR"
@@ -458,7 +696,7 @@ jobs:
             -s "$OUTPUT_DIR" \
             --region ${{ env.AWS_REGION }} \
             --dryrun \
-            "$POLICY_PATH" 2>&1 | tee dryrun-output.log
+            "$POLICY_FILE" 2>&1 | tee dryrun-output.log
           
           echo "✅ Dry-run completed!"
       
@@ -503,9 +741,10 @@ jobs:
           cat <<EOF > dryrun-report.md
           ## 🧪 Policy Dry-Run Report
           
-          **Policy File:** \`${{ inputs.policy_file }}\`
+          **Policy:** \`${{ inputs.policies_to_test }}\`
           **Execution Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
           **AWS Region:** ${{ env.AWS_REGION }}
+          **Target Account:** Member Account (${{ env.MEMBER_ACCOUNT_ID }})
           **Mode:** Dry-Run (No actions executed)
           
           ### Execution Summary
@@ -545,7 +784,7 @@ jobs:
       - name: Upload dry-run artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dryrun-results-${{ inputs.policy_file }}
+          name: dryrun-results-${{ inputs.policies_to_test }}
           path: |
             test-output/
             dryrun-output.log
@@ -556,23 +795,38 @@ jobs:
   # Job 4: Live Test (Execute Actions - USE WITH CAUTION!)
   # ======================================================================
   live-test-policy:
-    name: Live Test - ${{ inputs.policy_file }}
+    name: Live Test - ${{ inputs.policies_to_test }}
     runs-on: ubuntu-latest
     needs: [validate-policy, dry-run-policy, create-test-ec2]
     if: inputs.test_action == 'live-test'
-    environment:
-      name: ${{ inputs.environment }}-policy-test
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (Central Account)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          # Option 1: OIDC (Recommended)
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
+          role-to-assume: arn:aws:iam::${{ env.CENTRAL_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
           aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Assume role in Member Account
+        run: |
+          echo "🔐 Assuming OrganizationAccountAccessRole in member account..."
+          
+          CREDENTIALS=$(aws sts assume-role \
+            --role-arn "arn:aws:iam::${{ env.MEMBER_ACCOUNT_ID }}:role/OrganizationAccountAccessRole" \
+            --role-session-name "github-actions-live-test" \
+            --duration-seconds 3600 \
+            --output json)
+          
+          echo "AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId')" >> $GITHUB_ENV
+          echo "AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey')" >> $GITHUB_ENV
+          echo "AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r '.Credentials.SessionToken')" >> $GITHUB_ENV
+          
+          # Verify we're in the member account
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "✅ Assumed role in account: $ACCOUNT_ID"
       
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -587,15 +841,48 @@ jobs:
       - name: Warning banner
         run: |
           echo "::warning::⚠️ LIVE TEST MODE - Actions will be EXECUTED!"
-          echo "::warning::This will make REAL changes to AWS resources!"
+          echo "::warning::This will make REAL changes to AWS resources in Member Account!"
+          echo "::warning::Target Account: ${{ env.MEMBER_ACCOUNT_ID }}"
           sleep 5
+      
+      - name: Create filtered policy file
+        if: inputs.policies_to_test != 'all'
+        run: |
+          echo "📝 Creating filtered policy file for: ${{ inputs.policies_to_test }}"
+          
+          python <<EOF
+          import yaml
+          
+          with open('c7n/policies/aws-ec2-security.yml') as f:
+              data = yaml.safe_load(f)
+          
+          # Filter for selected policy
+          filtered_policies = [p for p in data['policies'] if p['name'] == '${{ inputs.policies_to_test }}']
+          
+          if not filtered_policies:
+              print(f"Error: Policy '${{ inputs.policies_to_test }}' not found")
+              exit(1)
+          
+          filtered_data = {'policies': filtered_policies}
+          
+          with open('filtered-policy.yml', 'w') as f:
+              yaml.dump(filtered_data, f, default_flow_style=False)
+          
+          print(f"✅ Filtered policy file created with {len(filtered_policies)} policy(ies)")
+          EOF
       
       - name: Run policy in live mode
         id: live
         run: |
           echo "🚨 Running policy in LIVE mode..."
+          echo "Target Account: ${{ env.MEMBER_ACCOUNT_ID }}"
           
-          POLICY_PATH="policies/${{ inputs.policy_file }}"
+          if [ "${{ inputs.policies_to_test }}" == "all" ]; then
+            POLICY_FILE="c7n/policies/aws-ec2-security.yml"
+          else
+            POLICY_FILE="filtered-policy.yml"
+          fi
+          
           OUTPUT_DIR="live-output/$(date +%Y%m%d-%H%M%S)"
           
           mkdir -p "$OUTPUT_DIR"
@@ -604,7 +891,7 @@ jobs:
           custodian run \
             -s "$OUTPUT_DIR" \
             --region ${{ env.AWS_REGION }} \
-            "$POLICY_PATH" 2>&1 | tee live-output.log
+            "$POLICY_FILE" 2>&1 | tee live-output.log
           
           echo "✅ Live execution completed!"
       
@@ -641,10 +928,10 @@ jobs:
           cat <<EOF > live-test-report.md
           ## 🚨 Live Policy Execution Report
           
-          **Policy File:** \`${{ inputs.policy_file }}\`
+          **Policy:** \`${{ inputs.policies_to_test }}\`
           **Execution Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          **Environment:** ${{ inputs.environment }}
           **AWS Region:** ${{ env.AWS_REGION }}
+          **Target Account:** Member Account (${{ env.MEMBER_ACCOUNT_ID }})
           **Mode:** LIVE (Actions EXECUTED)
           
           ### ⚠️ WARNING
@@ -686,7 +973,7 @@ jobs:
       - name: Upload live test artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: live-test-results-${{ inputs.policy_file }}
+          name: live-test-results-${{ inputs.policies_to_test }}
           path: |
             live-output/
             live-output.log
@@ -695,7 +982,7 @@ jobs:
 
       - name: Send notification
         run: |
-          echo "::notice::✅ Live policy test completed for ${{ inputs.policy_file }}"
+          echo "::notice::✅ Live policy test completed for ${{ inputs.policies_to_test }}"
           echo "::notice::Review artifacts and CloudWatch Logs for details"
 
   # ======================================================================
@@ -779,7 +1066,7 @@ jobs:
   # Job 6: Cleanup Test Resources
   # ======================================================================
   cleanup-test-resources:
-    name: Cleanup Test Resources
+    name: Cleanup Test Resources - ${{ inputs.policies_to_test }}
     runs-on: ubuntu-latest
     needs: [create-test-ec2, live-test-policy]
     if: always() && inputs.test_action == 'live-test'
@@ -808,6 +1095,57 @@ jobs:
           # Verify we're in the member account
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           echo "✅ Assumed role in account: $ACCOUNT_ID"
+      
+      - name: Cleanup AMI
+        if: needs.create-test-ec2.outputs.ami_id != ''
+        run: |
+          echo "🧹 Cleaning up AMI..."
+          
+          AMI_ID="${{ needs.create-test-ec2.outputs.ami_id }}"
+          
+          if [ -n "$AMI_ID" ]; then
+            # Deregister AMI
+            aws ec2 deregister-image \
+              --image-id $AMI_ID \
+              --region ${{ env.AWS_REGION }} || echo "Failed to deregister AMI"
+            
+            echo "✅ AMI deregistered"
+          fi
+      
+      - name: Cleanup Snapshots
+        if: needs.create-test-ec2.outputs.snapshot_id != ''
+        run: |
+          echo "🧹 Cleaning up snapshots..."
+          
+          SNAPSHOT_ID="${{ needs.create-test-ec2.outputs.snapshot_id }}"
+          
+          if [ -n "$SNAPSHOT_ID" ]; then
+            # Delete snapshot
+            aws ec2 delete-snapshot \
+              --snapshot-id $SNAPSHOT_ID \
+              --region ${{ env.AWS_REGION }} || echo "Failed to delete snapshot"
+            
+            echo "✅ Snapshot deleted"
+          fi
+          
+          # Cleanup any AMI-related snapshots
+          AMI_ID="${{ needs.create-test-ec2.outputs.ami_id }}"
+          if [ -n "$AMI_ID" ]; then
+            echo "Checking for AMI snapshots..."
+            SNAPSHOT_IDS=$(aws ec2 describe-snapshots \
+              --owner-ids self \
+              --filters "Name=description,Values=*$AMI_ID*" \
+              --query 'Snapshots[].SnapshotId' \
+              --output text \
+              --region ${{ env.AWS_REGION }})
+            
+            for SNAP_ID in $SNAPSHOT_IDS; do
+              echo "Deleting AMI snapshot: $SNAP_ID"
+              aws ec2 delete-snapshot \
+                --snapshot-id $SNAP_ID \
+                --region ${{ env.AWS_REGION }} || echo "Failed to delete snapshot"
+            done
+          fi
       
       - name: Cleanup EC2 instance
         if: needs.create-test-ec2.outputs.instance_id != ''
