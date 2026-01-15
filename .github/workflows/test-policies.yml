@@ -1068,19 +1068,22 @@ jobs:
         run: |
           echo "🧪 Testing Lambda function with policy..."
           
-          PAYLOAD=$(cat <<EOF
-          {
-            "policy_source": "file",
-            "policy_path": "/var/task/policies/${{ inputs.policy_file }}",
-            "dryrun": true,
-            "region": "${{ env.AWS_REGION }}"
-          }
-          EOF
-          )
+          # Create JSON payload file
+          cat > payload.json <<'JSON_END'
+{
+  "policy_source": "file",
+  "policy_path": "/var/task/policies/aws-ec2-security.yml",
+  "dryrun": true,
+  "region": "us-east-1"
+}
+JSON_END
+          
+          echo "Payload:"
+          cat payload.json
           
           aws lambda invoke \
             --function-name ${{ steps.lambda.outputs.function_name }} \
-            --payload "$PAYLOAD" \
+            --payload file://payload.json \
             --log-type Tail \
             --region ${{ env.AWS_REGION }} \
             lambda-response.json
