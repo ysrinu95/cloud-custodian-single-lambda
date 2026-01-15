@@ -71,7 +71,7 @@
           },
           {
             "policy_name": "ec2-unencrypted-ebs-volume",
-            "resource": "aws.ebs",
+            "resource": "aws.ec2",
             "source_file": "aws-ec2-security.yml",
             "enforcement_level": "notify",
             "description": "Detect unencrypted EBS volumes attached to newly launched instances"
@@ -132,7 +132,7 @@
         "CreateVolume": [
           {
             "policy_name": "ec2-unencrypted-ebs-volume",
-            "resource": "aws.ebs",
+            "resource": "aws.ec2",
             "source_file": "aws-ec2-security.yml",
             "enforcement_level": "notify",
             "description": "Detect and notify on unencrypted EBS volumes"
