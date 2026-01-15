@@ -351,7 +351,9 @@ resource "aws_iam_policy" "custodian_compute_network" {
           "ec2:DescribeSecurityGroupRules",
           "ec2:DescribeSnapshots",
           "ec2:DescribeEbs",
-          "ec2:DescribeVolumes"
+          "ec2:DescribeVolumes",
+          "ec2:DescribeImages",
+          "ec2:DescribeImageAttribute"
         ]
         Resource = "*"
         Condition = {
@@ -367,10 +369,14 @@ resource "aws_iam_policy" "custodian_compute_network" {
           "ec2:TerminateInstances",
           "ec2:StopInstances",
           "ec2:ModifyInstanceAttribute",
-          "ec2:CreateTags"
+          "ec2:CreateTags",
+          "ec2:ModifyImageAttribute",
+          "ec2:ModifySnapshotAttribute"
         ]
         Resource = [
-          "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:instance/*"
+          "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:instance/*",
+          "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:image/*",
+          "arn:aws:ec2:${var.aws_region}::snapshot/*"
         ]
       },
       {
