@@ -30,7 +30,7 @@ on:
 env:
   AWS_REGION: us-east-1
   TERRAFORM_VERSION: "1.6.0"
-  PYTHON_VERSION: "3.12"
+  PYTHON_VERSION: "3.11"
   CENTRAL_ACCOUNT_ID: "172327596604"
   TF_STATE_BUCKET: "ysr95-cloud-custodian-tf-bkt"
 
