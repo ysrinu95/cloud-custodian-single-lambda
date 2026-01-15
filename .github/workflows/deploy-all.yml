@@ -160,6 +160,23 @@ jobs:
           echo "dummy" > lambda-function.zip
           echo "dummy" > cloud-custodian-layer.zip
 
+      - name: Clean up old bucket from state (if exists)
+        if: github.event.inputs.action == 'apply'
+        working-directory: terraform/central
+        run: |
+          echo "Checking for old bucket resource in state..."
+          if terraform state list | grep -q 'aws_s3_bucket.policies\[0\]'; then
+            echo "Found old bucket resource, removing from state..."
+            terraform state rm 'aws_s3_bucket.policies[0]' || true
+            terraform state rm 'aws_s3_bucket_versioning.policies[0]' || true
+            terraform state rm 'aws_s3_bucket_server_side_encryption_configuration.policies[0]' || true
+            terraform state rm 'aws_s3_bucket_lifecycle_configuration.policies[0]' || true
+            echo "✅ Old bucket resources removed from state"
+          else
+            echo "No old bucket resource found in state, skipping..."
+          fi
+        continue-on-error: true
+
       - name: Terraform Plan (Central)
         if: github.event.inputs.action == 'plan'
         working-directory: terraform/central
