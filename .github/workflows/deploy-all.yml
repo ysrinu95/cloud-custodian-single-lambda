@@ -167,7 +167,8 @@ jobs:
           terraform plan \
             -var="lambda_package_path=lambda-function.zip" \
             -var="lambda_layer_path=cloud-custodian-layer.zip" \
-            -var="policy_bucket=ysr95-custodian-policies"
+            -var="policy_bucket=ysr95-custodian-policies" \
+            -var="create_policy_bucket=false"
 
       - name: Terraform Apply (Central)
         if: github.event.inputs.action == 'apply'
@@ -177,7 +178,8 @@ jobs:
           terraform apply -auto-approve \
             -var="lambda_package_path=lambda-function.zip" \
             -var="lambda_layer_path=cloud-custodian-layer.zip" \
-            -var="policy_bucket=ysr95-custodian-policies"
+            -var="policy_bucket=ysr95-custodian-policies" \
+            -var="create_policy_bucket=false"
           echo "✅ Central Account deployed!"
 
       - name: Terraform Destroy (Central)
