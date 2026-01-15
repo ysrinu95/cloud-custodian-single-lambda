@@ -456,10 +456,10 @@ jobs:
           
           if [ -z "$INSTANCE_ID" ]; then
             echo "No instance available, creating temporary instance for AMI..."
+            # Don't specify subnet - let AWS choose a supported AZ for t3.micro
             INSTANCE_ID=$(aws ec2 run-instances \
               --image-id ${{ steps.ami.outputs.ami_id }} \
               --instance-type t3.micro \
-              --subnet-id ${{ steps.vpc.outputs.subnet_id }} \
               --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=temp-ami-instance},{Key=Temporary,Value=true}]" \
               --query 'Instances[0].InstanceId' \
               --output text \
