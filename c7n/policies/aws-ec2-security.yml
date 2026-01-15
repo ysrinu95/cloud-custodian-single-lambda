@@ -124,7 +124,7 @@ policies:
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
       
       - type: set-permissions
-        remove-accounts: matched
+        remove: matched
 
   # EC2 instances with unencrypted EBS volumes - cloudtrail/periodic
   - name: ec2-unencrypted-ebs-volume
