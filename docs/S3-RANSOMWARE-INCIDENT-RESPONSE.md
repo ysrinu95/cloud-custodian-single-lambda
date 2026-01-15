@@ -226,7 +226,7 @@ Incident findings appear in Security Hub:
 
 Stored in S3:
 ```
-s3://ysr95-cloud-custodian-policies/incident-response/
+s3://ysr95-custodian-policies/incident-response/
 ├── reports/
 │   └── IR-YYYYMMDD-HHMMSS-bucketname-report.json
 ├── policy-backups/

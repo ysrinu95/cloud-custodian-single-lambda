@@ -90,7 +90,7 @@ variable "member_account_ids" {
 variable "policy_bucket" {
   description = "S3 bucket name for storing Cloud Custodian policies"
   type        = string
-  default     = "ysr95-cloud-custodian-policies"
+  default     = "ysr95-custodian-policies"
 }
 
 variable "create_policy_bucket" {

@@ -110,7 +110,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 
                 if has_ir_policy:
                     # Try to restore original policy
-                    backup_bucket = 'ysr95-cloud-custodian-policies'
+                    backup_bucket = 'ysr95-custodian-policies'
                     backup_key = f'incident-response/policy-backups/{incident_id}-{bucket_name}-policy.json'
                     
                     try:

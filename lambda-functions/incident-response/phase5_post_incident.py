@@ -44,7 +44,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             incident_report = generate_incident_report(event)
             
             # Save report to S3
-            report_bucket = 'ysr95-cloud-custodian-policies'
+            report_bucket = 'ysr95-custodian-policies'
             report_key = f'incident-response/reports/{incident_id}-report.json'
             
             s3.put_object(
@@ -485,7 +485,7 @@ def create_securityhub_finding(incident_id: str, bucket_name: str, event: Dict, 
             'Remediation': {
                 'Recommendation': {
                     'Text': 'Incident has been automatically remediated. Review recommendations for security improvements.',
-                    'Url': f's3://ysr95-cloud-custodian-policies/incident-response/reports/{incident_id}-report.json'
+                    'Url': f's3://ysr95-custodian-policies/incident-response/reports/{incident_id}-report.json'
                 }
             },
             'WorkflowState': 'RESOLVED',
@@ -566,7 +566,7 @@ def update_detection_rules(event: Dict, root_cause: Dict) -> Dict:
 def archive_incident_data(incident_id: str, event: Dict) -> Dict:
     """Archive all incident data for compliance and future reference"""
     try:
-        archive_bucket = 'ysr95-cloud-custodian-policies'
+        archive_bucket = 'ysr95-custodian-policies'
         archive_key = f'incident-response/archives/{incident_id}-complete-data.json'
         
         s3.put_object(
@@ -613,7 +613,7 @@ All incident response phases completed successfully:
 ✅ Post-Incident Analysis
 
 Full incident report available at:
-s3://ysr95-cloud-custodian-policies/incident-response/reports/{incident_id}-report.json
+s3://ysr95-custodian-policies/incident-response/reports/{incident_id}-report.json
 
 Security recommendations have been documented and should be reviewed by the security team.
             '''.strip()

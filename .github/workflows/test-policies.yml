@@ -1060,6 +1060,18 @@ jobs:
     if: always() && inputs.test_action == 'live-test'
     
     steps:
+      - name: Wait for policies to detect resources
+        run: |
+          echo "⏳ Waiting 5 minutes for Cloud Custodian policies to detect and process test resources..."
+          echo "This allows time for EventBridge events to trigger Lambda and policies to execute."
+          echo "Start time: $(date)"
+          
+          # Wait 5 minutes (300 seconds)
+          sleep 300
+          
+          echo "End time: $(date)"
+          echo "✅ Wait completed, proceeding with cleanup..."
+      
       - name: Configure AWS credentials (Central Account)
         uses: aws-actions/configure-aws-credentials@v4
         with:

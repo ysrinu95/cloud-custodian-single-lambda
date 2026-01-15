@@ -99,7 +99,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 current_policy = policy_response['Policy']
                 
                 # Store policy in a backup bucket
-                backup_bucket = 'ysr95-cloud-custodian-policies'
+                backup_bucket = 'ysr95-custodian-policies'
                 backup_key = f'incident-response/policy-backups/{incident_id}-{bucket_name}-policy.json'
                 s3.put_object(
                     Bucket=backup_bucket,

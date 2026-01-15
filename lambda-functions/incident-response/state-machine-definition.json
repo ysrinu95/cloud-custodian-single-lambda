@@ -265,7 +265,7 @@
       "Parameters": {
         "TopicArn": "${sns_topic_arn}",
         "Subject": "Incident Response Complete",
-        "Message.$": "States.Format('Incident {} has been successfully resolved.\nBucket: {}\nSeverity: {}\nAll phases completed:\n✅ Detection & Triage\n✅ Containment\n✅ Eradication\n✅ Recovery\n✅ Post-Incident Analysis\n\nFull report: s3://ysr95-cloud-custodian-policies/incident-response/reports/{}-report.json', $.incidentId, $.bucketName, $.severity, $.incidentId)"
+        "Message.$": "States.Format('Incident {} has been successfully resolved.\nBucket: {}\nSeverity: {}\nAll phases completed:\n✅ Detection & Triage\n✅ Containment\n✅ Eradication\n✅ Recovery\n✅ Post-Incident Analysis\n\nFull report: s3://ysr95-custodian-policies/incident-response/reports/{}-report.json', $.incidentId, $.bucketName, $.severity, $.incidentId)"
       },
       "ResultPath": "$.finalNotification",
       "Next": "Success"

@@ -257,7 +257,7 @@ policies:
         key: "detail.sourceIPAddress"
         op: in
         value_from:
-          url: s3://ysr95-cloud-custodian-policies/threat-intel/malicious-ips.txt
+          url: s3://ysr95-custodian-policies/threat-intel/malicious-ips.txt
           format: txt
     actions:
       - type: notify
