@@ -5,9 +5,7 @@ policies:
     description: Detect Amazon Machine Images (AMIs) that are publicly accessible
     
     filters:
-      - type: value
-        key: Public
-        value: true
+      - type: cross-account
     
     actions:
       - type: notify
