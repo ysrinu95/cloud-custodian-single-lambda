@@ -75,6 +75,13 @@
             "source_file": "aws-ec2-security.yml",
             "enforcement_level": "notify",
             "description": "Detect unencrypted EBS volumes attached to newly launched instances"
+          },
+          {
+            "policy_name": "ec2-imdsv1-enabled",
+            "resource": "aws.ec2",
+            "source_file": "aws-ec2-security.yml",
+            "enforcement_level": "notify",
+            "description": "Detect EC2 instances with insecure IMDSv1 enabled"
           }
         ],
         "GuardDuty Finding": [
