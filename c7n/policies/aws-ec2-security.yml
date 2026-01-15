@@ -92,7 +92,7 @@ policies:
     
     filters:
       - type: cross-account
-        whitelist_endpoints:
+        whitelist:
           - '{{account_id}}'
     
     actions:
