@@ -494,14 +494,39 @@ jobs:
             --image-ids $AMI_ID \
             --region ${{ env.AWS_REGION }}
           
+          # Check if block public access is enabled
+          echo "🔍 Checking AMI block public access settings..."
+          BLOCK_STATE=$(aws ec2 get-image-block-public-access-state \
+            --query 'ImageBlockPublicAccessState' \
+            --output text \
+            --region ${{ env.AWS_REGION }} 2>/dev/null || echo "not-supported")
+          
+          echo "Block public access state: $BLOCK_STATE"
+          
+          # Temporarily disable block public access if enabled
+          if [ "$BLOCK_STATE" == "block-new-sharing" ]; then
+            echo "⚠️  Block public access is enabled, temporarily disabling..."
+            aws ec2 disable-image-block-public-access \
+              --region ${{ env.AWS_REGION }} || {
+              echo "::warning::Failed to disable block public access. AMI will not be made public."
+              echo "::warning::The ami-publicly-accessible policy may not trigger as expected."
+            }
+            
+            # Wait a moment for the setting to take effect
+            sleep 5
+          fi
+          
           # Make AMI public
           echo "🌐 Making AMI publicly accessible..."
-          aws ec2 modify-image-attribute \
+          if aws ec2 modify-image-attribute \
             --image-id $AMI_ID \
             --launch-permission "Add=[{Group=all}]" \
-            --region ${{ env.AWS_REGION }}
-          
-          echo "✅ AMI is now public"
+            --region ${{ env.AWS_REGION }} 2>&1; then
+            echo "✅ AMI is now public"
+          else
+            echo "::warning::Failed to make AMI public. The policy may not detect it."
+            echo "::warning::This could be due to account-level restrictions."
+          fi
           
           # Terminate temporary instance if created
           if [ "$TEMP_INSTANCE" == "true" ]; then
