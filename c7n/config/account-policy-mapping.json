@@ -154,15 +154,6 @@
             "description": "Detect and notify on unencrypted EBS snapshots"
           }
         ],
-        "CreateImage": [
-          {
-            "policy_name": "ami-publicly-accessible",
-            "resource": "aws.ami",
-            "source_file": "aws-ec2-security.yml",
-            "enforcement_level": "notify",
-            "description": "Monitor newly created AMIs for public accessibility"
-          }
-        ],
         "ModifyImageAttribute": [
           {
             "policy_name": "ami-publicly-accessible",

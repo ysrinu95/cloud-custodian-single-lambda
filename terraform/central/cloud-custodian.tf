@@ -506,7 +506,6 @@ resource "aws_cloudwatch_event_rule" "custodian_security_events_from_members" {
             # EC2 events
             "RunInstances",
             "ModifyImageAttribute",
-            "CreateImage",
             "CopyImage",
             # EBS events
             "CreateVolume",
