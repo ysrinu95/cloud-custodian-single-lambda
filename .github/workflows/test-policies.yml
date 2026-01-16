@@ -409,7 +409,7 @@ jobs:
             --availability-zone $AZ \
             --size 10 \
             --volume-type gp3 \
-            --encrypted false \
+            --no-encrypted \
             --tag-specifications "ResourceType=volume,Tags=[{Key=Name,Value=custodian-test-volume-${{ inputs.policies_to_test }}},{Key=Environment,Value=test},{Key=CustodianTest,Value=true},{Key=Policy,Value=${{ inputs.policies_to_test }}}]" \
             --query 'VolumeId' \
             --output text \
