@@ -141,6 +141,10 @@ resource "aws_cloudwatch_event_rule" "forward_security_events_to_central" {
             "ModifyImageAttribute",
             "CreateImage",
             "CopyImage",
+            # EBS events
+            "CreateVolume",
+            "CreateSnapshot",
+            "ModifySnapshotAttribute",
             # ALB events
             "CreateLoadBalancer",
             "CreateListener",

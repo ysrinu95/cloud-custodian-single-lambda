@@ -508,6 +508,10 @@ resource "aws_cloudwatch_event_rule" "custodian_security_events_from_members" {
             "ModifyImageAttribute",
             "CreateImage",
             "CopyImage",
+            # EBS events
+            "CreateVolume",
+            "CreateSnapshot",
+            "ModifySnapshotAttribute",
             # ALB events
             "CreateLoadBalancer",
             "CreateListener",
