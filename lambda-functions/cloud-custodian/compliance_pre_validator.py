@@ -36,7 +36,7 @@ class ResourceValidator:
     - Elasticsearch/OpenSearch - encryption at rest and node-to-node
     - Redshift - encryption at rest
     - RDS - encryption at rest (DB instances and Aurora clusters)
-    - AMI - public accessibility (CreateImage and ModifyImageAttribute)
+    - AMI - public accessibility (ModifyImageAttribute only)
     """
     
     # Required EKS logging types
@@ -52,7 +52,6 @@ class ResourceValidator:
             'CreateElasticsearchDomain': self.validate_elasticsearch_encryption,
             'CreateDBInstance': self.validate_rds_encryption,
             'CreateDBCluster': self.validate_rds_cluster_encryption,
-            'CreateImage': self.validate_ami_create,
             'ModifyImageAttribute': self.validate_ami_permissions,
         }
     
@@ -404,30 +403,6 @@ class ResourceValidator:
             'action': 'skip',
             'reason': 'compliant',
             'resource_id': db_cluster_id
-        }
-    
-    def validate_ami_create(self, event_detail: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Validate AMI creation event (CreateImage).
-        
-        For CreateImage events, AMIs are always created as private by default,
-        so we can skip Cloud Custodian validation immediately.
-        
-        Args:
-            event_detail: CloudTrail event detail
-            
-        Returns:
-            Validation result - always skip for CreateImage (AMIs start private)
-        """
-        response = event_detail.get('responseElements', {})
-        ami_id = response.get('imageId', 'unknown')
-        
-        logger.info(f"AMI {ami_id} created - private by default, skipping validation")
-        return {
-            'action': 'skip',
-            'reason': 'compliant',
-            'resource_id': ami_id,
-            'details': 'New AMIs are always private by default'
         }
     
     def validate_ami_permissions(self, event_detail: Dict[str, Any]) -> Dict[str, Any]:
