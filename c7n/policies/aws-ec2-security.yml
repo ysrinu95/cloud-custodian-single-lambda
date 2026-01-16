@@ -118,6 +118,61 @@ policies:
       - type: set-permissions
         remove: matched
 
+  # Standalone EBS volume not encrypted - realtime/periodic
+  - name: ebs-volume-unencrypted
+    resource: aws.ebs
+    description: Detect EBS volumes that are not encrypted
+    
+    filters:
+      - type: value
+        key: Encrypted
+        value: false
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "2"
+        subject: "⚠️ EBS Volume Not Encrypted - {{ region }}"
+        violation_desc: |
+          **EBS Volume Created Without Encryption**
+          
+          **Volume ID:** {{ resource.VolumeId }}
+          **Size:** {{ resource.Size }} GB
+          **Volume Type:** {{ resource.VolumeType }}
+          **State:** {{ resource.State }}
+          **Availability Zone:** {{ resource.AvailabilityZone }}
+          
+          **Risk:** Unencrypted EBS volumes can expose data at rest.
+          
+          **Remediation:**
+          1. Create snapshot of unencrypted volume
+          2. Copy snapshot with encryption
+          3. Create new encrypted volume from encrypted snapshot
+          4. Replace the unencrypted volume
+          
+          ```bash
+          # Create snapshot
+          aws ec2 create-snapshot \
+            --volume-id {{ resource.VolumeId }} \
+            --description "Snapshot for encryption"
+          
+          # Copy with encryption
+          aws ec2 copy-snapshot \
+            --source-snapshot-id <snapshot-id> \
+            --encrypted \
+            --kms-key-id <kms-key-id>
+          
+          # Create encrypted volume
+          aws ec2 create-volume \
+            --snapshot-id <encrypted-snapshot-id> \
+            --availability-zone {{ resource.AvailabilityZone }}
+          ```
+        to:
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+
   # EC2 instances with unencrypted EBS volumes - cloudtrail/periodic
   - name: ec2-unencrypted-ebs-volume
     resource: aws.ec2

@@ -138,8 +138,8 @@
         ],
         "CreateVolume": [
           {
-            "policy_name": "ec2-unencrypted-ebs-volume",
-            "resource": "aws.ec2",
+            "policy_name": "ebs-volume-unencrypted",
+            "resource": "aws.ebs",
             "source_file": "aws-ec2-security.yml",
             "enforcement_level": "notify",
             "description": "Detect and notify on unencrypted EBS volumes"
@@ -170,6 +170,15 @@
             "source_file": "aws-ec2-security.yml",
             "enforcement_level": "notify",
             "description": "Detect and remediate AMIs made publicly accessible"
+          }
+        ],
+        "ModifySnapshotAttribute": [
+          {
+            "policy_name": "ebs-snapshot-public",
+            "resource": "aws.ebs-snapshot",
+            "source_file": "aws-ec2-security.yml",
+            "enforcement_level": "notify",
+            "description": "Detect and remediate EBS snapshots made publicly accessible"
           }
         ],
         "CreateLoadBalancer": [

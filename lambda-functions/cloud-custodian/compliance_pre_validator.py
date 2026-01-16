@@ -53,6 +53,8 @@ class ResourceValidator:
             'CreateDBInstance': self.validate_rds_encryption,
             'CreateDBCluster': self.validate_rds_cluster_encryption,
             'ModifyImageAttribute': self.validate_ami_permissions,
+            'CreateVolume': self.validate_volume_encryption,
+            'ModifySnapshotAttribute': self.validate_snapshot_permissions,
         }
     
     def validate(self, event_name: str, event_detail: Dict[str, Any]) -> Dict[str, Any]:
@@ -448,6 +450,88 @@ class ResourceValidator:
             'resource_id': ami_id,
             'details': 'AMI not made public'
         }
+    
+    def validate_volume_encryption(self, event_detail: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Validate EBS volume encryption (CreateVolume).
+        
+        Checks if the volume is encrypted.
+        
+        Args:
+            event_detail: CloudTrail event detail
+            
+        Returns:
+            Validation result - proceed if unencrypted, skip if encrypted
+        """
+        request_params = event_detail.get('requestParameters', {})
+        response_elements = event_detail.get('responseElements', {})
+        
+        volume_id = response_elements.get('volumeId', 'unknown')
+        is_encrypted = request_params.get('encrypted', False)
+        
+        if not is_encrypted:
+            logger.info(f"Volume {volume_id} created without encryption - proceeding with validation")
+            return {
+                'action': 'proceed',
+                'reason': 'violation',
+                'resource_id': volume_id,
+                'violations': {
+                    'encryption': 'disabled'
+                }
+            }
+        
+        logger.info(f"Volume {volume_id} is encrypted - skipping")
+        return {
+            'action': 'skip',
+            'reason': 'compliant',
+            'resource_id': volume_id,
+            'details': 'Volume is encrypted'
+        }
+    
+    def validate_snapshot_permissions(self, event_detail: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Validate EBS snapshot permissions modification (ModifySnapshotAttribute).
+        
+        Checks if the snapshot was made public (createVolumePermission.add.group='all').
+        
+        Args:
+            event_detail: CloudTrail event detail
+            
+        Returns:
+            Validation result - proceed if made public, skip otherwise
+        """
+        request_params = event_detail.get('requestParameters', {})
+        snapshot_id = request_params.get('snapshotId', 'unknown')
+        
+        # Check if createVolumePermission is being modified
+        create_volume_permission = request_params.get('createVolumePermission', {})
+        add_groups = create_volume_permission.get('add', {}).get('items', [])
+        
+        # Check if 'all' group is being added (making snapshot public)
+        is_made_public = any(
+            item.get('group') == 'all' 
+            for item in add_groups
+        )
+        
+        if is_made_public:
+            logger.info(f"Snapshot {snapshot_id} is being made public - proceeding with validation")
+            return {
+                'action': 'proceed',
+                'reason': 'violation',
+                'resource_id': snapshot_id,
+                'violations': {
+                    'public_access': 'enabled'
+                }
+            }
+        
+        logger.info(f"Snapshot {snapshot_id} permissions modified but not made public - skipping")
+        return {
+            'action': 'skip',
+            'reason': 'compliant',
+            'resource_id': snapshot_id,
+            'details': 'Snapshot not made public'
+        }
+
     
     def get_supported_events(self) -> List[str]:
         """
