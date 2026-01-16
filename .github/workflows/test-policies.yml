@@ -356,7 +356,7 @@ jobs:
             --subnet-id ${{ steps.vpc.outputs.subnet_id }} \
             --security-group-ids ${{ steps.vpc.outputs.sg_id }} \
             --associate-public-ip-address \
-            --block-device-mappings "[{\"DeviceName\":\"/dev/xvda\",\"Ebs\":{\"VolumeSize\":8,\"VolumeType\":\"gp3\",\"DeleteOnTermination\":true,\"Encrypted\":false}}]" \
+            --block-device-mappings "[{\"DeviceName\":\"/dev/xvda\",\"Ebs\":{\"VolumeSize\":30,\"VolumeType\":\"gp3\",\"DeleteOnTermination\":true,\"Encrypted\":false}}]" \
             --metadata-options "HttpTokens=$IMDS_TOKENS,HttpPutResponseHopLimit=1" \
             --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=custodian-test-${{ inputs.policies_to_test }}},{Key=Environment,Value=test},{Key=CustodianTest,Value=true},{Key=Policy,Value=${{ inputs.policies_to_test }}}]" \
             --query 'Instances[0].InstanceId' \
