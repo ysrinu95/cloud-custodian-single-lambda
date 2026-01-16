@@ -1232,63 +1232,112 @@ jobs:
         run: |
           echo "🧹 Cleaning up VPC and networking resources..."
           
-          # Find test VPC
-          VPC_ID=$(aws ec2 describe-vpcs \
+          # Find all test VPCs
+          VPC_IDS=$(aws ec2 describe-vpcs \
             --filters "Name=tag:Name,Values=custodian-test-vpc" \
-            --query 'Vpcs[0].VpcId' \
+            --query 'Vpcs[*].VpcId' \
             --output text \
             --region ${{ env.AWS_REGION }})
           
-          if [ "$VPC_ID" != "None" ] && [ -n "$VPC_ID" ]; then
-            echo "Found VPC: $VPC_ID"
+          if [ -z "$VPC_IDS" ]; then
+            echo "No test VPCs found to clean up"
+            exit 0
+          fi
+          
+          echo "Found VPCs to delete: $VPC_IDS"
+          
+          for VPC_ID in $VPC_IDS; do
+            echo "🗑️  Deleting VPC: $VPC_ID"
             
-            # Delete security groups (except default)
-            SG_IDS=$(aws ec2 describe-security-groups \
-              --filters "Name=vpc-id,Values=$VPC_ID" \
-              --query 'SecurityGroups[?GroupName!=`default`].GroupId' \
+            # 1. Terminate EC2 instances
+            echo "  → Terminating EC2 instances..."
+            INSTANCE_IDS=$(aws ec2 describe-instances \
+              --filters "Name=vpc-id,Values=$VPC_ID" "Name=instance-state-name,Values=running,stopped,stopping" \
+              --query 'Reservations[*].Instances[*].InstanceId' \
               --output text \
               --region ${{ env.AWS_REGION }})
             
-            for SG_ID in $SG_IDS; do
-              echo "Deleting security group: $SG_ID"
-              aws ec2 delete-security-group \
-                --group-id $SG_ID \
-                --region ${{ env.AWS_REGION }} || echo "Failed to delete SG"
-            done
+            if [ -n "$INSTANCE_IDS" ]; then
+              for INSTANCE_ID in $INSTANCE_IDS; do
+                echo "    Terminating instance: $INSTANCE_ID"
+                aws ec2 terminate-instances \
+                  --instance-ids $INSTANCE_ID \
+                  --region ${{ env.AWS_REGION }} || echo "    Failed to terminate instance"
+              done
+              
+              echo "    ⏳ Waiting for instances to terminate..."
+              aws ec2 wait instance-terminated \
+                --instance-ids $INSTANCE_IDS \
+                --region ${{ env.AWS_REGION }} || echo "    Timeout waiting for termination"
+            fi
             
-            # Delete subnets
-            SUBNET_IDS=$(aws ec2 describe-subnets \
+            # 2. Delete network interfaces
+            echo "  → Deleting network interfaces..."
+            ENI_IDS=$(aws ec2 describe-network-interfaces \
               --filters "Name=vpc-id,Values=$VPC_ID" \
-              --query 'Subnets[].SubnetId' \
+              --query 'NetworkInterfaces[*].NetworkInterfaceId' \
               --output text \
               --region ${{ env.AWS_REGION }})
             
-            for SUBNET_ID in $SUBNET_IDS; do
-              echo "Deleting subnet: $SUBNET_ID"
-              aws ec2 delete-subnet \
-                --subnet-id $SUBNET_ID \
-                --region ${{ env.AWS_REGION }} || echo "Failed to delete subnet"
+            for ENI_ID in $ENI_IDS; do
+              ATTACHMENT_ID=$(aws ec2 describe-network-interfaces \
+                --network-interface-ids $ENI_ID \
+                --query 'NetworkInterfaces[0].Attachment.AttachmentId' \
+                --output text \
+                --region ${{ env.AWS_REGION }})
+              
+              if [ "$ATTACHMENT_ID" != "None" ] && [ -n "$ATTACHMENT_ID" ]; then
+                echo "    Detaching ENI: $ENI_ID"
+                aws ec2 detach-network-interface \
+                  --attachment-id $ATTACHMENT_ID \
+                  --region ${{ env.AWS_REGION }} --force || echo "    Failed to detach ENI"
+                sleep 5
+              fi
+              
+              echo "    Deleting ENI: $ENI_ID"
+              aws ec2 delete-network-interface \
+                --network-interface-id $ENI_ID \
+                --region ${{ env.AWS_REGION }} || echo "    Failed to delete ENI"
             done
             
-            # Detach and delete internet gateways
+            # 3. Detach and delete internet gateways
+            echo "  → Detaching and deleting internet gateways..."
             IGW_IDS=$(aws ec2 describe-internet-gateways \
               --filters "Name=attachment.vpc-id,Values=$VPC_ID" \
-              --query 'InternetGateways[].InternetGatewayId' \
+              --query 'InternetGateways[*].InternetGatewayId' \
               --output text \
               --region ${{ env.AWS_REGION }})
             
             for IGW_ID in $IGW_IDS; do
-              echo "Detaching and deleting IGW: $IGW_ID"
+              echo "    Detaching IGW: $IGW_ID"
               aws ec2 detach-internet-gateway \
                 --internet-gateway-id $IGW_ID \
                 --vpc-id $VPC_ID \
-                --region ${{ env.AWS_REGION }} || echo "Failed to detach IGW"
+                --region ${{ env.AWS_REGION }} || echo "    Failed to detach IGW"
+              
+              echo "    Deleting IGW: $IGW_ID"
               aws ec2 delete-internet-gateway \
                 --internet-gateway-id $IGW_ID \
-                --region ${{ env.AWS_REGION }} || echo "Failed to delete IGW"
+                --region ${{ env.AWS_REGION }} || echo "    Failed to delete IGW"
             done
             
-            # Delete route tables (except main)
+            # 4. Delete subnets
+            echo "  → Deleting subnets..."
+            SUBNET_IDS=$(aws ec2 describe-subnets \
+              --filters "Name=vpc-id,Values=$VPC_ID" \
+              --query 'Subnets[*].SubnetId' \
+              --output text \
+              --region ${{ env.AWS_REGION }})
+            
+            for SUBNET_ID in $SUBNET_IDS; do
+              echo "    Deleting subnet: $SUBNET_ID"
+              aws ec2 delete-subnet \
+                --subnet-id $SUBNET_ID \
+                --region ${{ env.AWS_REGION }} || echo "    Failed to delete subnet"
+            done
+            
+            # 5. Delete route tables (except main)
+            echo "  → Deleting custom route tables..."
             RT_IDS=$(aws ec2 describe-route-tables \
               --filters "Name=vpc-id,Values=$VPC_ID" \
               --query 'RouteTables[?Associations[0].Main!=`true`].RouteTableId' \
@@ -1296,22 +1345,52 @@ jobs:
               --region ${{ env.AWS_REGION }})
             
             for RT_ID in $RT_IDS; do
-              echo "Deleting route table: $RT_ID"
+              echo "    Deleting route table: $RT_ID"
               aws ec2 delete-route-table \
                 --route-table-id $RT_ID \
-                --region ${{ env.AWS_REGION }} || echo "Failed to delete route table"
+                --region ${{ env.AWS_REGION }} || echo "    Failed to delete route table"
             done
             
-            # Finally delete VPC
-            echo "Deleting VPC: $VPC_ID"
+            # 6. Delete security groups (except default)
+            echo "  → Deleting security groups..."
+            SG_IDS=$(aws ec2 describe-security-groups \
+              --filters "Name=vpc-id,Values=$VPC_ID" \
+              --query 'SecurityGroups[?GroupName!=`default`].GroupId' \
+              --output text \
+              --region ${{ env.AWS_REGION }})
+            
+            for SG_ID in $SG_IDS; do
+              echo "    Deleting security group: $SG_ID"
+              aws ec2 delete-security-group \
+                --group-id $SG_ID \
+                --region ${{ env.AWS_REGION }} || echo "    Failed to delete security group"
+            done
+            
+            # 7. Delete network ACLs (except default)
+            echo "  → Deleting network ACLs..."
+            NACL_IDS=$(aws ec2 describe-network-acls \
+              --filters "Name=vpc-id,Values=$VPC_ID" \
+              --query 'NetworkAcls[?IsDefault==`false`].NetworkAclId' \
+              --output text \
+              --region ${{ env.AWS_REGION }})
+            
+            for NACL_ID in $NACL_IDS; do
+              echo "    Deleting network ACL: $NACL_ID"
+              aws ec2 delete-network-acl \
+                --network-acl-id $NACL_ID \
+                --region ${{ env.AWS_REGION }} || echo "    Failed to delete network ACL"
+            done
+            
+            # 8. Finally delete VPC
+            echo "  → Deleting VPC..."
             aws ec2 delete-vpc \
               --vpc-id $VPC_ID \
-              --region ${{ env.AWS_REGION }} || echo "Failed to delete VPC"
+              --region ${{ env.AWS_REGION }}
             
-            echo "✅ VPC cleanup completed"
-          else
-            echo "No test VPC found to clean up"
-          fi
+            echo "✅ VPC $VPC_ID deleted successfully"
+          done
+          
+          echo "✅ VPC cleanup completed"
       
       - name: Cleanup summary
         run: |
