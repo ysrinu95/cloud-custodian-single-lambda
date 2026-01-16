@@ -265,10 +265,11 @@ jobs:
           
           echo "✅ Attached IGW: $IGW_ID"
           
-          # Create Subnet
+          # Create Subnet in us-east-1b (supports t3.micro)
           SUBNET_ID=$(aws ec2 create-subnet \
             --vpc-id $VPC_ID \
             --cidr-block 10.0.1.0/24 \
+            --availability-zone us-east-1b \
             --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=custodian-test-subnet}]" \
             --query 'Subnet.SubnetId' \
             --output text \
