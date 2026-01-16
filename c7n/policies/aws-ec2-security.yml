@@ -31,9 +31,6 @@ policies:
         transport:
           type: sqs
           queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
-      
-      - type: remove-launch-permissions
-        accounts: matched
 
   # EBS snapshot not encrypted - realtime/periodic
   - name: ebs-snapshot-unencrypted
