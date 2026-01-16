@@ -701,57 +701,20 @@ def build_filters_and_resources(event_info: Dict[str, Any], resource_type: str, 
                 if instances:
                     result['provided_resources'] = instances
 
-        # For AMI CreateImage events, synthesize resource from CloudTrail responseElements
-        # to avoid API query timing issues (AMIs in "pending" state may not be queryable)
-        elif resource_type == 'aws.ami':
-            raw_event = event_info.get('raw_event', {})
-            event_name = raw_event.get('detail', {}).get('eventName')
-            
-            if event_name == 'CreateImage':
-                logger.info(f"Synthesizing AMI resource from CloudTrail CreateImage event")
-                response_elements = raw_event.get('detail', {}).get('responseElements', {})
-                request_parameters = raw_event.get('detail', {}).get('requestParameters', {})
-                
-                if response_elements and response_elements.get('imageId'):
-                    # Synthesize AMI resource matching describe_images API response format
-                    ami_resource = {
-                        'ImageId': response_elements.get('imageId'),
-                        'Name': request_parameters.get('name'),
-                        'Description': request_parameters.get('description', ''),
-                        'State': 'pending',  # CreateImage returns pending state
-                        'Public': False,  # Default to private
-                        'OwnerId': event_info.get('source_account'),
-                        'Architecture': 'x86_64',  # Most common
-                        'CreationDate': event_info.get('event_time'),
-                        'ImageType': 'machine',
-                        'RootDeviceType': 'ebs',
-                        'VirtualizationType': 'hvm',
-                        'Tags': [],
-                        'BlockDeviceMappings': request_parameters.get('blockDeviceMapping', {}).get('items', []),
-                        'c7n:MatchedFilters': ['event-filter']
-                    }
-                    
+        elif session and resource_type == 'aws.ami' and ids:
+            client = session.client('ec2', region_name=region)
+            # Filter to only AMI IDs (ami-*), not instance IDs (i-*) or other IDs
+            ami_ids = [id for id in ids if id.startswith('ami-')]
+            if ami_ids:
+                images = []
+                resp = client.describe_images(ImageIds=ami_ids)
+                for img in resp.get('Images', []):
+                    img['c7n:MatchedFilters'] = ['event-filter']
                     if creator_name:
-                        ami_resource['c7n:CreatorName'] = creator_name
-                    
-                    result['provided_resources'] = [ami_resource]
-                    logger.info(f"Synthesized AMI resource: {ami_resource['ImageId']}, State=pending")
-            
-            # Fallback to API query for other events or if synthesis fails
-            elif session and ids:
-                client = session.client('ec2', region_name=region)
-                # Filter to only AMI IDs (ami-*), not instance IDs (i-*) or other IDs
-                ami_ids = [id for id in ids if id.startswith('ami-')]
-                if ami_ids:
-                    images = []
-                    resp = client.describe_images(ImageIds=ami_ids)
-                    for img in resp.get('Images', []):
-                        img['c7n:MatchedFilters'] = ['event-filter']
-                        if creator_name:
-                            img['c7n:CreatorName'] = creator_name
-                        images.append(img)
-                    if images:
-                        result['provided_resources'] = images
+                        img['c7n:CreatorName'] = creator_name
+                    images.append(img)
+                if images:
+                    result['provided_resources'] = images
 
         # -------------------- LAMBDA --------------------
         elif session and resource_type == 'aws.lambda' and names:

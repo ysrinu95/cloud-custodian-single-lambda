@@ -36,6 +36,7 @@ class ResourceValidator:
     - Elasticsearch/OpenSearch - encryption at rest and node-to-node
     - Redshift - encryption at rest
     - RDS - encryption at rest (DB instances and Aurora clusters)
+    - AMI - public accessibility (CreateImage and ModifyImageAttribute)
     """
     
     # Required EKS logging types
@@ -51,6 +52,8 @@ class ResourceValidator:
             'CreateElasticsearchDomain': self.validate_elasticsearch_encryption,
             'CreateDBInstance': self.validate_rds_encryption,
             'CreateDBCluster': self.validate_rds_cluster_encryption,
+            'CreateImage': self.validate_ami_create,
+            'ModifyImageAttribute': self.validate_ami_permissions,
         }
     
     def validate(self, event_name: str, event_detail: Dict[str, Any]) -> Dict[str, Any]:
@@ -401,6 +404,74 @@ class ResourceValidator:
             'action': 'skip',
             'reason': 'compliant',
             'resource_id': db_cluster_id
+        }
+    
+    def validate_ami_create(self, event_detail: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Validate AMI creation event (CreateImage).
+        
+        For CreateImage events, AMIs are always created as private by default,
+        so we can skip Cloud Custodian validation immediately.
+        
+        Args:
+            event_detail: CloudTrail event detail
+            
+        Returns:
+            Validation result - always skip for CreateImage (AMIs start private)
+        """
+        response = event_detail.get('responseElements', {})
+        ami_id = response.get('imageId', 'unknown')
+        
+        logger.info(f"AMI {ami_id} created - private by default, skipping validation")
+        return {
+            'action': 'skip',
+            'reason': 'compliant',
+            'resource_id': ami_id,
+            'details': 'New AMIs are always private by default'
+        }
+    
+    def validate_ami_permissions(self, event_detail: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Validate AMI permissions modification (ModifyImageAttribute).
+        
+        Checks if the AMI was made public (launchPermission.add.group='all').
+        
+        Args:
+            event_detail: CloudTrail event detail
+            
+        Returns:
+            Validation result - proceed if made public, skip otherwise
+        """
+        request_params = event_detail.get('requestParameters', {})
+        ami_id = request_params.get('imageId', 'unknown')
+        
+        # Check if launchPermission is being modified
+        launch_permission = request_params.get('launchPermission', {})
+        add_groups = launch_permission.get('add', {}).get('items', [])
+        
+        # Check if 'all' group is being added (making AMI public)
+        is_made_public = any(
+            item.get('group') == 'all' 
+            for item in add_groups
+        )
+        
+        if is_made_public:
+            logger.info(f"AMI {ami_id} is being made public - proceeding with validation")
+            return {
+                'action': 'proceed',
+                'reason': 'violation',
+                'resource_id': ami_id,
+                'violations': {
+                    'public_access': 'enabled'
+                }
+            }
+        
+        logger.info(f"AMI {ami_id} permissions modified but not made public - skipping")
+        return {
+            'action': 'skip',
+            'reason': 'compliant',
+            'resource_id': ami_id,
+            'details': 'AMI not made public'
         }
     
     def get_supported_events(self) -> List[str]:
