@@ -814,7 +814,7 @@ resource "null_resource" "lambda_function_build" {
       rm -rf "$${BUILD_DIR}"
       
       echo "✅ Lambda function build complete: $${ZIP_NAME}"
-      echo "✅ Lambda handler is ready: lambda_function.handler"
+      echo "✅ Lambda handler is ready: lambda_handler.handler"
     EOT
   }
 }
@@ -847,7 +847,7 @@ resource "aws_lambda_function" "custodian_cross_account_executor" {
   filename         = fileexists("${path.module}/${var.lambda_package_path}") ? "${path.module}/${var.lambda_package_path}" : "${path.module}/${local.lambda_zip_name}"
   function_name    = "cloud-custodian-cross-account-executor"
   role             = aws_iam_role.lambda_execution.arn
-  handler          = "lambda_function.handler"
+  handler          = "lambda_handler.handler"
   runtime          = "python3.11"
   timeout          = var.lambda_timeout
   memory_size      = var.lambda_memory_size
