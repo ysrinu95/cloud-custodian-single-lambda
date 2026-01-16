@@ -4,9 +4,6 @@ policies:
     resource: aws.ami
     description: Detect Amazon Machine Images (AMIs) that are publicly accessible
     
-    filters:
-      - type: cross-account
-    
     actions:
       - type: notify
         template: default.html
