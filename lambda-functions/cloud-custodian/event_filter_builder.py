@@ -538,7 +538,23 @@ def build_filters_and_resources(event_info: Dict[str, Any], resource_type: str, 
     elif ids:
         id_field = ID_FIELD_MAPPING.get(resource_type)
         if id_field and ids:
-            result['filters'].append({'type': 'value', 'key': id_field, 'value': ids[0]})
+            # Filter IDs by resource-specific patterns to avoid mismatches
+            filtered_ids = ids
+            if resource_type == 'aws.ec2':
+                # EC2 instances: only use instance IDs (i-*), not AMI IDs (ami-*) or other IDs
+                filtered_ids = [id for id in ids if id.startswith('i-')]
+            elif resource_type == 'aws.ami':
+                # AMIs: only use AMI IDs (ami-*), not instance IDs
+                filtered_ids = [id for id in ids if id.startswith('ami-')]
+            elif resource_type == 'aws.ebs':
+                # EBS volumes: only use volume IDs (vol-*)
+                filtered_ids = [id for id in ids if id.startswith('vol-')]
+            elif resource_type == 'aws.ebs-snapshot':
+                # EBS snapshots: only use snapshot IDs (snap-*)
+                filtered_ids = [id for id in ids if id.startswith('snap-')]
+            
+            if filtered_ids:
+                result['filters'].append({'type': 'value', 'key': id_field, 'value': filtered_ids[0]})
 
     # Strategy 3: Filter by name (for S3, IAM, Lambda, etc.)
     elif names:
@@ -666,33 +682,39 @@ def build_filters_and_resources(event_info: Dict[str, Any], resource_type: str, 
         # -------------------- COMPUTE --------------------
         elif session and resource_type == 'aws.ec2' and ids:
             client = session.client('ec2', region_name=region)
-            instances = []
-            resp = client.describe_instances(InstanceIds=ids)
-            for r in resp.get('Reservations', []):
-                for i in r.get('Instances', []):
-                    i['c7n:MatchedFilters'] = ['event-filter']
-                    # Add creator information if available
-                    if creator_name:
-                        # Add to Tags if not already present
-                        if 'Tags' not in i:
-                            i['Tags'] = []
-                        i['Tags'].append({'Key': 'c7n:CreatorName', 'Value': creator_name})
-                        i['c7n:CreatorName'] = creator_name
-                    instances.append(i)
-            if instances:
-                result['provided_resources'] = instances
+            # Filter to only EC2 instance IDs (i-*), not AMI IDs (ami-*) or other IDs
+            instance_ids = [id for id in ids if id.startswith('i-')]
+            if instance_ids:
+                instances = []
+                resp = client.describe_instances(InstanceIds=instance_ids)
+                for r in resp.get('Reservations', []):
+                    for i in r.get('Instances', []):
+                        i['c7n:MatchedFilters'] = ['event-filter']
+                        # Add creator information if available
+                        if creator_name:
+                            # Add to Tags if not already present
+                            if 'Tags' not in i:
+                                i['Tags'] = []
+                            i['Tags'].append({'Key': 'c7n:CreatorName', 'Value': creator_name})
+                            i['c7n:CreatorName'] = creator_name
+                        instances.append(i)
+                if instances:
+                    result['provided_resources'] = instances
 
         elif session and resource_type == 'aws.ami' and ids:
             client = session.client('ec2', region_name=region)
-            images = []
-            resp = client.describe_images(ImageIds=ids)
-            for img in resp.get('Images', []):
-                img['c7n:MatchedFilters'] = ['event-filter']
-                if creator_name:
-                    img['c7n:CreatorName'] = creator_name
-                images.append(img)
-            if images:
-                result['provided_resources'] = images
+            # Filter to only AMI IDs (ami-*), not instance IDs (i-*) or other IDs
+            ami_ids = [id for id in ids if id.startswith('ami-')]
+            if ami_ids:
+                images = []
+                resp = client.describe_images(ImageIds=ami_ids)
+                for img in resp.get('Images', []):
+                    img['c7n:MatchedFilters'] = ['event-filter']
+                    if creator_name:
+                        img['c7n:CreatorName'] = creator_name
+                    images.append(img)
+                if images:
+                    result['provided_resources'] = images
 
         # -------------------- LAMBDA --------------------
         elif session and resource_type == 'aws.lambda' and names:

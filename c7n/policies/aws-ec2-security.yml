@@ -202,7 +202,7 @@ policies:
           **EC2 Instance Using Insecure IMDSv1**
           
           **Instance ID:** {{ resource.InstanceId }}
-          **Instance Name:** {{ resource.Tags[?Key=='Name'].Value | [0] }}
+          **Instance Name:** {% for tag in resource.Tags %}{% if tag.Key == 'Name' %}{{ tag.Value }}{% endif %}{% endfor %}
           **Current IMDS Config:** {{ resource.MetadataOptions.HttpTokens }}
           
           **Risk:** IMDSv1 is vulnerable to SSRF attacks that can leak credentials.

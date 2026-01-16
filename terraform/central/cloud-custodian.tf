@@ -1077,7 +1077,11 @@ resource "aws_iam_role_policy" "lambda_execution_policy" {
           "ec2:DescribeInstances",
           "ec2:DescribeInstanceAttribute",
           "ec2:DescribeInstanceStatus",
-          "ec2:DescribeTags"
+          "ec2:DescribeTags",
+          "ec2:DescribeVolumes",
+          "ec2:DescribeSnapshots",
+          "ec2:DescribeImages",
+          "ec2:DescribeImageAttribute"
         ]
         Resource = "*"
       },
