@@ -203,9 +203,6 @@ jobs:
             xargs -I {} aws elbv2 delete-target-group --target-group-arn {} --region $REGION 2>/dev/null || true
           
           echo "✅ Cleanup complete"
-            xargs -I {} bash -c 'aws iam delete-login-profile --user-name {} 2>/dev/null; aws iam delete-user --user-name {}' || true
-          
-          echo "✅ Cleanup complete"
 
       - name: Create S3 test resources
         if: contains(github.event.inputs.resource_types, 's3') || github.event.inputs.resource_types == 'all'
