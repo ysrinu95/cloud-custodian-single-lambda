@@ -119,7 +119,6 @@ jobs:
           fi
           
           echo "✅ Successfully assumed role in member account"
-          aws-region: ${{ env.AWS_REGION }}
 
       - name: Verify AWS credentials
         run: |
