@@ -79,7 +79,7 @@ policies:
           - ysrinu95@gmail.com
         transport:
           type: sqs
-          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications
 
   # CloudFront access logging not to central bucket
   - name: cloudfront-logging-not-central
@@ -173,7 +173,7 @@ policies:
           - ysrinu95@gmail.com
         transport:
           type: sqs
-          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications
 
   # CloudFront with TLS version 1.1 or lower
   - name: cloudfront-tls-v11-or-lower
@@ -252,4 +252,4 @@ policies:
           - ysrinu95@gmail.com
         transport:
           type: sqs
-          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-periodic-notifications
