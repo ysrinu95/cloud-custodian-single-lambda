@@ -629,6 +629,7 @@ jobs:
           
           # 2. ElastiCache Redis without transit encryption (should be detected)
           # Note: For transit encryption, need to create replication group
+          # Omitting --transit-encryption-enabled flag means it defaults to false
           REPL_NO_TRANSIT="${{ env.TEST_RESOURCE_PREFIX }}-redis-no-transit-${TIMESTAMP}"
           aws elasticache create-replication-group \
             --replication-group-id ${REPL_NO_TRANSIT} \
@@ -637,7 +638,6 @@ jobs:
             --cache-node-type cache.t3.micro \
             --num-cache-clusters 1 \
             --at-rest-encryption-enabled \
-            --transit-encryption-enabled false \
             --security-group-ids ${SG_ID} \
             --tags "Key=${{ env.TEST_TAG_KEY }},Value=${{ env.TEST_TAG_VALUE }}" "Key=Violation,Value=NoTransitEncryption" \
             --region $REGION
