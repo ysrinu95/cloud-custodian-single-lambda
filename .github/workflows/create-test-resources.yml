@@ -50,12 +50,52 @@ jobs:
           role-to-assume: arn:aws:iam::${{ env.CENTRAL_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
           aws-region: ${{ github.event.inputs.region || env.AWS_REGION }}
 
-      - name: Assume member account role
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::${{ github.event.inputs.account_id }}:role/CloudCustodianExecutionRole
-          role-chaining: true
-          aws-region: ${{ github.event.inputs.region || env.AWS_REGION }}
+      - name: Assume role in Member Account
+        run: |
+          echo "🔐 Assuming CloudCustodianExecutionRole in member account..."
+          echo "Target account: ${{ github.event.inputs.account_id }}"
+          
+          # First, verify we're starting from central account
+          CURRENT_ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          echo "Current account: $CURRENT_ACCOUNT"
+          
+          if [ "$CURRENT_ACCOUNT" != "${{ env.CENTRAL_ACCOUNT_ID }}" ]; then
+            echo "::error::Expected to be in central account ${{ env.CENTRAL_ACCOUNT_ID }}, but in $CURRENT_ACCOUNT"
+            exit 1
+          fi
+          
+          # Assume role in member account
+          CREDENTIALS=$(aws sts assume-role \
+            --role-arn "arn:aws:iam::${{ github.event.inputs.account_id }}:role/CloudCustodianExecutionRole" \
+            --role-session-name "github-actions-create-test-resources" \
+            --duration-seconds 3600 \
+            --output json 2>&1)
+          
+          if [ $? -ne 0 ]; then
+            echo "::error::Failed to assume role: $CREDENTIALS"
+            exit 1
+          fi
+          
+          # Export credentials to environment
+          export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId')
+          export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey')
+          export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r '.Credentials.SessionToken')
+          
+          # Also save to GITHUB_ENV for subsequent steps
+          echo "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" >> $GITHUB_ENV
+          echo "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" >> $GITHUB_ENV
+          echo "AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN" >> $GITHUB_ENV
+          
+          # Verify we're now in the member account
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "✅ Now in account: $ACCOUNT_ID"
+          
+          if [ "$ACCOUNT_ID" != "${{ github.event.inputs.account_id }}" ]; then
+            echo "::error::Failed to assume role in member account. Expected ${{ github.event.inputs.account_id }}, got $ACCOUNT_ID"
+            exit 1
+          fi
+          
+          echo "✅ Successfully assumed role in member account"
 
       - name: Verify AWS credentials
         run: |
