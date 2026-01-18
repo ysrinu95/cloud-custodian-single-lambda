@@ -151,13 +151,26 @@ jobs:
           
           # Cleanup IAM test users (be careful!)
           echo "Cleaning IAM test users..."
-          aws iam list-users --query "Users[?starts_with(UserName, '${{ env.TEST_RESOURCE_PREFIX }}-iam-user')].UserName" --output text | \
-            xargs -I {} bash -c 'aws iam delete-login-profile --user-name {} 2>/dev/null; aws iam list-access-keys --user-name {} --query "AccessKeyMetadata[].AccessKeyId" --output text | xargs -I [] aws iam delete-access-key --user-name {} --access-key-id []; aws iam delete-user --user-name {}' || true
+          aws iam list-users --query "Users[?starts_with(UserName, '${{ env.TEST_RESOURCE_PREFIX }}-iam-user')].UserName" --output text | tr '\t' '\n' | while read user; do
+            [ -z "$user" ] && continue
+            aws iam delete-login-profile --user-name "$user" 2>/dev/null || true
+            aws iam list-access-keys --user-name "$user" --query 'AccessKeyMetadata[].AccessKeyId' --output text | tr '\t' '\n' | while read key; do
+              [ -z "$key" ] && continue
+              aws iam delete-access-key --user-name "$user" --access-key-id "$key" 2>/dev/null || true
+            done
+            aws iam delete-user --user-name "$user" 2>/dev/null || true
+          done
           
           # Cleanup IAM test roles
           echo "Cleaning IAM test roles..."
-          aws iam list-roles --query "Roles[?starts_with(RoleName, '${{ env.TEST_RESOURCE_PREFIX }}')].RoleName" --output text | \
-            xargs -I {} bash -c 'aws iam list-attached-role-policies --role-name {} --query "AttachedPolicies[].PolicyArn" --output text | xargs -I [] aws iam detach-role-policy --role-name {} --policy-arn []; aws iam delete-role --role-name {}' 2>/dev/null || true
+          aws iam list-roles --query "Roles[?starts_with(RoleName, '${{ env.TEST_RESOURCE_PREFIX }}')].RoleName" --output text | tr '\t' '\n' | while read role; do
+            [ -z "$role" ] && continue
+            aws iam list-attached-role-policies --role-name "$role" --query 'AttachedPolicies[].PolicyArn' --output text | tr '\t' '\n' | while read policy; do
+              [ -z "$policy" ] && continue
+              aws iam detach-role-policy --role-name "$role" --policy-arn "$policy" 2>/dev/null || true
+            done
+            aws iam delete-role --role-name "$role" 2>/dev/null || true
+          done
           
           # Cleanup RDS instances
           echo "Cleaning RDS test instances..."
@@ -181,12 +194,12 @@ jobs:
           
           # Cleanup Load Balancers
           echo "Cleaning ALB/NLB test load balancers..."
-          aws elbv2 describe-load-balancers --region $REGION --query "LoadBalancers[?starts_with(LoadBalancerName, '${{ env.TEST_RESOURCE_PREFIX }}-alb')].LoadBalancerArn" --output text | \
+          aws elbv2 describe-load-balancers --region $REGION --query "LoadBalancers[?starts_with(LoadBalancerName, 'c7n-alb-')].LoadBalancerArn" --output text | \
             xargs -I {} aws elbv2 delete-load-balancer --load-balancer-arn {} --region $REGION 2>/dev/null || true
           
           # Cleanup Target Groups
           echo "Cleaning target groups..."
-          aws elbv2 describe-target-groups --region $REGION --query "TargetGroups[?starts_with(TargetGroupName, '${{ env.TEST_RESOURCE_PREFIX }}')].TargetGroupArn" --output text | \
+          aws elbv2 describe-target-groups --region $REGION --query "TargetGroups[?starts_with(TargetGroupName, 'c7n-tg-')].TargetGroupArn" --output text | \
             xargs -I {} aws elbv2 delete-target-group --target-group-arn {} --region $REGION 2>/dev/null || true
           
           echo "✅ Cleanup complete"
@@ -674,19 +687,21 @@ jobs:
           echo "Using Security Group: ${SG_ID}"
           
           # 1. ALB with outdated TLS policy (should be detected)
-          ALB_OUTDATED_TLS="${{ env.TEST_RESOURCE_PREFIX }}-alb-outdated-tls-${TIMESTAMP}"
+          # ALB names are limited to 32 characters
+          ALB_NAME="c7n-alb-tls-${TIMESTAMP}"
           ALB_ARN=$(aws elbv2 create-load-balancer \
-            --name ${ALB_OUTDATED_TLS} \
+            --name ${ALB_NAME} \
             --subnets ${SUBNETS} \
             --security-groups ${SG_ID} \
             --tags "Key=${{ env.TEST_TAG_KEY }},Value=${{ env.TEST_TAG_VALUE }}" "Key=Violation,Value=OutdatedTLS" \
             --query "LoadBalancers[0].LoadBalancerArn" \
             --output text --region $REGION)
-          echo "✅ Created: ${ALB_OUTDATED_TLS} (ARN: ${ALB_ARN})"
+          echo "✅ Created: ${ALB_NAME} (ARN: ${ALB_ARN})"
           
-          # Create target group
+          # Create target group (also limited to 32 characters)
+          TG_NAME="c7n-tg-${TIMESTAMP}"
           TG_ARN=$(aws elbv2 create-target-group \
-            --name ${ALB_OUTDATED_TLS:0:32} \
+            --name ${TG_NAME} \
             --protocol HTTP \
             --port 80 \
             --vpc-id ${VPC_ID} \
@@ -706,7 +721,7 @@ jobs:
           
           echo ""
           echo "📊 ELB/ALB Test Resources Summary:"
-          echo "   - Outdated TLS Policy: ${ALB_OUTDATED_TLS}"
+          echo "   - Outdated TLS Policy: ${ALB_NAME}"
 
       - name: Generate summary report
         if: always()
