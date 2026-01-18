@@ -1,0 +1,379 @@
+name: Cleanup Test Resources
+
+on:
+  workflow_dispatch:
+    inputs:
+      resource_types:
+        description: 'Resource types to clean up (comma-separated: s3,ec2,iam,lambda,rds,cloudwatch,elasticache,elb,all)'
+        required: true
+        default: 'all'
+        type: string
+      confirm_deletion:
+        description: 'Type DELETE to confirm deletion of all test resources'
+        required: true
+        type: string
+      target_account:
+        description: 'Target AWS account ID'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  cleanup-test-resources:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm_deletion }}" != "DELETE" ]; then
+            echo "❌ Deletion not confirmed. You must type 'DELETE' to proceed."
+            exit 1
+          fi
+          echo "✅ Deletion confirmed"
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::172327596604:role/GitHubActions-CloudCustodian-Role
+          role-session-name: github-actions-cleanup-test-resources
+          aws-region: us-east-1
+
+      - name: Assume Role in Target Account
+        id: assume-role
+        run: |
+          account_id="${{ github.event.inputs.target_account }}"
+          
+          echo "Attempting to assume role in account: $account_id"
+          
+          # Try OrganizationAccountAccessRole first (standard AWS Organizations role)
+          CREDENTIALS=$(aws sts assume-role \
+            --role-arn "arn:aws:iam::${account_id}:role/OrganizationAccountAccessRole" \
+            --role-session-name "github-actions-cleanup-test-resources" \
+            --duration-seconds 3600 2>&1)
+          
+          if [ $? -ne 0 ]; then
+            echo "OrganizationAccountAccessRole failed, trying CloudCustodianExecutionRole..."
+            CREDENTIALS=$(aws sts assume-role \
+              --role-arn "arn:aws:iam::${account_id}:role/CloudCustodianExecutionRole" \
+              --role-session-name "github-actions-cleanup-test-resources" \
+              --duration-seconds 3600)
+          fi
+          
+          export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId')
+          export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey')
+          export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r '.Credentials.SessionToken')
+          
+          echo "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" >> $GITHUB_ENV
+          echo "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" >> $GITHUB_ENV
+          echo "AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN" >> $GITHUB_ENV
+          
+          # Verify we're in the target account
+          CURRENT_ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          echo "Current account: $CURRENT_ACCOUNT"
+          
+          if [ "$CURRENT_ACCOUNT" != "$account_id" ]; then
+            echo "❌ Failed to assume role in target account"
+            exit 1
+          fi
+          
+          echo "✅ Successfully assumed role in account: $CURRENT_ACCOUNT"
+
+      - name: Parse Resource Types
+        id: parse-types
+        run: |
+          TYPES="${{ github.event.inputs.resource_types }}"
+          
+          if [ "$TYPES" == "all" ]; then
+            echo "cleanup_s3=true" >> $GITHUB_OUTPUT
+            echo "cleanup_ec2=true" >> $GITHUB_OUTPUT
+            echo "cleanup_iam=true" >> $GITHUB_OUTPUT
+            echo "cleanup_lambda=true" >> $GITHUB_OUTPUT
+            echo "cleanup_rds=true" >> $GITHUB_OUTPUT
+            echo "cleanup_cloudwatch=true" >> $GITHUB_OUTPUT
+            echo "cleanup_elasticache=true" >> $GITHUB_OUTPUT
+            echo "cleanup_elb=true" >> $GITHUB_OUTPUT
+          else
+            echo "cleanup_s3=$(echo $TYPES | grep -q 's3' && echo true || echo false)" >> $GITHUB_OUTPUT
+            echo "cleanup_ec2=$(echo $TYPES | grep -q 'ec2' && echo true || echo false)" >> $GITHUB_OUTPUT
+            echo "cleanup_iam=$(echo $TYPES | grep -q 'iam' && echo true || echo false)" >> $GITHUB_OUTPUT
+            echo "cleanup_lambda=$(echo $TYPES | grep -q 'lambda' && echo true || echo false)" >> $GITHUB_OUTPUT
+            echo "cleanup_rds=$(echo $TYPES | grep -q 'rds' && echo true || echo false)" >> $GITHUB_OUTPUT
+            echo "cleanup_cloudwatch=$(echo $TYPES | grep -q 'cloudwatch' && echo true || echo false)" >> $GITHUB_OUTPUT
+            echo "cleanup_elasticache=$(echo $TYPES | grep -q 'elasticache' && echo true || echo false)" >> $GITHUB_OUTPUT
+            echo "cleanup_elb=$(echo $TYPES | grep -q 'elb' && echo true || echo false)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Cleanup S3 Buckets
+        if: steps.parse-types.outputs.cleanup_s3 == 'true'
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🗑️  Cleaning up S3 test buckets"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          for bucket in $(aws s3api list-buckets --query 'Buckets[?contains(Name, `c7n-test-`) == `true`].Name' --output text); do
+            echo "Deleting bucket: $bucket"
+            
+            # Remove all versions and delete markers
+            aws s3api delete-objects --bucket "$bucket" \
+              --delete "$(aws s3api list-object-versions --bucket "$bucket" \
+              --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}' --output json)" 2>/dev/null || true
+            
+            aws s3api delete-objects --bucket "$bucket" \
+              --delete "$(aws s3api list-object-versions --bucket "$bucket" \
+              --query '{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}' --output json)" 2>/dev/null || true
+            
+            # Delete all objects
+            aws s3 rm "s3://$bucket" --recursive 2>/dev/null || true
+            
+            # Delete bucket
+            aws s3api delete-bucket --bucket "$bucket" --region us-east-1 2>/dev/null || true
+            echo "✅ Deleted: $bucket"
+          done
+
+      - name: Cleanup EC2 Instances
+        if: steps.parse-types.outputs.cleanup_ec2 == 'true'
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🗑️  Cleaning up EC2 test instances"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          for region in us-east-1 us-west-2 eu-west-1; do
+            echo "Region: $region"
+            
+            INSTANCE_IDS=$(aws ec2 describe-instances \
+              --region "$region" \
+              --filters "Name=tag:Name,Values=c7n-test-*" "Name=instance-state-name,Values=running,stopped,stopping" \
+              --query 'Reservations[].Instances[].InstanceId' \
+              --output text)
+            
+            if [ -n "$INSTANCE_IDS" ]; then
+              echo "Terminating instances: $INSTANCE_IDS"
+              aws ec2 terminate-instances --instance-ids $INSTANCE_IDS --region "$region"
+              echo "✅ Terminated instances in $region"
+            else
+              echo "No test instances found in $region"
+            fi
+          done
+
+      - name: Cleanup Security Groups
+        if: steps.parse-types.outputs.cleanup_ec2 == 'true'
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🗑️  Cleaning up test security groups"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          # Wait for instances to terminate
+          sleep 60
+          
+          for region in us-east-1 us-west-2 eu-west-1; do
+            echo "Region: $region"
+            
+            SG_IDS=$(aws ec2 describe-security-groups \
+              --region "$region" \
+              --filters "Name=tag:Name,Values=c7n-test-*" \
+              --query 'SecurityGroups[].GroupId' \
+              --output text)
+            
+            for sg_id in $SG_IDS; do
+              echo "Deleting security group: $sg_id"
+              aws ec2 delete-security-group --group-id "$sg_id" --region "$region" 2>/dev/null || echo "Failed to delete $sg_id (may be in use)"
+            done
+          done
+
+      - name: Cleanup IAM Users
+        if: steps.parse-types.outputs.cleanup_iam == 'true'
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🗑️  Cleaning up IAM test users"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          aws iam list-users --query 'Users[?contains(UserName, `c7n-test-`) == `true`].UserName' --output text | tr '\t' '\n' | while read user; do
+            [ -z "$user" ] && continue
+            
+            echo "Deleting user: $user"
+            
+            # Delete login profile
+            aws iam delete-login-profile --user-name "$user" 2>/dev/null || true
+            
+            # Delete access keys
+            aws iam list-access-keys --user-name "$user" --query 'AccessKeyMetadata[].AccessKeyId' --output text | tr '\t' '\n' | while read key; do
+              [ -z "$key" ] && continue
+              aws iam delete-access-key --user-name "$user" --access-key-id "$key" 2>/dev/null || true
+            done
+            
+            # Detach policies
+            aws iam list-attached-user-policies --user-name "$user" --query 'AttachedPolicies[].PolicyArn' --output text | tr '\t' '\n' | while read policy; do
+              [ -z "$policy" ] && continue
+              aws iam detach-user-policy --user-name "$user" --policy-arn "$policy" 2>/dev/null || true
+            done
+            
+            # Delete user
+            aws iam delete-user --user-name "$user" 2>/dev/null || echo "Failed to delete $user"
+            echo "✅ Deleted: $user"
+          done
+
+      - name: Cleanup IAM Roles
+        if: steps.parse-types.outputs.cleanup_iam == 'true'
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🗑️  Cleaning up IAM test roles"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          aws iam list-roles --query 'Roles[?contains(RoleName, `c7n-test-`) == `true`].RoleName' --output text | tr '\t' '\n' | while read role; do
+            [ -z "$role" ] && continue
+            
+            echo "Deleting role: $role"
+            
+            # Detach policies
+            aws iam list-attached-role-policies --role-name "$role" --query 'AttachedPolicies[].PolicyArn' --output text | tr '\t' '\n' | while read policy; do
+              [ -z "$policy" ] && continue
+              aws iam detach-role-policy --role-name "$role" --policy-arn "$policy" 2>/dev/null || true
+            done
+            
+            # Delete inline policies
+            aws iam list-role-policies --role-name "$role" --query 'PolicyNames[]' --output text | tr '\t' '\n' | while read policy; do
+              [ -z "$policy" ] && continue
+              aws iam delete-role-policy --role-name "$role" --policy-name "$policy" 2>/dev/null || true
+            done
+            
+            # Delete role
+            aws iam delete-role --role-name "$role" 2>/dev/null || echo "Failed to delete $role"
+            echo "✅ Deleted: $role"
+          done
+
+      - name: Cleanup Lambda Functions
+        if: steps.parse-types.outputs.cleanup_lambda == 'true'
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🗑️  Cleaning up Lambda test functions"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          for region in us-east-1 us-west-2 eu-west-1; do
+            echo "Region: $region"
+            
+            aws lambda list-functions --region "$region" --query 'Functions[?contains(FunctionName, `c7n-test-`) == `true`].FunctionName' --output text | tr '\t' '\n' | while read func; do
+              [ -z "$func" ] && continue
+              echo "Deleting function: $func"
+              aws lambda delete-function --function-name "$func" --region "$region" 2>/dev/null || true
+              echo "✅ Deleted: $func"
+            done
+          done
+
+      - name: Cleanup RDS Instances
+        if: steps.parse-types.outputs.cleanup_rds == 'true'
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🗑️  Cleaning up RDS test instances"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          for region in us-east-1 us-west-2 eu-west-1; do
+            echo "Region: $region"
+            
+            aws rds describe-db-instances --region "$region" --query 'DBInstances[?contains(DBInstanceIdentifier, `c7n-test-`) == `true`].DBInstanceIdentifier' --output text | tr '\t' '\n' | while read db; do
+              [ -z "$db" ] && continue
+              echo "Deleting RDS instance: $db"
+              aws rds delete-db-instance \
+                --db-instance-identifier "$db" \
+                --skip-final-snapshot \
+                --delete-automated-backups \
+                --region "$region" 2>/dev/null || true
+              echo "✅ Deleted: $db"
+            done
+          done
+
+      - name: Cleanup ElastiCache Clusters
+        if: steps.parse-types.outputs.cleanup_elasticache == 'true'
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🗑️  Cleaning up ElastiCache test clusters"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          for region in us-east-1 us-west-2; do
+            echo "Region: $region"
+            
+            # Delete replication groups
+            aws elasticache describe-replication-groups --region "$region" --query 'ReplicationGroups[?contains(ReplicationGroupId, `c7n-test-`) == `true`].ReplicationGroupId' --output text | tr '\t' '\n' | while read rg; do
+              [ -z "$rg" ] && continue
+              echo "Deleting replication group: $rg"
+              aws elasticache delete-replication-group --replication-group-id "$rg" --region "$region" 2>/dev/null || true
+              echo "✅ Deleted: $rg"
+            done
+            
+            # Delete standalone cache clusters
+            aws elasticache describe-cache-clusters --region "$region" --query 'CacheClusters[?contains(CacheClusterId, `c7n-test-`) == `true`].CacheClusterId' --output text | tr '\t' '\n' | while read cluster; do
+              [ -z "$cluster" ] && continue
+              echo "Deleting cache cluster: $cluster"
+              aws elasticache delete-cache-cluster --cache-cluster-id "$cluster" --region "$region" 2>/dev/null || true
+              echo "✅ Deleted: $cluster"
+            done
+          done
+
+      - name: Cleanup Load Balancers
+        if: steps.parse-types.outputs.cleanup_elb == 'true'
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🗑️  Cleaning up Load Balancer test resources"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          for region in us-east-1 us-west-2; do
+            echo "Region: $region"
+            
+            # Delete ALBs/NLBs
+            aws elbv2 describe-load-balancers --region "$region" --query 'LoadBalancers[?contains(LoadBalancerName, `c7n-`) == `true`].LoadBalancerArn' --output text | tr '\t' '\n' | while read lb_arn; do
+              [ -z "$lb_arn" ] && continue
+              echo "Deleting load balancer: $lb_arn"
+              aws elbv2 delete-load-balancer --load-balancer-arn "$lb_arn" --region "$region" 2>/dev/null || true
+              echo "✅ Deleted load balancer"
+            done
+            
+            # Wait for LBs to delete
+            sleep 30
+            
+            # Delete target groups
+            aws elbv2 describe-target-groups --region "$region" --query 'TargetGroups[?contains(TargetGroupName, `c7n-`) == `true`].TargetGroupArn' --output text | tr '\t' '\n' | while read tg_arn; do
+              [ -z "$tg_arn" ] && continue
+              echo "Deleting target group: $tg_arn"
+              aws elbv2 delete-target-group --target-group-arn "$tg_arn" --region "$region" 2>/dev/null || true
+              echo "✅ Deleted target group"
+            done
+          done
+
+      - name: Cleanup CloudWatch Log Groups
+        if: steps.parse-types.outputs.cleanup_cloudwatch == 'true'
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🗑️  Cleaning up CloudWatch test log groups"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          for region in us-east-1 us-west-2 eu-west-1; do
+            echo "Region: $region"
+            
+            aws logs describe-log-groups --region "$region" --log-group-name-prefix "/aws/lambda/c7n-test-" --query 'logGroups[].logGroupName' --output text | tr '\t' '\n' | while read lg; do
+              [ -z "$lg" ] && continue
+              echo "Deleting log group: $lg"
+              aws logs delete-log-group --log-group-name "$lg" --region "$region" 2>/dev/null || true
+              echo "✅ Deleted: $lg"
+            done
+          done
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📊 Cleanup Summary"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "Target Account: ${{ github.event.inputs.target_account }}"
+          echo "Resource Types: ${{ github.event.inputs.resource_types }}"
+          echo ""
+          echo "✅ Cleanup completed"
+          echo ""
+          echo "Note: Some resources may take time to fully delete (RDS, ElastiCache)."
+          echo "Verify deletion in AWS Console after a few minutes."
+          echo ""
