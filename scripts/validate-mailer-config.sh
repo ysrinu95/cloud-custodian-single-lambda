@@ -210,6 +210,20 @@ echo ""
 if [ "${INVOCATION_COUNT:-0}" == "0" ] || [ "$INVOCATION_COUNT" == "None" ]; then
   echo "⚠️  Lambda has NOT been invoked recently"
   echo ""
+  
+  # Check if log group exists
+  LOG_GROUP_EXISTS=$(aws logs describe-log-groups \
+    --log-group-name-prefix "/aws/lambda/$LAMBDA_NAME" \
+    --region "$REGION" \
+    --query "logGroups[?logGroupName=='/aws/lambda/$LAMBDA_NAME'] | length(@)" \
+    --output text 2>/dev/null || echo "0")
+  
+  if [ "$LOG_GROUP_EXISTS" == "0" ]; then
+    echo "❌ Log group does not exist: /aws/lambda/$LAMBDA_NAME"
+    echo "   This confirms the Lambda has NEVER been invoked!"
+    echo "   → Missing SQS event source mapping (trigger)"
+    echo ""
+  fi
 fi
 
 # 6. Summary
@@ -222,13 +236,11 @@ ISSUES_FOUND=0
 
 # Check for missing event source mappings
 if [ "$HAS_PERIODIC_MAPPING" == "false" ] && [ "$PERIODIC_EXISTS" == "true" ]; then
-  echo "🔴 ISSUE: Missing event source mapping for periodic queue"
-  echo "   Action required:"
-  echo "   aws lambda create-event-source-mapping \\"
-  echo "     --function-name $LAMBDA_NAME \\"
-  echo "     --event-source-arn arn:aws:sqs:$REGION:$CENTRAL_ACCOUNT:$PERIODIC_QUEUE \\"
-  echo "     --batch-size 10 \\"
-  echo "     --region $REGION"
+  echo "🔴 CRITICAL: Missing event source mapping for periodic queue"
+  echo "   The Lambda CANNOT process messages without this trigger!"
+  echo ""
+  echo "   Run the setup script to create it:"
+  echo "   ./scripts/setup-mailer-triggers.sh $REGION"
   echo ""
   ISSUES_FOUND=$((ISSUES_FOUND + 1))
 fi
