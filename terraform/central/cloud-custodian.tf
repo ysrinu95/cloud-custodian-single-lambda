@@ -526,6 +526,8 @@ resource "aws_cloudwatch_event_rule" "custodian_security_events_from_members" {
             "DeleteBucketPublicAccessBlock",
             "PutBucketEncryption",
             "DeleteBucketEncryption",
+            "PutBucketVersioning",
+            "DeleteBucketReplication",
             # CloudFront events
             "CreateDistribution",
             "UpdateDistribution",

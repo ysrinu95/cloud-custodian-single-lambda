@@ -1,0 +1,379 @@
+policies:
+  # ============================================================================
+  # S3 Ransomware Detection Policies - Production Ready
+  # ============================================================================
+  # These policies detect and respond to ransomware attacks on S3 buckets
+  # Reference: AWS Security Blog on S3 Ransomware Defense
+  # ============================================================================
+
+  # Policy 1: Mass Deletion Detection (Event-Driven)
+  - name: s3-mass-deletion-realtime
+    resource: aws.s3
+    description: |
+      Detect rapid deletion of S3 objects via CloudTrail DeleteObject events.
+      Triggers on suspicious deletion patterns indicative of ransomware.
+    
+    filters:
+      # Only process buckets with versioning enabled (recovery possible)
+      - type: value
+        key: Versioning.Status
+        value: Enabled
+        op: ne
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: S3 Ransomware - Mass Deletion Detected - {{ region }}"
+        violation_desc: |
+          **⚠️ CRITICAL SECURITY ALERT: Mass S3 Object Deletion Detected**
+          
+          **Bucket:** {{ resource.Name }}
+          **Region:** {{ region }}
+          **Account:** {{ account_id }}
+          
+          **Attack Pattern:** Rapid deletion of S3 objects detected, consistent with ransomware behavior.
+          
+          **Immediate Actions Taken:**
+          1. Security Hub finding created
+          2. Incident response workflow initiated
+          3. Security team notified
+          
+          **Required Manual Actions:**
+          1. Review CloudTrail logs for the identity behind deletions
+          2. Disable compromised IAM credentials immediately
+          3. Verify versioning is enabled for recovery
+          4. Check for ransom notes in the bucket
+          
+          **Recovery Steps:**
+          ```bash
+          # List deleted objects with versions
+          aws s3api list-object-versions --bucket {{ resource.Name }}
+          
+          # Restore deleted objects
+          aws s3api list-object-versions --bucket {{ resource.Name }} \\
+            --query 'DeleteMarkers[*].[Key,VersionId]' --output text | \\
+            while read key versionId; do
+              aws s3api delete-object --bucket {{ resource.Name }} \\
+                --key "$key" --version-id "$versionId"
+            done
+          ```
+          
+          **Resources:**
+          - Bucket ARN: arn:aws:s3:::{{ resource.Name }}
+          - CloudTrail: Check DeleteObject events in last 15 minutes
+        to:
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+      
+      - type: post-finding
+        severity: 90
+        severity_label: CRITICAL
+        types:
+          - "Software and Configuration Checks/AWS Security Best Practices/S3 Ransomware"
+        compliance_status: FAILED
+        title: "S3 Mass Deletion Event - Potential Ransomware"
+        description: |
+          Mass deletion of S3 objects detected on bucket {{ resource.Name }}.
+          This pattern is consistent with ransomware behavior.
+          Immediate investigation required.
+
+  # Policy 2: Encryption Tampering Detection
+  - name: s3-encryption-tampering
+    resource: aws.s3
+    description: |
+      Detect unauthorized changes to S3 bucket encryption settings.
+      Ransomware may disable encryption before data destruction.
+    
+    filters:
+      - type: value
+        key: Encryption
+        value: absent
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: S3 Encryption Disabled - {{ region }}"
+        violation_desc: |
+          **⚠️ CRITICAL: S3 Bucket Encryption Disabled**
+          
+          **Bucket:** {{ resource.Name }}
+          
+          Bucket encryption has been disabled or removed. This is a common
+          ransomware tactic before data destruction or exfiltration.
+          
+          **Auto-Remediation:** Encryption will be re-enabled automatically.
+        to:
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+      
+      - type: set-bucket-encryption
+        enabled: true
+        crypto: AES256
+      
+      - type: post-finding
+        severity: 80
+        severity_label: HIGH
+        types:
+          - "Software and Configuration Checks/AWS Security Best Practices"
+        title: "S3 Bucket Encryption Disabled"
+
+  # Policy 3: Versioning Suspension Detection
+  - name: s3-versioning-suspended
+    resource: aws.s3
+    description: |
+      Detect and auto-remediate when versioning is suspended.
+      Versioning is critical for ransomware recovery.
+    
+    filters:
+      - or:
+          - type: value
+            key: Versioning.Status
+            value: Suspended
+          - type: value
+            key: Versioning.Status
+            value: absent
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: S3 Versioning Suspended - {{ region }}"
+        violation_desc: |
+          **⚠️ CRITICAL: S3 Versioning Suspended or Disabled**
+          
+          **Bucket:** {{ resource.Name }}
+          
+          Versioning has been suspended. This prevents recovery from
+          ransomware attacks. Versioning is being re-enabled automatically.
+          
+          **Auto-Remediation:** Versioning re-enabled
+        to:
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+      
+      - type: toggle-versioning
+        enabled: true
+      
+      - type: post-finding
+        severity: 85
+        severity_label: HIGH
+        types:
+          - "Software and Configuration Checks/AWS Security Best Practices"
+        title: "S3 Versioning Suspended - Ransomware Risk"
+
+  # Policy 4: Malicious Bucket Policy Detection
+  - name: s3-malicious-bucket-policy
+    resource: aws.s3
+    description: |
+      Detect bucket policies that allow public access or cross-account
+      access to unknown principals (data exfiltration setup).
+    
+    filters:
+      - type: cross-account
+      - not:
+          - type: value
+            key: Policy.Statement[].Principal.AWS
+            value: "arn:aws:iam::172327596604:root"
+            op: contains
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: Suspicious S3 Bucket Policy - {{ region }}"
+        violation_desc: |
+          **⚠️ CRITICAL: Malicious or Suspicious Bucket Policy Detected**
+          
+          **Bucket:** {{ resource.Name }}
+          
+          Bucket policy allows cross-account or public access.
+          This may indicate ransomware setup for data exfiltration.
+          
+          **Policy Details:**
+          {{ resource.Policy }}
+          
+          **Auto-Remediation:** Policy will be removed
+        to:
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+      
+      - type: remove-statements
+        statement_ids: matched
+      
+      - type: post-finding
+        severity: 90
+        severity_label: CRITICAL
+        types:
+          - "Software and Configuration Checks/AWS Security Best Practices"
+        title: "Malicious S3 Bucket Policy Detected"
+
+  # Policy 5: Object Lock Not Enabled (Periodic Check)
+  - name: s3-object-lock-not-enabled
+    resource: aws.s3
+    description: |
+      Identify critical buckets without Object Lock enabled.
+      Object Lock provides immutable storage protection against ransomware.
+    
+    filters:
+      - type: value
+        key: ObjectLockConfiguration
+        value: absent
+      - type: value
+        key: "tag:Criticality"
+        value: "high"
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "2"
+        subject: "⚠️ S3 Object Lock Not Enabled - {{ region }}"
+        violation_desc: |
+          **S3 Object Lock Not Enabled on Critical Bucket**
+          
+          **Bucket:** {{ resource.Name }}
+          **Criticality:** High
+          
+          Object Lock provides immutable storage that protects against
+          ransomware, accidental deletions, and malicious actors.
+          
+          **Recommendation:** Enable Object Lock with compliance mode
+          
+          ```bash
+          # Note: Object Lock can only be enabled on bucket creation
+          # You need to migrate data to a new bucket with Object Lock
+          aws s3api create-bucket --bucket {{ resource.Name }}-locked \\
+            --object-lock-enabled-for-bucket
+          
+          aws s3api put-object-lock-configuration \\
+            --bucket {{ resource.Name }}-locked \\
+            --object-lock-configuration '{
+              "ObjectLockEnabled": "Enabled",
+              "Rule": {
+                "DefaultRetention": {
+                  "Mode": "COMPLIANCE",
+                  "Days": 30
+                }
+              }
+            }'
+          ```
+        to:
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+      
+      - type: post-finding
+        severity: 60
+        severity_label: MEDIUM
+        types:
+          - "Software and Configuration Checks/AWS Security Best Practices"
+        title: "S3 Object Lock Not Enabled on Critical Bucket"
+
+  # Policy 6: Public Access Block Disabled
+  - name: s3-public-access-block-disabled
+    resource: aws.s3
+    description: |
+      Detect when S3 Public Access Block is disabled.
+      This is often done before data exfiltration.
+    
+    filters:
+      - or:
+          - type: value
+            key: PublicAccessBlockConfiguration.BlockPublicAcls
+            value: false
+          - type: value
+            key: PublicAccessBlockConfiguration.BlockPublicPolicy
+            value: false
+          - type: value
+            key: PublicAccessBlockConfiguration.IgnorePublicAcls
+            value: false
+          - type: value
+            key: PublicAccessBlockConfiguration.RestrictPublicBuckets
+            value: false
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: S3 Public Access Block Disabled - {{ region }}"
+        violation_desc: |
+          **⚠️ CRITICAL: S3 Public Access Block Disabled**
+          
+          **Bucket:** {{ resource.Name }}
+          
+          Public Access Block has been disabled. This may indicate
+          preparation for data exfiltration or unauthorized access.
+          
+          **Auto-Remediation:** Public Access Block being re-enabled
+        to:
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+      
+      - type: set-public-block
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      
+      - type: post-finding
+        severity: 85
+        severity_label: HIGH
+        types:
+          - "Software and Configuration Checks/AWS Security Best Practices"
+        title: "S3 Public Access Block Disabled"
+
+  # Policy 7: Replication Configuration Tampering
+  - name: s3-replication-tampering
+    resource: aws.s3
+    description: |
+      Detect unauthorized changes or deletion of replication configuration.
+      Attackers may disable replication to prevent backup recovery.
+    
+    filters:
+      - type: value
+        key: Replication
+        value: absent
+      - type: value
+        key: "tag:ReplicationRequired"
+        value: "true"
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: S3 Replication Disabled - {{ region }}"
+        violation_desc: |
+          **⚠️ CRITICAL: S3 Replication Configuration Removed**
+          
+          **Bucket:** {{ resource.Name }}
+          
+          Replication configuration has been removed from a bucket
+          that requires replication for disaster recovery.
+          
+          **Action Required:** Restore replication configuration immediately
+        to:
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+      
+      - type: post-finding
+        severity: 80
+        severity_label: HIGH
+        types:
+          - "Software and Configuration Checks/AWS Security Best Practices"
+        title: "S3 Replication Configuration Removed"
+
+

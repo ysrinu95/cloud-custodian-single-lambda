@@ -83,9 +83,10 @@ policies:
     description: Detect EBS snapshots that are publicly accessible
     
     filters:
-      - type: cross-account
-        whitelist:
-          - '{{account_id}}'
+      - type: value
+        key: CreateVolumePermissions[].Group
+        value: all
+        op: contains
     
     actions:
       - type: notify

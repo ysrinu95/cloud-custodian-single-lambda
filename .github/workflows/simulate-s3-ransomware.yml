@@ -1,0 +1,446 @@
+name: Simulate S3 Ransomware Attack
+
+on:
+  workflow_dispatch:
+    inputs:
+      attack_type:
+        description: 'Type of ransomware attack to simulate'
+        required: true
+        type: choice
+        options:
+          - mass-deletion
+          - mass-encryption
+          - policy-tampering
+          - versioning-disable
+          - replication-tampering
+          - all-attacks
+      target_bucket_prefix:
+        description: 'Prefix for test bucket name'
+        required: false
+        default: 'ransomware-test'
+      object_count:
+        description: 'Number of objects to create for testing'
+        required: false
+        default: '100'
+      cleanup_after_test:
+        description: 'Clean up resources after test'
+        required: false
+        type: boolean
+        default: true
+
+env:
+  AWS_REGION: us-east-1
+  PYTHON_VERSION: "3.11"
+  MEMBER_ACCOUNT_ID: "813185901390"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # ======================================================================
+  # Job 1: Setup Test Environment
+  # ======================================================================
+  setup-test-environment:
+    name: Setup S3 Test Environment
+    runs-on: ubuntu-latest
+    outputs:
+      bucket_name: ${{ steps.create-bucket.outputs.bucket_name }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS Credentials (Member Account)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.MEMBER_ACCOUNT_ID }}:role/github-actions-role
+          role-session-name: github-actions-ransomware-sim
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Create Test S3 Bucket
+        id: create-bucket
+        run: |
+          TIMESTAMP=$(date +%s)
+          BUCKET_NAME="${{ inputs.target_bucket_prefix }}-${TIMESTAMP}"
+          
+          echo "🪣 Creating test bucket: $BUCKET_NAME"
+          aws s3 mb s3://$BUCKET_NAME --region ${{ env.AWS_REGION }}
+          
+          # Enable versioning (critical for ransomware recovery)
+          echo "📝 Enabling versioning..."
+          aws s3api put-bucket-versioning \
+            --bucket $BUCKET_NAME \
+            --versioning-configuration Status=Enabled
+          
+          # Add bucket tags
+          aws s3api put-bucket-tagging \
+            --bucket $BUCKET_NAME \
+            --tagging "TagSet=[{Key=Purpose,Value=RansomwareTest},{Key=Environment,Value=Test},{Key=AutoDelete,Value=true}]"
+          
+          # Enable encryption
+          aws s3api put-bucket-encryption \
+            --bucket $BUCKET_NAME \
+            --server-side-encryption-configuration '{
+              "Rules": [{
+                "ApplyServerSideEncryptionByDefault": {
+                  "SSEAlgorithm": "AES256"
+                }
+              }]
+            }'
+          
+          echo "bucket_name=$BUCKET_NAME" >> $GITHUB_OUTPUT
+          echo "✅ Test bucket created: $BUCKET_NAME"
+      
+      - name: Create Test Objects
+        run: |
+          BUCKET_NAME="${{ steps.create-bucket.outputs.bucket_name }}"
+          OBJECT_COUNT=${{ inputs.object_count }}
+          
+          echo "📄 Creating $OBJECT_COUNT test objects..."
+          
+          for i in $(seq 1 $OBJECT_COUNT); do
+            # Create files with different patterns to simulate real data
+            FILE_NAME="test-file-${i}.txt"
+            FILE_CONTENT="This is test file ${i} - Timestamp: $(date)"
+            
+            echo "$FILE_CONTENT" | aws s3 cp - "s3://$BUCKET_NAME/documents/$FILE_NAME"
+            
+            # Add some JSON files
+            if [ $((i % 10)) -eq 0 ]; then
+              JSON_FILE="data-${i}.json"
+              echo '{"id":'$i',"data":"test data","timestamp":"'$(date -Iseconds)'"}' | \
+                aws s3 cp - "s3://$BUCKET_NAME/data/$JSON_FILE"
+            fi
+          done
+          
+          echo "✅ Created $OBJECT_COUNT test objects"
+          
+          # List objects for verification
+          echo "📋 Bucket contents:"
+          aws s3 ls s3://$BUCKET_NAME --recursive | head -20
+
+  # ======================================================================
+  # Job 2: Simulate Ransomware Attacks
+  # ======================================================================
+  simulate-attack:
+    name: Simulate Ransomware Attack - ${{ inputs.attack_type }}
+    runs-on: ubuntu-latest
+    needs: setup-test-environment
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.MEMBER_ACCOUNT_ID }}:role/github-actions-role
+          role-session-name: github-actions-ransomware-attack
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Attack 1 - Mass Deletion
+        if: inputs.attack_type == 'mass-deletion' || inputs.attack_type == 'all-attacks'
+        run: |
+          BUCKET_NAME="${{ needs.setup-test-environment.outputs.bucket_name }}"
+          
+          echo "🔥 SIMULATING MASS DELETION ATTACK..."
+          echo "⚠️  Deleting objects in rapid succession (ransomware pattern)"
+          
+          # Get list of objects
+          OBJECTS=$(aws s3api list-objects-v2 \
+            --bucket $BUCKET_NAME \
+            --query 'Contents[*].Key' \
+            --output text)
+          
+          # Rapid deletion (first 50 objects)
+          DELETE_COUNT=0
+          for OBJECT_KEY in $OBJECTS; do
+            aws s3api delete-object \
+              --bucket $BUCKET_NAME \
+              --key "$OBJECT_KEY" \
+              --no-cli-pager
+            
+            DELETE_COUNT=$((DELETE_COUNT + 1))
+            
+            # Simulate rapid fire deletions (ransomware pattern)
+            if [ $DELETE_COUNT -ge 50 ]; then
+              break
+            fi
+            
+            # Small delay to make it slightly realistic but still rapid
+            sleep 0.1
+          done
+          
+          echo "🗑️  Deleted $DELETE_COUNT objects in rapid succession"
+          echo "✅ Mass deletion attack simulated"
+          
+          # Wait for CloudWatch metrics to update
+          echo "⏳ Waiting for CloudWatch metrics..."
+          sleep 60
+      
+      - name: Attack 2 - Mass Encryption/Overwriting
+        if: inputs.attack_type == 'mass-encryption' || inputs.attack_type == 'all-attacks'
+        run: |
+          BUCKET_NAME="${{ needs.setup-test-environment.outputs.bucket_name }}"
+          
+          echo "🔥 SIMULATING MASS ENCRYPTION ATTACK..."
+          echo "⚠️  Overwriting objects with encrypted content (ransomware pattern)"
+          
+          # Create ransomware note
+          RANSOM_NOTE="🔒 YOUR FILES HAVE BEEN ENCRYPTED 🔒
+          
+          Your files are encrypted and you cannot access them.
+          To decrypt your files, you must pay 1 BTC to address: [FAKE_BTC_ADDRESS]
+          
+          Contact: ransomware@example.com
+          Incident ID: FAKE-$(date +%s)
+          
+          ⏰ You have 72 hours before files are permanently deleted."
+          
+          # Get remaining objects
+          OBJECTS=$(aws s3api list-objects-v2 \
+            --bucket $BUCKET_NAME \
+            --query 'Contents[*].Key' \
+            --output text | head -30)
+          
+          ENCRYPT_COUNT=0
+          for OBJECT_KEY in $OBJECTS; do
+            # Overwrite with encrypted content
+            echo "$RANSOM_NOTE" | aws s3 cp - "s3://$BUCKET_NAME/${OBJECT_KEY}.encrypted" \
+              --metadata "ransomware=true,encrypted=$(date -Iseconds)"
+            
+            # Delete original
+            aws s3api delete-object \
+              --bucket $BUCKET_NAME \
+              --key "$OBJECT_KEY"
+            
+            ENCRYPT_COUNT=$((ENCRYPT_COUNT + 1))
+            
+            if [ $ENCRYPT_COUNT -ge 30 ]; then
+              break
+            fi
+            
+            sleep 0.1
+          done
+          
+          # Place ransom note in bucket
+          echo "$RANSOM_NOTE" | aws s3 cp - "s3://$BUCKET_NAME/RANSOM_NOTE.txt"
+          
+          echo "🔐 Encrypted/Overwritten $ENCRYPT_COUNT objects"
+          echo "✅ Mass encryption attack simulated"
+          
+          sleep 30
+      
+      - name: Attack 3 - Bucket Policy Tampering
+        if: inputs.attack_type == 'policy-tampering' || inputs.attack_type == 'all-attacks'
+        run: |
+          BUCKET_NAME="${{ needs.setup-test-environment.outputs.bucket_name }}"
+          
+          echo "🔥 SIMULATING BUCKET POLICY TAMPERING..."
+          echo "⚠️  Applying malicious bucket policy (data exfiltration setup)"
+          
+          # Create malicious policy that allows public access
+          MALICIOUS_POLICY='{
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "MaliciousPublicRead",
+                "Effect": "Allow",
+                "Principal": "*",
+                "Action": [
+                  "s3:GetObject",
+                  "s3:ListBucket"
+                ],
+                "Resource": [
+                  "arn:aws:s3:::'$BUCKET_NAME'",
+                  "arn:aws:s3:::'$BUCKET_NAME'/*"
+                ]
+              }
+            ]
+          }'
+          
+          echo "🚨 Applying malicious bucket policy..."
+          aws s3api put-bucket-policy \
+            --bucket $BUCKET_NAME \
+            --policy "$MALICIOUS_POLICY"
+          
+          # Disable block public access
+          echo "🚨 Disabling block public access..."
+          aws s3api delete-public-access-block \
+            --bucket $BUCKET_NAME || echo "Block public access already disabled"
+          
+          echo "✅ Bucket policy tampering attack simulated"
+          
+          sleep 30
+      
+      - name: Attack 4 - Versioning Disable
+        if: inputs.attack_type == 'versioning-disable' || inputs.attack_type == 'all-attacks'
+        run: |
+          BUCKET_NAME="${{ needs.setup-test-environment.outputs.bucket_name }}"
+          
+          echo "🔥 SIMULATING VERSIONING DISABLE ATTACK..."
+          echo "⚠️  Disabling versioning to prevent recovery"
+          
+          # Suspend versioning (attackers do this to prevent recovery)
+          aws s3api put-bucket-versioning \
+            --bucket $BUCKET_NAME \
+            --versioning-configuration Status=Suspended
+          
+          echo "🚫 Versioning suspended on bucket"
+          echo "✅ Versioning disable attack simulated"
+          
+          sleep 30
+      
+      - name: Attack 5 - Replication Tampering
+        if: inputs.attack_type == 'replication-tampering' || inputs.attack_type == 'all-attacks'
+        run: |
+          BUCKET_NAME="${{ needs.setup-test-environment.outputs.bucket_name }}"
+          
+          echo "🔥 SIMULATING REPLICATION TAMPERING..."
+          echo "⚠️  Attempting to delete replication configuration"
+          
+          # Try to delete replication (may not exist)
+          aws s3api delete-bucket-replication \
+            --bucket $BUCKET_NAME 2>&1 || echo "No replication configuration to delete"
+          
+          echo "✅ Replication tampering attack simulated"
+          
+          sleep 30
+      
+      - name: Attack Summary
+        run: |
+          BUCKET_NAME="${{ needs.setup-test-environment.outputs.bucket_name }}"
+          
+          echo "📊 ATTACK SIMULATION SUMMARY"
+          echo "============================"
+          echo "Attack Type: ${{ inputs.attack_type }}"
+          echo "Target Bucket: $BUCKET_NAME"
+          echo ""
+          
+          echo "📋 Current Bucket State:"
+          aws s3 ls s3://$BUCKET_NAME --recursive || echo "Bucket may be empty or inaccessible"
+          
+          echo ""
+          echo "🔍 Checking CloudWatch Alarms..."
+          aws cloudwatch describe-alarms \
+            --alarm-name-prefix "s3-ransomware" \
+            --state-value ALARM \
+            --query 'MetricAlarms[*].[AlarmName,StateValue,StateReason]' \
+            --output table || echo "No alarms found"
+
+  # ======================================================================
+  # Job 3: Wait for Cloud Custodian Detection
+  # ======================================================================
+  wait-for-detection:
+    name: Wait for Cloud Custodian Detection
+    runs-on: ubuntu-latest
+    needs: [setup-test-environment, simulate-attack]
+    
+    steps:
+      - name: Wait for Policy Execution
+        run: |
+          echo "⏳ Waiting for Cloud Custodian policies to detect and respond..."
+          echo "This typically takes 2-5 minutes for event-driven policies"
+          echo "CloudWatch metrics-based policies may take 5-15 minutes"
+          
+          sleep 180  # Wait 3 minutes
+          
+          echo "✅ Wait period completed"
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.MEMBER_ACCOUNT_ID }}:role/github-actions-role
+          role-session-name: github-actions-verify
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Check Security Hub Findings
+        run: |
+          echo "🔍 Checking Security Hub for ransomware findings..."
+          
+          aws securityhub get-findings \
+            --filters '{
+              "ProductName": [{"Value": "Cloud Custodian", "Comparison": "EQUALS"}],
+              "CreatedAt": [{"Start": "'$(date -u -d '10 minutes ago' +%Y-%m-%dT%H:%M:%SZ)'"}],
+              "SeverityLabel": [{"Value": "CRITICAL", "Comparison": "EQUALS"}]
+            }' \
+            --query 'Findings[*].[Title,Severity.Label,CreatedAt]' \
+            --output table || echo "No findings found yet"
+      
+      - name: Check CloudWatch Logs
+        run: |
+          echo "📋 Checking Lambda execution logs..."
+          
+          # Check Cloud Custodian Lambda logs
+          aws logs tail /aws/lambda/cloud-custodian \
+            --since 10m \
+            --filter-pattern "ransomware" || echo "No ransomware-related logs found"
+
+  # ======================================================================
+  # Job 4: Cleanup Test Resources
+  # ======================================================================
+  cleanup-resources:
+    name: Cleanup Test Resources
+    runs-on: ubuntu-latest
+    needs: [setup-test-environment, wait-for-detection]
+    if: always() && inputs.cleanup_after_test == true
+    
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.MEMBER_ACCOUNT_ID }}:role/github-actions-role
+          role-session-name: github-actions-cleanup
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Delete Test Bucket
+        run: |
+          BUCKET_NAME="${{ needs.setup-test-environment.outputs.bucket_name }}"
+          
+          if [ -z "$BUCKET_NAME" ]; then
+            echo "No bucket to clean up"
+            exit 0
+          fi
+          
+          echo "🧹 Cleaning up test bucket: $BUCKET_NAME"
+          
+          # Remove all versions and delete markers
+          echo "Removing all object versions..."
+          aws s3api list-object-versions \
+            --bucket $BUCKET_NAME \
+            --query 'Versions[*].[Key,VersionId]' \
+            --output text | while read key versionId; do
+            aws s3api delete-object \
+              --bucket $BUCKET_NAME \
+              --key "$key" \
+              --version-id "$versionId" || true
+          done
+          
+          # Remove delete markers
+          aws s3api list-object-versions \
+            --bucket $BUCKET_NAME \
+            --query 'DeleteMarkers[*].[Key,VersionId]' \
+            --output text | while read key versionId; do
+            aws s3api delete-object \
+              --bucket $BUCKET_NAME \
+              --key "$key" \
+              --version-id "$versionId" || true
+          done
+          
+          # Delete bucket
+          aws s3 rb s3://$BUCKET_NAME --force || true
+          
+          echo "✅ Test bucket cleaned up"
+      
+      - name: Cleanup Summary
+        run: |
+          echo "✅ CLEANUP COMPLETED"
+          echo "==================="
+          echo "All test resources have been removed"
+          echo ""
+          echo "📝 Next Steps:"
+          echo "1. Review CloudWatch Logs for policy execution"
+          echo "2. Check Security Hub for findings"
+          echo "3. Review SNS notifications sent to security team"
+          echo "4. Verify Step Functions execution if triggered"

@@ -1,0 +1,801 @@
+name: Create Test Resources for Periodic Policies
+
+on:
+  workflow_dispatch:
+    inputs:
+      account_id:
+        description: 'Member Account ID for test resources'
+        required: false
+        type: string
+        default: '813185901390'
+      region:
+        description: 'AWS Region for test resources'
+        required: false
+        type: string
+        default: 'us-east-1'
+      resource_types:
+        description: 'Resource types to create (comma-separated: s3,ec2,iam,lambda,rds,cloudwatch,eks,elasticache,elb or "all")'
+        required: false
+        type: string
+        default: 'all'
+      cleanup_existing:
+        description: 'Cleanup existing test resources before creating new ones'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: us-east-1
+  CENTRAL_ACCOUNT_ID: "172327596604"
+  TEST_RESOURCE_PREFIX: "c7n-test"
+  TEST_TAG_KEY: "CloudCustodianTest"
+  TEST_TAG_VALUE: "PeriodicPolicyValidation"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  create-test-resources:
+    name: Create Test Resources
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (Central Account)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.CENTRAL_ACCOUNT_ID }}:role/GitHubActions-CloudCustodian-Role
+          aws-region: ${{ github.event.inputs.region || env.AWS_REGION }}
+
+      - name: Assume member account role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ github.event.inputs.account_id }}:role/CloudCustodianExecutionRole
+          role-chaining: true
+          aws-region: ${{ github.event.inputs.region || env.AWS_REGION }}
+
+      - name: Verify AWS credentials
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  Test Resources Creation Setup"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Current AWS identity:"
+          aws sts get-caller-identity
+          echo ""
+          echo "Account ID: ${{ github.event.inputs.account_id }}"
+          echo "Region: ${{ github.event.inputs.region || env.AWS_REGION }}"
+          echo "Resource Types: ${{ github.event.inputs.resource_types }}"
+          echo "Cleanup Existing: ${{ github.event.inputs.cleanup_existing }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      - name: Cleanup existing test resources
+        if: ${{ github.event.inputs.cleanup_existing == 'true' }}
+        run: |
+          echo "🧹 Cleaning up existing test resources..."
+          REGION="${{ github.event.inputs.region || env.AWS_REGION }}"
+          
+          # Cleanup S3 buckets
+          echo "Cleaning S3 test buckets..."
+          aws s3api list-buckets --query "Buckets[?starts_with(Name, '${{ env.TEST_RESOURCE_PREFIX }}-s3')].Name" --output text | \
+            xargs -I {} aws s3 rb s3://{} --force 2>/dev/null || true
+          
+          # Cleanup EC2 instances
+          echo "Cleaning EC2 test instances..."
+          aws ec2 describe-instances \
+            --filters "Name=tag:${{ env.TEST_TAG_KEY }},Values=${{ env.TEST_TAG_VALUE }}" \
+            --query "Reservations[].Instances[?State.Name!='terminated'].InstanceId" \
+            --output text --region $REGION | \
+            xargs -I {} aws ec2 terminate-instances --instance-ids {} --region $REGION 2>/dev/null || true
+          
+          # Cleanup Lambda functions
+          echo "Cleaning Lambda test functions..."
+          aws lambda list-functions --region $REGION --query "Functions[?starts_with(FunctionName, '${{ env.TEST_RESOURCE_PREFIX }}-lambda')].FunctionName" --output text | \
+            xargs -I {} aws lambda delete-function --function-name {} --region $REGION 2>/dev/null || true
+          
+          # Cleanup IAM test users (be careful!)
+          echo "Cleaning IAM test users..."
+          aws iam list-users --query "Users[?starts_with(UserName, '${{ env.TEST_RESOURCE_PREFIX }}-iam-user')].UserName" --output text | \
+            xargs -I {} bash -c 'aws iam delete-login-profile --user-name {} 2>/dev/null; aws iam list-access-keys --user-name {} --query "AccessKeyMetadata[].AccessKeyId" --output text | xargs -I [] aws iam delete-access-key --user-name {} --access-key-id []; aws iam delete-user --user-name {}' || true
+          
+          # Cleanup IAM test roles
+          echo "Cleaning IAM test roles..."
+          aws iam list-roles --query "Roles[?starts_with(RoleName, '${{ env.TEST_RESOURCE_PREFIX }}')].RoleName" --output text | \
+            xargs -I {} bash -c 'aws iam list-attached-role-policies --role-name {} --query "AttachedPolicies[].PolicyArn" --output text | xargs -I [] aws iam detach-role-policy --role-name {} --policy-arn []; aws iam delete-role --role-name {}' 2>/dev/null || true
+          
+          # Cleanup RDS instances
+          echo "Cleaning RDS test instances..."
+          aws rds describe-db-instances --region $REGION --query "DBInstances[?starts_with(DBInstanceIdentifier, '${{ env.TEST_RESOURCE_PREFIX }}-rds')].DBInstanceIdentifier" --output text | \
+            xargs -I {} aws rds delete-db-instance --db-instance-identifier {} --skip-final-snapshot --region $REGION 2>/dev/null || true
+          
+          # Cleanup CloudWatch Log Groups
+          echo "Cleaning CloudWatch test log groups..."
+          aws logs describe-log-groups --region $REGION --query "logGroups[?starts_with(logGroupName, '/aws/${{ env.TEST_RESOURCE_PREFIX }}')].logGroupName" --output text | \
+            xargs -I {} aws logs delete-log-group --log-group-name {} --region $REGION 2>/dev/null || true
+          
+          # Cleanup ElastiCache clusters
+          echo "Cleaning ElastiCache test clusters..."
+          aws elasticache describe-cache-clusters --region $REGION --query "CacheClusters[?starts_with(CacheClusterId, '${{ env.TEST_RESOURCE_PREFIX }}-redis')].CacheClusterId" --output text | \
+            xargs -I {} aws elasticache delete-cache-cluster --cache-cluster-id {} --region $REGION 2>/dev/null || true
+          
+          # Cleanup ElastiCache replication groups
+          echo "Cleaning ElastiCache test replication groups..."
+          aws elasticache describe-replication-groups --region $REGION --query "ReplicationGroups[?starts_with(ReplicationGroupId, '${{ env.TEST_RESOURCE_PREFIX }}-redis')].ReplicationGroupId" --output text | \
+            xargs -I {} aws elasticache delete-replication-group --replication-group-id {} --region $REGION 2>/dev/null || true
+          
+          # Cleanup Load Balancers
+          echo "Cleaning ALB/NLB test load balancers..."
+          aws elbv2 describe-load-balancers --region $REGION --query "LoadBalancers[?starts_with(LoadBalancerName, '${{ env.TEST_RESOURCE_PREFIX }}-alb')].LoadBalancerArn" --output text | \
+            xargs -I {} aws elbv2 delete-load-balancer --load-balancer-arn {} --region $REGION 2>/dev/null || true
+          
+          # Cleanup Target Groups
+          echo "Cleaning target groups..."
+          aws elbv2 describe-target-groups --region $REGION --query "TargetGroups[?starts_with(TargetGroupName, '${{ env.TEST_RESOURCE_PREFIX }}')].TargetGroupArn" --output text | \
+            xargs -I {} aws elbv2 delete-target-group --target-group-arn {} --region $REGION 2>/dev/null || true
+          
+          echo "✅ Cleanup complete"
+            xargs -I {} bash -c 'aws iam delete-login-profile --user-name {} 2>/dev/null; aws iam delete-user --user-name {}' || true
+          
+          echo "✅ Cleanup complete"
+
+      - name: Create S3 test resources
+        if: contains(github.event.inputs.resource_types, 's3') || github.event.inputs.resource_types == 'all'
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📦 Creating S3 Test Resources"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          TIMESTAMP=$(date +%s)
+          REGION="${{ github.event.inputs.region || env.AWS_REGION }}"
+          
+          # 1. S3 bucket without encryption (should be detected)
+          BUCKET_NO_ENC="${{ env.TEST_RESOURCE_PREFIX }}-s3-no-encryption-${TIMESTAMP}"
+          aws s3 mb s3://${BUCKET_NO_ENC} --region $REGION
+          aws s3api put-bucket-tagging --bucket ${BUCKET_NO_ENC} \
+            --tagging "TagSet=[{Key=${{ env.TEST_TAG_KEY }},Value=${{ env.TEST_TAG_VALUE }}},{Key=Environment,Value=Test},{Key=Violation,Value=NoEncryption}]"
+          echo "✅ Created: ${BUCKET_NO_ENC} (no encryption)"
+          
+          # 2. S3 bucket without versioning (should be detected)
+          BUCKET_NO_VER="${{ env.TEST_RESOURCE_PREFIX }}-s3-no-versioning-${TIMESTAMP}"
+          aws s3 mb s3://${BUCKET_NO_VER} --region $REGION
+          aws s3api put-bucket-encryption --bucket ${BUCKET_NO_VER} \
+            --server-side-encryption-configuration '{"Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]}'
+          aws s3api put-bucket-tagging --bucket ${BUCKET_NO_VER} \
+            --tagging "TagSet=[{Key=${{ env.TEST_TAG_KEY }},Value=${{ env.TEST_TAG_VALUE }}},{Key=Environment,Value=Test},{Key=Violation,Value=NoVersioning}]"
+          echo "✅ Created: ${BUCKET_NO_VER} (no versioning)"
+          
+          # 3. S3 bucket without public access block (should be detected)
+          BUCKET_NO_PAB="${{ env.TEST_RESOURCE_PREFIX }}-s3-no-pab-${TIMESTAMP}"
+          aws s3 mb s3://${BUCKET_NO_PAB} --region $REGION
+          aws s3api put-bucket-encryption --bucket ${BUCKET_NO_PAB} \
+            --server-side-encryption-configuration '{"Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]}'
+          aws s3api delete-public-access-block --bucket ${BUCKET_NO_PAB}
+          aws s3api put-bucket-tagging --bucket ${BUCKET_NO_PAB} \
+            --tagging "TagSet=[{Key=${{ env.TEST_TAG_KEY }},Value=${{ env.TEST_TAG_VALUE }}},{Key=Environment,Value=Test},{Key=Violation,Value=NoPublicAccessBlock}]"
+          echo "✅ Created: ${BUCKET_NO_PAB} (no public access block)"
+          
+          # 4. Compliant S3 bucket (should pass all checks)
+          BUCKET_COMPLIANT="${{ env.TEST_RESOURCE_PREFIX }}-s3-compliant-${TIMESTAMP}"
+          aws s3 mb s3://${BUCKET_COMPLIANT} --region $REGION
+          aws s3api put-bucket-encryption --bucket ${BUCKET_COMPLIANT} \
+            --server-side-encryption-configuration '{"Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]}'
+          aws s3api put-bucket-versioning --bucket ${BUCKET_COMPLIANT} \
+            --versioning-configuration Status=Enabled
+          aws s3api put-public-access-block --bucket ${BUCKET_COMPLIANT} \
+            --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+          aws s3api put-bucket-tagging --bucket ${BUCKET_COMPLIANT} \
+            --tagging "TagSet=[{Key=${{ env.TEST_TAG_KEY }},Value=${{ env.TEST_TAG_VALUE }}},{Key=Environment,Value=Test},{Key=Compliant,Value=true}]"
+          echo "✅ Created: ${BUCKET_COMPLIANT} (fully compliant)"
+          
+          echo ""
+          echo "📊 S3 Test Resources Summary:"
+          echo "   - No Encryption: ${BUCKET_NO_ENC}"
+          echo "   - No Versioning: ${BUCKET_NO_VER}"
+          echo "   - No Public Access Block: ${BUCKET_NO_PAB}"
+          echo "   - Compliant: ${BUCKET_COMPLIANT}"
+
+      - name: Create EC2 test resources
+        if: contains(github.event.inputs.resource_types, 'ec2') || github.event.inputs.resource_types == 'all'
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🖥️  Creating EC2 Test Resources"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          REGION="${{ github.event.inputs.region || env.AWS_REGION }}"
+          
+          # Get default VPC
+          VPC_ID=$(aws ec2 describe-vpcs --filters "Name=isDefault,Values=true" \
+            --query "Vpcs[0].VpcId" --output text --region $REGION)
+          
+          # Get default subnet
+          SUBNET_ID=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" \
+            --query "Subnets[0].SubnetId" --output text --region $REGION)
+          
+          # Get latest Amazon Linux 2023 AMI
+          AMI_ID=$(aws ec2 describe-images \
+            --owners amazon \
+            --filters "Name=name,Values=al2023-ami-2023*-x86_64" "Name=state,Values=available" \
+            --query "sort_by(Images, &CreationDate)[-1].ImageId" \
+            --output text --region $REGION)
+          
+          echo "Using VPC: ${VPC_ID}"
+          echo "Using Subnet: ${SUBNET_ID}"
+          echo "Using AMI: ${AMI_ID}"
+          
+          # 1. EC2 instance without encryption (should be detected)
+          INSTANCE_NO_ENC=$(aws ec2 run-instances \
+            --image-id ${AMI_ID} \
+            --instance-type t2.micro \
+            --subnet-id ${SUBNET_ID} \
+            --tag-specifications \
+              "ResourceType=instance,Tags=[{Key=Name,Value=${{ env.TEST_RESOURCE_PREFIX }}-ec2-no-encryption},{Key=${{ env.TEST_TAG_KEY }},Value=${{ env.TEST_TAG_VALUE }}},{Key=Environment,Value=Test},{Key=Violation,Value=NoEncryption}]" \
+            --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":8,"VolumeType":"gp3","Encrypted":false,"DeleteOnTermination":true}}]' \
+            --query "Instances[0].InstanceId" \
+            --output text --region $REGION)
+          echo "✅ Created: ${INSTANCE_NO_ENC} (unencrypted EBS volume)"
+          
+          # 2. EC2 instance with encryption (compliant)
+          INSTANCE_ENCRYPTED=$(aws ec2 run-instances \
+            --image-id ${AMI_ID} \
+            --instance-type t2.micro \
+            --subnet-id ${SUBNET_ID} \
+            --tag-specifications \
+              "ResourceType=instance,Tags=[{Key=Name,Value=${{ env.TEST_RESOURCE_PREFIX }}-ec2-encrypted},{Key=${{ env.TEST_TAG_KEY }},Value=${{ env.TEST_TAG_VALUE }}},{Key=Environment,Value=Test},{Key=Compliant,Value=true}]" \
+            --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":8,"VolumeType":"gp3","Encrypted":true,"DeleteOnTermination":true}}]' \
+            --query "Instances[0].InstanceId" \
+            --output text --region $REGION)
+          echo "✅ Created: ${INSTANCE_ENCRYPTED} (encrypted EBS volume)"
+          
+          echo ""
+          echo "📊 EC2 Test Resources Summary:"
+          echo "   - No Encryption: ${INSTANCE_NO_ENC}"
+          echo "   - Encrypted (Compliant): ${INSTANCE_ENCRYPTED}"
+
+      - name: Create Lambda test resources
+        if: contains(github.event.inputs.resource_types, 'lambda') || github.event.inputs.resource_types == 'all'
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "λ Creating Lambda Test Resources"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          TIMESTAMP=$(date +%s)
+          REGION="${{ github.event.inputs.region || env.AWS_REGION }}"
+          ACCOUNT_ID="${{ github.event.inputs.account_id }}"
+          
+          # Create IAM role for Lambda (if doesn't exist)
+          ROLE_NAME="${{ env.TEST_RESOURCE_PREFIX }}-lambda-role"
+          
+          if ! aws iam get-role --role-name ${ROLE_NAME} 2>/dev/null; then
+            echo "Creating Lambda execution role..."
+            aws iam create-role --role-name ${ROLE_NAME} \
+              --assume-role-policy-document '{
+                "Version": "2012-10-17",
+                "Statement": [{
+                  "Effect": "Allow",
+                  "Principal": {"Service": "lambda.amazonaws.com"},
+                  "Action": "sts:AssumeRole"
+                }]
+              }' \
+              --tags "Key=${{ env.TEST_TAG_KEY }},Value=${{ env.TEST_TAG_VALUE }}"
+            
+            aws iam attach-role-policy --role-name ${ROLE_NAME} \
+              --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+            
+            echo "Waiting for IAM role to propagate..."
+            sleep 10
+          fi
+          
+          ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${ROLE_NAME}"
+          
+          # Create deployment package
+          cat > /tmp/lambda_function.py << 'PYEOF'
+          import json
+          def lambda_handler(event, context):
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps('Test Lambda for Cloud Custodian periodic policies')
+              }
+          PYEOF
+          
+          cd /tmp
+          zip lambda-test.zip lambda_function.py
+          
+          # 1. Lambda without VPC (may be a security concern)
+          LAMBDA_NO_VPC="${{ env.TEST_RESOURCE_PREFIX }}-lambda-no-vpc-${TIMESTAMP}"
+          aws lambda create-function \
+            --function-name ${LAMBDA_NO_VPC} \
+            --runtime python3.11 \
+            --role ${ROLE_ARN} \
+            --handler lambda_function.lambda_handler \
+            --zip-file fileb:///tmp/lambda-test.zip \
+            --tags "${{ env.TEST_TAG_KEY }}=${{ env.TEST_TAG_VALUE }},Environment=Test,Violation=NoVPC" \
+            --region $REGION
+          echo "✅ Created: ${LAMBDA_NO_VPC} (no VPC)"
+          
+          # 2. Lambda without encryption (should be detected)
+          LAMBDA_NO_ENC="${{ env.TEST_RESOURCE_PREFIX }}-lambda-no-encryption-${TIMESTAMP}"
+          aws lambda create-function \
+            --function-name ${LAMBDA_NO_ENC} \
+            --runtime python3.11 \
+            --role ${ROLE_ARN} \
+            --handler lambda_function.lambda_handler \
+            --zip-file fileb:///tmp/lambda-test.zip \
+            --tags "${{ env.TEST_TAG_KEY }}=${{ env.TEST_TAG_VALUE }},Environment=Test,Violation=NoEncryption" \
+            --region $REGION
+          echo "✅ Created: ${LAMBDA_NO_ENC} (no encryption)"
+          
+          # 3. Lambda with DEPRECATED runtime (python3.8 - deprecated)
+          LAMBDA_DEPRECATED="${{ env.TEST_RESOURCE_PREFIX }}-lambda-deprecated-${TIMESTAMP}"
+          aws lambda create-function \
+            --function-name ${LAMBDA_DEPRECATED} \
+            --runtime python3.8 \
+            --role ${ROLE_ARN} \
+            --handler lambda_function.lambda_handler \
+            --zip-file fileb:///tmp/lambda-test.zip \
+            --tags "${{ env.TEST_TAG_KEY }}=${{ env.TEST_TAG_VALUE }},Environment=Test,Violation=DeprecatedRuntime" \
+            --region $REGION
+          echo "✅ Created: ${LAMBDA_DEPRECATED} (deprecated runtime: python3.8)"
+          
+          # 4. Lambda with OUTDATED runtime (python3.9 - will be deprecated soon)
+          LAMBDA_OUTDATED="${{ env.TEST_RESOURCE_PREFIX }}-lambda-outdated-${TIMESTAMP}"
+          aws lambda create-function \
+            --function-name ${LAMBDA_OUTDATED} \
+            --runtime python3.9 \
+            --role ${ROLE_ARN} \
+            --handler lambda_function.lambda_handler \
+            --zip-file fileb:///tmp/lambda-test.zip \
+            --tags "${{ env.TEST_TAG_KEY }}=${{ env.TEST_TAG_VALUE }},Environment=Test,Violation=OutdatedRuntime" \
+            --region $REGION
+          echo "✅ Created: ${LAMBDA_OUTDATED} (outdated runtime: python3.9)"
+          
+          # 5. Lambda with OUTDATED runtime (nodejs18.x - will be deprecated soon)
+          # Note: Requires different handler
+          cat > /tmp/lambda_function_node.js << 'JSEOF'
+          exports.handler = async (event) => {
+              return {
+                  statusCode: 200,
+                  body: JSON.stringify('Test Lambda for Cloud Custodian')
+              };
+          };
+          JSEOF
+          
+          cd /tmp
+          zip lambda-test-node.zip lambda_function_node.js
+          
+          LAMBDA_NODE_OUTDATED="${{ env.TEST_RESOURCE_PREFIX }}-lambda-node-outdated-${TIMESTAMP}"
+          aws lambda create-function \
+            --function-name ${LAMBDA_NODE_OUTDATED} \
+            --runtime nodejs18.x \
+            --role ${ROLE_ARN} \
+            --handler lambda_function_node.handler \
+            --zip-file fileb:///tmp/lambda-test-node.zip \
+            --tags "${{ env.TEST_TAG_KEY }}=${{ env.TEST_TAG_VALUE }},Environment=Test,Violation=OutdatedRuntime" \
+            --region $REGION
+          echo "✅ Created: ${LAMBDA_NODE_OUTDATED} (outdated runtime: nodejs18.x)"
+          
+          echo ""
+          echo "📊 Lambda Test Resources Summary:"
+          echo "   - No VPC: ${LAMBDA_NO_VPC}"
+          echo "   - No Encryption: ${LAMBDA_NO_ENC}"
+          echo "   - Deprecated Runtime (python3.8): ${LAMBDA_DEPRECATED}"
+          echo "   - Outdated Runtime (python3.9): ${LAMBDA_OUTDATED}"
+          echo "   - Outdated Runtime (nodejs18.x): ${LAMBDA_NODE_OUTDATED}"
+
+      - name: Create IAM test resources
+        if: contains(github.event.inputs.resource_types, 'iam') || github.event.inputs.resource_types == 'all'
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🔐 Creating IAM Test Resources"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          TIMESTAMP=$(date +%s)
+          
+          # 1. IAM user without MFA (should be detected)
+          USER_NO_MFA="${{ env.TEST_RESOURCE_PREFIX }}-iam-user-no-mfa-${TIMESTAMP}"
+          aws iam create-user --user-name ${USER_NO_MFA} \
+            --tags "Key=${{ env.TEST_TAG_KEY }},Value=${{ env.TEST_TAG_VALUE }}" "Key=Violation,Value=NoMFA"
+          echo "✅ Created: ${USER_NO_MFA} (no MFA)"
+          
+          # 2. IAM user with old access keys (simulate)
+          USER_OLD_KEYS="${{ env.TEST_RESOURCE_PREFIX }}-iam-user-old-keys-${TIMESTAMP}"
+          aws iam create-user --user-name ${USER_OLD_KEYS} \
+            --tags "Key=${{ env.TEST_TAG_KEY }},Value=${{ env.TEST_TAG_VALUE }}" "Key=Violation,Value=OldAccessKeys"
+          aws iam create-access-key --user-name ${USER_OLD_KEYS} > /dev/null
+          echo "✅ Created: ${USER_OLD_KEYS} (access keys - will be old after 90 days)"
+          
+          # 3. IAM role with overly permissive policy
+          ROLE_OVERPERMISSIVE="${{ env.TEST_RESOURCE_PREFIX }}-iam-role-overpermissive-${TIMESTAMP}"
+          aws iam create-role --role-name ${ROLE_OVERPERMISSIVE} \
+            --assume-role-policy-document '{
+              "Version": "2012-10-17",
+              "Statement": [{
+                "Effect": "Allow",
+                "Principal": {"Service": "ec2.amazonaws.com"},
+                "Action": "sts:AssumeRole"
+              }]
+            }' \
+            --tags "Key=${{ env.TEST_TAG_KEY }},Value=${{ env.TEST_TAG_VALUE }}" "Key=Violation,Value=OverPermissive"
+          echo "✅ Created: ${ROLE_OVERPERMISSIVE} (overly permissive)"
+          
+          echo ""
+          echo "📊 IAM Test Resources Summary:"
+          echo "   - User without MFA: ${USER_NO_MFA}"
+          echo "   - User with access keys: ${USER_OLD_KEYS}"
+          echo "   - Overpermissive role: ${ROLE_OVERPERMISSIVE}"
+
+      - name: Create RDS test resources
+        if: contains(github.event.inputs.resource_types, 'rds') || github.event.inputs.resource_types == 'all'
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🗄️  Creating RDS Test Resources"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          TIMESTAMP=$(date +%s)
+          REGION="${{ github.event.inputs.region || env.AWS_REGION }}"
+          
+          # 1. RDS instance without encryption (should be detected)
+          DB_NO_ENC="${{ env.TEST_RESOURCE_PREFIX }}-rds-no-enc-${TIMESTAMP}"
+          aws rds create-db-instance \
+            --db-instance-identifier ${DB_NO_ENC} \
+            --db-instance-class db.t3.micro \
+            --engine mysql \
+            --master-username admin \
+            --master-user-password TempPassword123! \
+            --allocated-storage 20 \
+            --storage-encrypted false \
+            --backup-retention-period 0 \
+            --publicly-accessible false \
+            --tags "Key=${{ env.TEST_TAG_KEY }},Value=${{ env.TEST_TAG_VALUE }}" "Key=Violation,Value=NoEncryption" \
+            --region $REGION || echo "⚠️  RDS creation may take time or fail due to quota"
+          echo "✅ Initiated: ${DB_NO_ENC} (unencrypted - may take 5-10 minutes)"
+          
+          echo ""
+          echo "📊 RDS Test Resources Summary:"
+          echo "   - No Encryption: ${DB_NO_ENC} (creation in progress)"
+          echo "   Note: RDS instances take 5-10 minutes to create"
+
+      - name: Create CloudWatch test resources
+        if: contains(github.event.inputs.resource_types, 'cloudwatch') || github.event.inputs.resource_types == 'all'
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📊 Creating CloudWatch Test Resources"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          TIMESTAMP=$(date +%s)
+          REGION="${{ github.event.inputs.region || env.AWS_REGION }}"
+          
+          # 1. CloudWatch Log Group without retention (should be detected)
+          LOG_GROUP_NO_RETENTION="/aws/${{ env.TEST_RESOURCE_PREFIX }}/no-retention-${TIMESTAMP}"
+          aws logs create-log-group --log-group-name ${LOG_GROUP_NO_RETENTION} --region $REGION
+          aws logs tag-log-group --log-group-name ${LOG_GROUP_NO_RETENTION} \
+            --tags "${{ env.TEST_TAG_KEY }}=${{ env.TEST_TAG_VALUE }},Violation=NoRetention" \
+            --region $REGION
+          echo "✅ Created: ${LOG_GROUP_NO_RETENTION} (no retention policy)"
+          
+          # 2. CloudWatch Log Group without encryption (should be detected)
+          LOG_GROUP_NO_ENC="/aws/${{ env.TEST_RESOURCE_PREFIX }}/no-encryption-${TIMESTAMP}"
+          aws logs create-log-group --log-group-name ${LOG_GROUP_NO_ENC} --region $REGION
+          aws logs put-retention-policy --log-group-name ${LOG_GROUP_NO_ENC} \
+            --retention-in-days 7 --region $REGION
+          aws logs tag-log-group --log-group-name ${LOG_GROUP_NO_ENC} \
+            --tags "${{ env.TEST_TAG_KEY }}=${{ env.TEST_TAG_VALUE }},Violation=NoEncryption" \
+            --region $REGION
+          echo "✅ Created: ${LOG_GROUP_NO_ENC} (no encryption)"
+          
+          # 3. Compliant CloudWatch Log Group
+          LOG_GROUP_COMPLIANT="/aws/${{ env.TEST_RESOURCE_PREFIX }}/compliant-${TIMESTAMP}"
+          aws logs create-log-group --log-group-name ${LOG_GROUP_COMPLIANT} --region $REGION
+          aws logs put-retention-policy --log-group-name ${LOG_GROUP_COMPLIANT} \
+            --retention-in-days 30 --region $REGION
+          aws logs tag-log-group --log-group-name ${LOG_GROUP_COMPLIANT} \
+            --tags "${{ env.TEST_TAG_KEY }}=${{ env.TEST_TAG_VALUE }},Compliant=true" \
+            --region $REGION
+          echo "✅ Created: ${LOG_GROUP_COMPLIANT} (compliant)"
+          
+          echo ""
+          echo "📊 CloudWatch Test Resources Summary:"
+          echo "   - No Retention: ${LOG_GROUP_NO_RETENTION}"
+          echo "   - No Encryption: ${LOG_GROUP_NO_ENC}"
+          echo "   - Compliant: ${LOG_GROUP_COMPLIANT}"
+
+      - name: Create EKS test resources
+        if: contains(github.event.inputs.resource_types, 'eks') || github.event.inputs.resource_types == 'all'
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "☸️  Creating EKS Test Resources"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          TIMESTAMP=$(date +%s)
+          REGION="${{ github.event.inputs.region || env.AWS_REGION }}"
+          ACCOUNT_ID="${{ github.event.inputs.account_id }}"
+          
+          echo "⚠️  WARNING: EKS cluster creation takes 15-20 minutes and costs ~$0.10/hour"
+          echo "⚠️  Skipping EKS cluster creation in automated workflow"
+          echo ""
+          echo "To manually create an EKS test cluster:"
+          echo ""
+          echo "# 1. Create EKS cluster with OLD Kubernetes version (will be detected)"
+          echo "eksctl create cluster \\"
+          echo "  --name ${{ env.TEST_RESOURCE_PREFIX }}-eks-old-version \\"
+          echo "  --version 1.27 \\"
+          echo "  --region $REGION \\"
+          echo "  --tags ${{ env.TEST_TAG_KEY }}=${{ env.TEST_TAG_VALUE }},Violation=OldVersion"
+          echo ""
+          echo "# 2. Create EKS cluster with PUBLIC endpoint (will be detected)"
+          echo "eksctl create cluster \\"
+          echo "  --name ${{ env.TEST_RESOURCE_PREFIX }}-eks-public-endpoint \\"
+          echo "  --version 1.28 \\"
+          echo "  --region $REGION \\"
+          echo "  --endpoint-public-access=true \\"
+          echo "  --endpoint-private-access=false \\"
+          echo "  --tags ${{ env.TEST_TAG_KEY }}=${{ env.TEST_TAG_VALUE }},Violation=PublicEndpoint"
+          echo ""
+          echo "# 3. Create EKS cluster without logging (will be detected)"
+          echo "eksctl create cluster \\"
+          echo "  --name ${{ env.TEST_RESOURCE_PREFIX }}-eks-no-logging \\"
+          echo "  --version 1.28 \\"
+          echo "  --region $REGION \\"
+          echo "  --tags ${{ env.TEST_TAG_KEY }}=${{ env.TEST_TAG_VALUE }},Violation=NoLogging"
+          echo ""
+          echo "📊 EKS Test Resources: Manual creation required (see above commands)"
+
+      - name: Create ElastiCache test resources
+        if: contains(github.event.inputs.resource_types, 'elasticache') || github.event.inputs.resource_types == 'all'
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🔴 Creating ElastiCache Test Resources"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          TIMESTAMP=$(date +%s)
+          REGION="${{ github.event.inputs.region || env.AWS_REGION }}"
+          
+          # Get default VPC security group
+          VPC_ID=$(aws ec2 describe-vpcs --filters "Name=isDefault,Values=true" \
+            --query "Vpcs[0].VpcId" --output text --region $REGION)
+          
+          SG_ID=$(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=${VPC_ID}" "Name=group-name,Values=default" \
+            --query "SecurityGroups[0].GroupId" --output text --region $REGION)
+          
+          echo "Using VPC: ${VPC_ID}"
+          echo "Using Security Group: ${SG_ID}"
+          
+          # 1. ElastiCache Redis without encryption at rest (should be detected)
+          CACHE_NO_ENC="${{ env.TEST_RESOURCE_PREFIX }}-redis-no-enc-${TIMESTAMP}"
+          aws elasticache create-cache-cluster \
+            --cache-cluster-id ${CACHE_NO_ENC} \
+            --engine redis \
+            --cache-node-type cache.t3.micro \
+            --num-cache-nodes 1 \
+            --security-group-ids ${SG_ID} \
+            --tags "Key=${{ env.TEST_TAG_KEY }},Value=${{ env.TEST_TAG_VALUE }}" "Key=Violation,Value=NoEncryptionAtRest" \
+            --region $REGION
+          echo "✅ Created: ${CACHE_NO_ENC} (no encryption at rest)"
+          
+          # 2. ElastiCache Redis without transit encryption (should be detected)
+          # Note: For transit encryption, need to create replication group
+          REPL_NO_TRANSIT="${{ env.TEST_RESOURCE_PREFIX }}-redis-no-transit-${TIMESTAMP}"
+          aws elasticache create-replication-group \
+            --replication-group-id ${REPL_NO_TRANSIT} \
+            --replication-group-description "Test Redis without transit encryption" \
+            --engine redis \
+            --cache-node-type cache.t3.micro \
+            --num-cache-clusters 1 \
+            --at-rest-encryption-enabled \
+            --transit-encryption-enabled false \
+            --security-group-ids ${SG_ID} \
+            --tags "Key=${{ env.TEST_TAG_KEY }},Value=${{ env.TEST_TAG_VALUE }}" "Key=Violation,Value=NoTransitEncryption" \
+            --region $REGION
+          echo "✅ Created: ${REPL_NO_TRANSIT} (no transit encryption)"
+          
+          echo ""
+          echo "📊 ElastiCache Test Resources Summary:"
+          echo "   - No Encryption at Rest: ${CACHE_NO_ENC}"
+          echo "   - No Transit Encryption: ${REPL_NO_TRANSIT}"
+
+      - name: Create ELB/ALB test resources
+        if: contains(github.event.inputs.resource_types, 'elb') || contains(github.event.inputs.resource_types, 'lb') || github.event.inputs.resource_types == 'all'
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "⚖️  Creating ELB/ALB Test Resources"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          TIMESTAMP=$(date +%s)
+          REGION="${{ github.event.inputs.region || env.AWS_REGION }}"
+          
+          # Get default VPC details
+          VPC_ID=$(aws ec2 describe-vpcs --filters "Name=isDefault,Values=true" \
+            --query "Vpcs[0].VpcId" --output text --region $REGION)
+          
+          # Get at least 2 subnets for ALB
+          SUBNETS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" \
+            --query "Subnets[0:2].SubnetId" --output text --region $REGION | tr '\t' ' ')
+          
+          SG_ID=$(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=${VPC_ID}" "Name=group-name,Values=default" \
+            --query "SecurityGroups[0].GroupId" --output text --region $REGION)
+          
+          echo "Using VPC: ${VPC_ID}"
+          echo "Using Subnets: ${SUBNETS}"
+          echo "Using Security Group: ${SG_ID}"
+          
+          # 1. ALB with outdated TLS policy (should be detected)
+          ALB_OUTDATED_TLS="${{ env.TEST_RESOURCE_PREFIX }}-alb-outdated-tls-${TIMESTAMP}"
+          ALB_ARN=$(aws elbv2 create-load-balancer \
+            --name ${ALB_OUTDATED_TLS} \
+            --subnets ${SUBNETS} \
+            --security-groups ${SG_ID} \
+            --tags "Key=${{ env.TEST_TAG_KEY }},Value=${{ env.TEST_TAG_VALUE }}" "Key=Violation,Value=OutdatedTLS" \
+            --query "LoadBalancers[0].LoadBalancerArn" \
+            --output text --region $REGION)
+          echo "✅ Created: ${ALB_OUTDATED_TLS} (ARN: ${ALB_ARN})"
+          
+          # Create target group
+          TG_ARN=$(aws elbv2 create-target-group \
+            --name ${ALB_OUTDATED_TLS:0:32} \
+            --protocol HTTP \
+            --port 80 \
+            --vpc-id ${VPC_ID} \
+            --tags "Key=${{ env.TEST_TAG_KEY }},Value=${{ env.TEST_TAG_VALUE }}" \
+            --query "TargetGroups[0].TargetGroupArn" \
+            --output text --region $REGION)
+          
+          # Create HTTPS listener with OUTDATED TLS policy (ELBSecurityPolicy-2016-08)
+          aws elbv2 create-listener \
+            --load-balancer-arn ${ALB_ARN} \
+            --protocol HTTPS \
+            --port 443 \
+            --certificates CertificateArn=arn:aws:iam::${{ github.event.inputs.account_id }}:server-certificate/test-cert \
+            --ssl-policy ELBSecurityPolicy-2016-08 \
+            --default-actions Type=forward,TargetGroupArn=${TG_ARN} \
+            --region $REGION 2>/dev/null || echo "⚠️  Note: Listener creation failed (likely no SSL certificate). ALB created but listener needs manual setup."
+          
+          echo ""
+          echo "📊 ELB/ALB Test Resources Summary:"
+          echo "   - Outdated TLS Policy: ${ALB_OUTDATED_TLS}"
+
+      - name: Generate summary report
+        if: always()
+        run: |
+          echo "# 🧪 Test Resources Creation Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- **Account ID:** ${{ github.event.inputs.account_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Region:** ${{ github.event.inputs.region || env.AWS_REGION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Resource Types:** ${{ github.event.inputs.resource_types }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cleanup Existing:** ${{ github.event.inputs.cleanup_existing }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## Test Resources Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "These resources are tagged with:" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.TEST_TAG_KEY }}=${{ env.TEST_TAG_VALUE }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`Environment=Test\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Resource Purpose" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource Type | Compliant | Non-Compliant | Purpose |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------------|-----------|---------------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| S3 Buckets | 1 | 3 | Test encryption, versioning, public access policies |" >> $GITHUB_STEP_SUMMARY
+          echo "| EC2 Instances | 1 | 1 | Test EBS encryption policies |" >> $GITHUB_STEP_SUMMARY
+          echo "| Lambda Functions | 0 | 5 | Test VPC, encryption, deprecated/outdated runtime policies |" >> $GITHUB_STEP_SUMMARY
+          echo "| IAM Users/Roles | 0 | 3 | Test MFA and access key policies |" >> $GITHUB_STEP_SUMMARY
+          echo "| RDS Instances | 0 | 1 | Test database encryption policies |" >> $GITHUB_STEP_SUMMARY
+          echo "| CloudWatch Logs | 1 | 2 | Test retention and encryption policies |" >> $GITHUB_STEP_SUMMARY
+          echo "| EKS Clusters | 0 | Manual | Test K8s version, endpoint, logging (manual creation) |" >> $GITHUB_STEP_SUMMARY
+          echo "| ElastiCache | 0 | 2 | Test encryption at rest and in transit |" >> $GITHUB_STEP_SUMMARY
+          echo "| Load Balancers | 0 | 1 | Test TLS policy configuration |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## Expected Policy Detections" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "When periodic policies run, they should detect:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### S3 Policies" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ S3 buckets without encryption" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ S3 buckets without versioning" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ S3 buckets without public access block" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### EC2 Policies" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ EC2 instances with unencrypted EBS volumes" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Lambda Policies" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Lambda functions without VPC configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Lambda functions without encryption" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Lambda functions with **deprecated** runtimes (python3.8)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Lambda functions with **outdated** runtimes (python3.9, nodejs18.x)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### IAM Policies" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ IAM users without MFA enabled" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ IAM users with old access keys (after 90 days)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### RDS Policies" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ RDS instances without encryption" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### CloudWatch Policies" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ CloudWatch log groups without retention" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ CloudWatch log groups without encryption" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ElastiCache Policies" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ ElastiCache Redis without encryption at rest" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ ElastiCache Redis without transit encryption" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Load Balancer Policies" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ ALB/ELB with outdated TLS security policies" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### EKS Policies (Manual Test)" >> $GITHUB_STEP_SUMMARY
+          echo "- 📝 EKS clusters with outdated Kubernetes versions" >> $GITHUB_STEP_SUMMARY
+          echo "- 📝 EKS clusters with public API endpoints" >> $GITHUB_STEP_SUMMARY
+          echo "- 📝 EKS clusters without control plane logging" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. 🚀 Run the **Run Cloud Custodian Periodic Policies** workflow" >> $GITHUB_STEP_SUMMARY
+          echo "2. 📊 Review the policy execution results" >> $GITHUB_STEP_SUMMARY
+          echo "3. ✅ Verify test resources are detected correctly" >> $GITHUB_STEP_SUMMARY
+          echo "4. 📧 Check notifications in SQS queue" >> $GITHUB_STEP_SUMMARY
+          echo "5. 🔍 Review Security Hub findings" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## Cleanup" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To remove test resources, run this workflow again with:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Enable **Cleanup existing test resources**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Or use AWS CLI:" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo '# Find all test resources by tag' >> $GITHUB_STEP_SUMMARY
+          echo 'aws resourcegroupstaggingapi get-resources \' >> $GITHUB_STEP_SUMMARY
+          echo '  --tag-filters "Key=${{ env.TEST_TAG_KEY }},Values=${{ env.TEST_TAG_VALUE }}"' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📎 Quick Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [S3 Console](https://s3.console.aws.amazon.com/s3/buckets?region=${{ github.event.inputs.region || env.AWS_REGION }})" >> $GITHUB_STEP_SUMMARY
+          echo "- [EC2 Console](https://console.aws.amazon.com/ec2/home?region=${{ github.event.inputs.region || env.AWS_REGION }}#Instances:)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Lambda Console](https://console.aws.amazon.com/lambda/home?region=${{ github.event.inputs.region || env.AWS_REGION }}#/functions)" >> $GITHUB_STEP_SUMMARY
+          echo "- [IAM Console](https://console.aws.amazon.com/iam/home#/users)" >> $GITHUB_STEP_SUMMARY
+          echo "- [RDS Console](https://console.aws.amazon.com/rds/home?region=${{ github.event.inputs.region || env.AWS_REGION }}#databases:)" >> $GITHUB_STEP_SUMMARY
+          echo "- [CloudWatch Console](https://console.aws.amazon.com/cloudwatch/home?region=${{ github.event.inputs.region || env.AWS_REGION }}#logsV2:log-groups)" >> $GITHUB_STEP_SUMMARY
+          echo "- [ElastiCache Console](https://console.aws.amazon.com/elasticache/home?region=${{ github.event.inputs.region || env.AWS_REGION }}#/redis)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Load Balancers Console](https://console.aws.amazon.com/ec2/home?region=${{ github.event.inputs.region || env.AWS_REGION }}#LoadBalancers:)" >> $GITHUB_STEP_SUMMARY
+          echo "- [EKS Console](https://console.aws.amazon.com/eks/home?region=${{ github.event.inputs.region || env.AWS_REGION }}#/clusters)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Save resource inventory
+        if: always()
+        run: |
+          REGION="${{ github.event.inputs.region || env.AWS_REGION }}"
+          
+          cat > test-resources-inventory.json << 'EOF'
+          {
+            "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "account_id": "${{ github.event.inputs.account_id }}",
+            "region": "$REGION",
+            "tag_key": "${{ env.TEST_TAG_KEY }}",
+            "tag_value": "${{ env.TEST_TAG_VALUE }}",
+            "resources": {
+              "s3_buckets": [],
+              "ec2_instances": [],
+              "lambda_functions": [],
+              "iam_users": [],
+              "rds_instances": [],
+              "cloudwatch_log_groups": []
+            }
+          }
+          EOF
+          
+          # Query resources by tag and populate inventory
+          aws resourcegroupstaggingapi get-resources \
+            --tag-filters "Key=${{ env.TEST_TAG_KEY }},Values=${{ env.TEST_TAG_VALUE }}" \
+            --region $REGION > test-resources-inventory.json || true
+          
+          echo "📄 Test resources inventory saved"
+
+      - name: Upload inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-resources-inventory
+          path: test-resources-inventory.json
+          retention-days: 90

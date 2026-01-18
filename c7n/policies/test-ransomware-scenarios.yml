@@ -1,0 +1,792 @@
+# ============================================================================
+# S3 Ransomware Attack Test Scenarios
+# ============================================================================
+# This file contains test scenarios to validate ransomware detection policies.
+# Based on research from:
+# - AWS Security Blog: Anatomy of a Ransomware Event
+# - Rhino Security Labs: S3 Ransomware Attack Vectors
+# - AWS Customer Playbook Framework
+# - S3 Ransomware Simulator projects
+# ============================================================================
+
+# ============================================================================
+# IMPORTANT: These are TEST scenarios for validation purposes only
+# Execute in isolated test environment with disposable test buckets
+# ============================================================================
+
+test_scenarios:
+  
+  # --------------------------------------------------------------------------
+  # Scenario 1: Mass Deletion Attack
+  # --------------------------------------------------------------------------
+  # Simulates ransomware deleting objects to hold data for ransom
+  # Detection: s3-mass-deletion-realtime, s3-mass-deletion-detected
+  # --------------------------------------------------------------------------
+  - name: test-mass-deletion-attack
+    description: |
+      Simulate mass deletion ransomware attack on S3 bucket.
+      Attack Pattern: Rapidly delete >50 objects to trigger detection.
+      
+      Reference: 
+      - https://github.com/raphabot/s3-ransomware-simulator
+      - https://rhinosecuritylabs.com/aws/s3-ransomware-part-1-attack-vector/
+    
+    prerequisites:
+      - Create test bucket: test-ransomware-deletion-${RANDOM}
+      - Upload 100+ test files to bucket
+      - Enable versioning on bucket
+      - Configure S3 Request Metrics (FilterId: EntireBucket)
+    
+    attack_steps:
+      - step: 1
+        action: "Setup test environment"
+        commands: |
+          # Create test bucket
+          TEST_BUCKET="test-ransomware-deletion-$(date +%s)"
+          aws s3 mb s3://${TEST_BUCKET}
+          
+          # Enable versioning
+          aws s3api put-bucket-versioning \
+            --bucket ${TEST_BUCKET} \
+            --versioning-configuration Status=Enabled
+          
+          # Create 100 test objects
+          for i in {1..100}; do
+            echo "Test file $i - $(date)" > /tmp/test-file-$i.txt
+            aws s3 cp /tmp/test-file-$i.txt s3://${TEST_BUCKET}/data/file-$i.txt
+          done
+          
+          echo "Test bucket created: ${TEST_BUCKET}"
+          echo "Objects created: 100"
+      
+      - step: 2
+        action: "Execute mass deletion attack"
+        commands: |
+          # Simulate ransomware deleting objects rapidly
+          # This should trigger: s3-mass-deletion-detected (>50 DELETE in 5min)
+          
+          echo "🚨 Starting mass deletion attack simulation..."
+          
+          for i in {1..60}; do
+            aws s3 rm s3://${TEST_BUCKET}/data/file-$i.txt
+            echo "Deleted file-$i.txt"
+          done
+          
+          echo "✅ Mass deletion simulation complete: 60 objects deleted"
+      
+      - step: 3
+        action: "Verify detection"
+        commands: |
+          # Check CloudTrail for DeleteObject events
+          aws cloudtrail lookup-events \
+            --lookup-attributes AttributeKey=ResourceName,AttributeValue=${TEST_BUCKET} \
+            --max-results 50 \
+            --query 'Events[?EventName==`DeleteObject`]'
+          
+          # Check CloudWatch metrics
+          aws cloudwatch get-metric-statistics \
+            --namespace AWS/S3 \
+            --metric-name DeleteRequests \
+            --dimensions Name=BucketName,Value=${TEST_BUCKET} Name=FilterId,Value=EntireBucket \
+            --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
+            --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+            --period 300 \
+            --statistics Sum
+          
+          # Check Security Hub findings
+          aws securityhub get-findings \
+            --filters '{"ResourceId": [{"Value": "'"${TEST_BUCKET}"'", "Comparison": "CONTAINS"}]}'
+      
+      - step: 4
+        action: "Recovery (verify versioning protection)"
+        commands: |
+          # List deleted objects with versions
+          aws s3api list-object-versions \
+            --bucket ${TEST_BUCKET} \
+            --prefix data/
+          
+          # Restore one deleted object
+          VERSION_ID=$(aws s3api list-object-versions \
+            --bucket ${TEST_BUCKET} \
+            --prefix data/file-1.txt \
+            --query 'DeleteMarkers[0].VersionId' \
+            --output text)
+          
+          aws s3api delete-object \
+            --bucket ${TEST_BUCKET} \
+            --key data/file-1.txt \
+            --version-id ${VERSION_ID}
+          
+          echo "✅ Object restored using versioning"
+    
+    cleanup:
+      commands: |
+        # Delete all object versions
+        aws s3api delete-objects \
+          --bucket ${TEST_BUCKET} \
+          --delete "$(aws s3api list-object-versions \
+            --bucket ${TEST_BUCKET} \
+            --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}')"
+        
+        # Delete bucket
+        aws s3 rb s3://${TEST_BUCKET} --force
+        echo "✅ Cleanup complete"
+
+  # --------------------------------------------------------------------------
+  # Scenario 2: Mass Encryption Attack (Object Overwriting)
+  # --------------------------------------------------------------------------
+  # Simulates ransomware encrypting objects by overwriting with encrypted versions
+  # Detection: s3-mass-encryption-detected
+  # --------------------------------------------------------------------------
+  - name: test-mass-encryption-attack
+    description: |
+      Simulate mass encryption ransomware attack on S3 bucket.
+      Attack Pattern: Rapidly overwrite objects with encrypted versions (>100 PUTs in 5min).
+      
+      Reference:
+      - https://github.com/agnideesh/python-ransomware-simulator
+      - https://github.com/knytio/s3ransym
+      - https://aws.amazon.com/blogs/security/anatomy-of-a-ransomware-event-targeting-data-in-amazon-s3/
+    
+    prerequisites:
+      - Create test bucket: test-ransomware-encryption-${RANDOM}
+      - Upload 150+ test files to bucket
+      - Enable versioning on bucket
+      - Configure S3 Request Metrics (FilterId: EntireBucket)
+    
+    attack_steps:
+      - step: 1
+        action: "Setup test environment"
+        commands: |
+          # Create test bucket with versioning
+          TEST_BUCKET="test-ransomware-encryption-$(date +%s)"
+          aws s3 mb s3://${TEST_BUCKET}
+          
+          aws s3api put-bucket-versioning \
+            --bucket ${TEST_BUCKET} \
+            --versioning-configuration Status=Enabled
+          
+          # Create 150 test objects
+          for i in {1..150}; do
+            echo "Original content $i - $(date)" > /tmp/original-$i.txt
+            aws s3 cp /tmp/original-$i.txt s3://${TEST_BUCKET}/documents/doc-$i.txt
+          done
+          
+          echo "Test bucket created: ${TEST_BUCKET}"
+          echo "Objects created: 150"
+      
+      - step: 2
+        action: "Execute mass encryption attack"
+        commands: |
+          # Simulate ransomware encrypting objects
+          # Download, encrypt (simulate), re-upload
+          # This should trigger: s3-mass-encryption-detected (>100 PUT in 5min)
+          
+          echo "🚨 Starting mass encryption attack simulation..."
+          
+          for i in {1..120}; do
+            # Simulate encryption by overwriting with "encrypted" content
+            echo "ENCRYPTED_DATA_RANSOM_NOTE_$(openssl rand -hex 16)" > /tmp/encrypted-$i.txt
+            aws s3 cp /tmp/encrypted-$i.txt s3://${TEST_BUCKET}/documents/doc-$i.txt
+            echo "Encrypted doc-$i.txt"
+          done
+          
+          # Upload ransom note
+          cat > /tmp/RANSOM_NOTE.txt << 'EOFMARKER'
+          YOUR FILES HAVE BEEN ENCRYPTED
+          
+          All your S3 objects have been encrypted with military-grade encryption.
+          To recover your files, you must pay 5 BTC to: [BITCOIN_ADDRESS]
+          After payment, contact: ransomware@evil.com with transaction ID
+          You have 48 hours before the decryption key is destroyed.
+          DO NOT contact authorities or AWS - your data will be permanently deleted.
+          Decryption tool will be provided after payment verification.
+          EOFMARKER
+          
+          aws s3 cp /tmp/RANSOM_NOTE.txt s3://${TEST_BUCKET}/RANSOM_NOTE.txt
+          aws s3 cp /tmp/RANSOM_NOTE.txt s3://${TEST_BUCKET}/HOW_TO_DECRYPT.txt
+          
+          echo "✅ Mass encryption simulation complete: 120 objects encrypted"
+      
+      - step: 3
+        action: "Verify detection"
+        commands: |
+          # Check CloudTrail for PutObject events
+          aws cloudtrail lookup-events \
+            --lookup-attributes AttributeKey=ResourceName,AttributeValue=${TEST_BUCKET} \
+            --max-results 50 \
+            --query 'Events[?EventName==`PutObject`]'
+          
+          # Check CloudWatch metrics for PUT spike
+          aws cloudwatch get-metric-statistics \
+            --namespace AWS/S3 \
+            --metric-name PutRequests \
+            --dimensions Name=BucketName,Value=${TEST_BUCKET} Name=FilterId,Value=EntireBucket \
+            --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
+            --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+            --period 300 \
+            --statistics Sum
+          
+          # List object versions to show encryption
+          aws s3api list-object-versions \
+            --bucket ${TEST_BUCKET} \
+            --prefix documents/doc-1.txt \
+            --query 'Versions[].[VersionId,LastModified,Size]' \
+            --output table
+      
+      - step: 4
+        action: "Recovery (restore from versions)"
+        commands: |
+          # Restore original versions of encrypted objects
+          echo "📋 Restoring original versions..."
+          
+          # Get previous version ID (before encryption)
+          PREV_VERSION=$(aws s3api list-object-versions \
+            --bucket ${TEST_BUCKET} \
+            --prefix documents/doc-1.txt \
+            --query 'Versions[1].VersionId' \
+            --output text)
+          
+          # Copy previous version as current
+          aws s3api copy-object \
+            --bucket ${TEST_BUCKET} \
+            --copy-source ${TEST_BUCKET}/documents/doc-1.txt?versionId=${PREV_VERSION} \
+            --key documents/doc-1.txt
+          
+          echo "✅ Object restored from previous version"
+          
+          # Verify content
+          aws s3 cp s3://${TEST_BUCKET}/documents/doc-1.txt - | head -1
+    
+    cleanup:
+      commands: |
+        aws s3 rb s3://${TEST_BUCKET} --force
+        echo "✅ Cleanup complete"
+
+  # --------------------------------------------------------------------------
+  # Scenario 3: Configuration Tampering (Disable Versioning)
+  # --------------------------------------------------------------------------
+  # Simulates ransomware disabling versioning before attack
+  # Detection: s3-versioning-suspended
+  # --------------------------------------------------------------------------
+  - name: test-versioning-tampering
+    description: |
+      Simulate ransomware disabling versioning to prevent recovery.
+      
+      Reference:
+      - https://rhinosecuritylabs.com/aws/s3-ransomware-part-2-prevention-and-defense/
+    
+    attack_steps:
+      - step: 1
+        action: "Create bucket with versioning"
+        commands: |
+          TEST_BUCKET="test-versioning-tamper-$(date +%s)"
+          aws s3 mb s3://${TEST_BUCKET}
+          
+          aws s3api put-bucket-versioning \
+            --bucket ${TEST_BUCKET} \
+            --versioning-configuration Status=Enabled
+          
+          echo "✅ Bucket created with versioning enabled"
+      
+      - step: 2
+        action: "Suspend versioning (malicious action)"
+        commands: |
+          # This should trigger: s3-versioning-suspended policy
+          echo "🚨 Suspending versioning..."
+          
+          aws s3api put-bucket-versioning \
+            --bucket ${TEST_BUCKET} \
+            --versioning-configuration Status=Suspended
+          
+          echo "✅ Versioning suspended - detection should trigger"
+          
+          # Wait for detection
+          sleep 10
+          
+          # Check bucket versioning status
+          aws s3api get-bucket-versioning --bucket ${TEST_BUCKET}
+      
+      - step: 3
+        action: "Verify auto-remediation"
+        commands: |
+          # Cloud Custodian should auto-remediate by re-enabling versioning
+          echo "🔍 Checking if versioning was auto-remediated..."
+          
+          # Wait for remediation
+          sleep 30
+          
+          # Verify versioning is re-enabled
+          STATUS=$(aws s3api get-bucket-versioning \
+            --bucket ${TEST_BUCKET} \
+            --query 'Status' \
+            --output text)
+          
+          if [ "$STATUS" == "Enabled" ]; then
+            echo "✅ Auto-remediation successful: Versioning re-enabled"
+          else
+            echo "❌ Auto-remediation failed: Versioning still $STATUS"
+          fi
+    
+    cleanup:
+      commands: |
+        aws s3 rb s3://${TEST_BUCKET}
+        echo "✅ Cleanup complete"
+
+  # --------------------------------------------------------------------------
+  # Scenario 4: Encryption Removal Attack
+  # --------------------------------------------------------------------------
+  # Simulates ransomware removing bucket encryption
+  # Detection: s3-encryption-tampering
+  # --------------------------------------------------------------------------
+  - name: test-encryption-removal
+    description: |
+      Simulate ransomware removing bucket encryption configuration.
+      
+      Reference:
+      - https://aws.amazon.com/blogs/security/preventing-unintended-encryption-of-amazon-s3-objects/
+    
+    attack_steps:
+      - step: 1
+        action: "Create bucket with encryption"
+        commands: |
+          TEST_BUCKET="test-encryption-removal-$(date +%s)"
+          aws s3 mb s3://${TEST_BUCKET}
+          
+          # Enable default encryption
+          aws s3api put-bucket-encryption \
+            --bucket ${TEST_BUCKET} \
+            --server-side-encryption-configuration '{
+              "Rules": [{
+                "ApplyServerSideEncryptionByDefault": {
+                  "SSEAlgorithm": "AES256"
+                },
+                "BucketKeyEnabled": true
+              }]
+            }'
+          
+          echo "✅ Bucket created with SSE-S3 encryption"
+      
+      - step: 2
+        action: "Remove encryption (malicious action)"
+        commands: |
+          # This should trigger: s3-encryption-tampering policy
+          echo "🚨 Removing bucket encryption..."
+          
+          aws s3api delete-bucket-encryption --bucket ${TEST_BUCKET}
+          
+          echo "✅ Encryption removed - detection should trigger"
+          
+          # Verify encryption is removed
+          aws s3api get-bucket-encryption --bucket ${TEST_BUCKET} 2>&1 || \
+            echo "Encryption configuration not found (removed)"
+      
+      - step: 3
+        action: "Verify auto-remediation"
+        commands: |
+          # Wait for Cloud Custodian auto-remediation
+          sleep 30
+          
+          # Check if encryption was restored
+          aws s3api get-bucket-encryption --bucket ${TEST_BUCKET}
+    
+    cleanup:
+      commands: |
+        aws s3 rb s3://${TEST_BUCKET}
+        echo "✅ Cleanup complete"
+
+  # --------------------------------------------------------------------------
+  # Scenario 5: Public Access Block Removal
+  # --------------------------------------------------------------------------
+  # Simulates ransomware preparing for data exfiltration
+  # Detection: s3-public-access-block-disabled
+  # --------------------------------------------------------------------------
+  - name: test-public-access-block-removal
+    description: |
+      Simulate ransomware removing Public Access Block before exfiltration.
+      
+      Reference:
+      - https://www.cybr.com/cloud-security/amazon-s3-ransomware-defenses-cheat-sheet/
+    
+    attack_steps:
+      - step: 1
+        action: "Create bucket with Public Access Block"
+        commands: |
+          TEST_BUCKET="test-pab-removal-$(date +%s)"
+          aws s3 mb s3://${TEST_BUCKET}
+          
+          # Enable Public Access Block
+          aws s3api put-public-access-block \
+            --bucket ${TEST_BUCKET} \
+            --public-access-block-configuration \
+              "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+          
+          echo "✅ Public Access Block enabled"
+      
+      - step: 2
+        action: "Remove Public Access Block (malicious)"
+        commands: |
+          # This should trigger: s3-public-access-block-disabled
+          echo "🚨 Removing Public Access Block..."
+          
+          aws s3api delete-public-access-block --bucket ${TEST_BUCKET}
+          
+          echo "✅ Public Access Block removed - detection should trigger"
+      
+      - step: 3
+        action: "Verify auto-remediation"
+        commands: |
+          sleep 30
+          
+          # Check if PAB was restored
+          aws s3api get-public-access-block --bucket ${TEST_BUCKET}
+    
+    cleanup:
+      commands: |
+        aws s3 rb s3://${TEST_BUCKET}
+
+  # --------------------------------------------------------------------------
+  # Scenario 6: Malicious Bucket Policy (Cross-Account Access)
+  # --------------------------------------------------------------------------
+  # Simulates ransomware adding policy for data exfiltration
+  # Detection: s3-malicious-bucket-policy
+  # --------------------------------------------------------------------------
+  - name: test-malicious-bucket-policy
+    description: |
+      Simulate ransomware adding cross-account bucket policy for exfiltration.
+      
+      Reference:
+      - https://github.com/aws-samples/aws-customer-playbook-framework/blob/main/docs/Ransom_Response_S3.md
+    
+    attack_steps:
+      - step: 1
+        action: "Create test bucket"
+        commands: |
+          TEST_BUCKET="test-malicious-policy-$(date +%s)"
+          aws s3 mb s3://${TEST_BUCKET}
+          echo "✅ Bucket created"
+      
+      - step: 2
+        action: "Apply malicious bucket policy"
+        commands: |
+          # This should trigger: s3-malicious-bucket-policy
+          echo "🚨 Adding malicious cross-account policy..."
+          
+          aws s3api put-bucket-policy \
+            --bucket ${TEST_BUCKET} \
+            --policy '{
+              "Version": "2012-10-17",
+              "Statement": [{
+                "Sid": "ExfiltrationAccess",
+                "Effect": "Allow",
+                "Principal": {"AWS": "arn:aws:iam::123456789012:root"},
+                "Action": [
+                  "s3:GetObject",
+                  "s3:ListBucket"
+                ],
+                "Resource": [
+                  "arn:aws:s3:::'"${TEST_BUCKET}"'",
+                  "arn:aws:s3:::'"${TEST_BUCKET}"'/*"
+                ]
+              }]
+            }'
+          
+          echo "✅ Malicious policy applied - detection should trigger"
+      
+      - step: 3
+        action: "Verify detection and remediation"
+        commands: |
+          sleep 30
+          
+          # Check if policy was removed or statement deleted
+          aws s3api get-bucket-policy --bucket ${TEST_BUCKET} || \
+            echo "✅ Policy removed by auto-remediation"
+    
+    cleanup:
+      commands: |
+        aws s3 rb s3://${TEST_BUCKET}
+
+  # --------------------------------------------------------------------------
+  # Scenario 7: Data Exfiltration Attack
+  # --------------------------------------------------------------------------
+  # Simulates ransomware downloading all objects before encryption
+  # Detection: s3-data-exfiltration-detected
+  # --------------------------------------------------------------------------
+  - name: test-data-exfiltration
+    description: |
+      Simulate data exfiltration via mass download (double-extortion ransomware).
+      
+      Reference:
+      - https://rhinosecuritylabs.com/aws/s3-ransomware-part-1-attack-vector/
+      - Double-extortion: Steal data, then encrypt/delete
+    
+    attack_steps:
+      - step: 1
+        action: "Setup bucket with data"
+        commands: |
+          TEST_BUCKET="test-exfiltration-$(date +%s)"
+          aws s3 mb s3://${TEST_BUCKET}
+          
+          # Create large dataset
+          for i in {1..600}; do
+            dd if=/dev/urandom of=/tmp/sensitive-$i.bin bs=1M count=1 2>/dev/null
+            aws s3 cp /tmp/sensitive-$i.bin s3://${TEST_BUCKET}/data/file-$i.bin --only-show-errors
+          done
+          
+          echo "✅ Created 600 objects for exfiltration test"
+      
+      - step: 2
+        action: "Execute data exfiltration"
+        commands: |
+          # This should trigger: s3-data-exfiltration-detected (>500 GET in 10min)
+          echo "🚨 Starting data exfiltration simulation..."
+          
+          mkdir -p /tmp/exfiltrated
+          
+          # Rapidly download objects
+          for i in {1..550}; do
+            aws s3 cp s3://${TEST_BUCKET}/data/file-$i.bin /tmp/exfiltrated/ --only-show-errors
+          done
+          
+          echo "✅ Exfiltrated 550 objects - detection should trigger"
+      
+      - step: 3
+        action: "Verify detection"
+        commands: |
+          # Check CloudWatch metrics for GET spike
+          aws cloudwatch get-metric-statistics \
+            --namespace AWS/S3 \
+            --metric-name GetRequests \
+            --dimensions Name=BucketName,Value=${TEST_BUCKET} Name=FilterId,Value=EntireBucket \
+            --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
+            --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+            --period 600 \
+            --statistics Sum
+          
+          # Check BytesDownloaded
+          aws cloudwatch get-metric-statistics \
+            --namespace AWS/S3 \
+            --metric-name BytesDownloaded \
+            --dimensions Name=BucketName,Value=${TEST_BUCKET} Name=FilterId,Value=EntireBucket \
+            --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
+            --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+            --period 600 \
+            --statistics Sum
+    
+    cleanup:
+      commands: |
+        aws s3 rb s3://${TEST_BUCKET} --force
+        rm -rf /tmp/exfiltrated /tmp/sensitive-*.bin
+        echo "✅ Cleanup complete"
+
+# ============================================================================
+# Integration Test: Full Ransomware Attack Lifecycle
+# ============================================================================
+# This simulates a complete double-extortion ransomware attack
+# ============================================================================
+
+full_attack_simulation:
+  name: complete-ransomware-lifecycle
+  description: |
+    Simulates a complete double-extortion ransomware attack:
+    1. Disable security controls (versioning, encryption, PAB)
+    2. Exfiltrate data (download all objects)
+    3. Encrypt/overwrite objects
+    4. Delete some objects
+    5. Leave ransom note
+    
+    Reference: All attack patterns combined
+  
+  execution:
+    commands: |
+      #!/bin/bash
+      set -e
+      
+      echo "=========================================================================="
+      echo "  Complete Ransomware Attack Simulation"
+      echo "=========================================================================="
+      
+      # Phase 0: Setup
+      TEST_BUCKET="test-ransomware-full-$(date +%s)"
+      echo "📦 Creating test bucket: ${TEST_BUCKET}"
+      aws s3 mb s3://${TEST_BUCKET}
+      
+      # Enable all protections
+      aws s3api put-bucket-versioning --bucket ${TEST_BUCKET} --versioning-configuration Status=Enabled
+      aws s3api put-bucket-encryption --bucket ${TEST_BUCKET} --server-side-encryption-configuration \
+        '{"Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]}'
+      aws s3api put-public-access-block --bucket ${TEST_BUCKET} --public-access-block-configuration \
+        "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+      
+      # Create test data
+      echo "📝 Creating 200 test objects..."
+      for i in {1..200}; do
+        echo "Sensitive data $i" > /tmp/data-$i.txt
+        aws s3 cp /tmp/data-$i.txt s3://${TEST_BUCKET}/files/data-$i.txt --only-show-errors
+      done
+      
+      echo ""
+      echo "=========================================================================="
+      echo "  Phase 1: Disable Security Controls"
+      echo "=========================================================================="
+      
+      # Disable versioning
+      echo "🚨 Disabling versioning..."
+      aws s3api put-bucket-versioning --bucket ${TEST_BUCKET} --versioning-configuration Status=Suspended
+      
+      # Remove encryption
+      echo "🚨 Removing encryption..."
+      aws s3api delete-bucket-encryption --bucket ${TEST_BUCKET} 2>/dev/null || true
+      
+      # Remove Public Access Block
+      echo "🚨 Removing Public Access Block..."
+      aws s3api delete-public-access-block --bucket ${TEST_BUCKET}
+      
+      echo "⏳ Waiting for detections (30 seconds)..."
+      sleep 30
+      
+      echo ""
+      echo "=========================================================================="
+      echo "  Phase 2: Data Exfiltration"
+      echo "=========================================================================="
+      
+      echo "🚨 Exfiltrating data..."
+      mkdir -p /tmp/stolen
+      for i in {1..150}; do
+        aws s3 cp s3://${TEST_BUCKET}/files/data-$i.txt /tmp/stolen/ --only-show-errors
+      done
+      echo "✅ Exfiltrated 150 files"
+      
+      echo ""
+      echo "=========================================================================="
+      echo "  Phase 3: Mass Encryption"
+      echo "=========================================================================="
+      
+      echo "🚨 Encrypting objects..."
+      for i in {1..100}; do
+        echo "ENCRYPTED_$(openssl rand -hex 32)" > /tmp/encrypted-$i.txt
+        aws s3 cp /tmp/encrypted-$i.txt s3://${TEST_BUCKET}/files/data-$i.txt --only-show-errors
+      done
+      echo "✅ Encrypted 100 files"
+      
+      echo ""
+      echo "=========================================================================="
+      echo "  Phase 4: Mass Deletion"
+      echo "=========================================================================="
+      
+      echo "🚨 Deleting objects..."
+      for i in {101..150}; do
+        aws s3 rm s3://${TEST_BUCKET}/files/data-$i.txt --only-show-errors
+      done
+      echo "✅ Deleted 50 files"
+      
+      echo ""
+      echo "=========================================================================="
+      echo "  Phase 5: Leave Ransom Note"
+      echo "=========================================================================="
+      
+      cat > /tmp/RANSOM_NOTE.txt << 'EOFMARKER'
+      ALL YOUR S3 DATA HAS BEEN ENCRYPTED AND STOLEN
+      
+      Your S3 bucket has been compromised. We have:
+      - Downloaded all your sensitive data
+      - Encrypted your objects with military-grade encryption
+      - Deleted backups and versions
+      
+      PAY 10 BTC to: [BITCOIN_ADDRESS]
+      Contact: ransom@evil.com with Transaction ID
+      
+      TIME LIMIT: 48 HOURS
+      
+      If you don't pay:
+      - Your data will be sold on dark web
+      - Encryption keys will be destroyed
+      - Your data will be publicly leaked
+      
+      DO NOT contact AWS or authorities!
+      EOFMARKER
+      
+      aws s3 cp /tmp/RANSOM_NOTE.txt s3://${TEST_BUCKET}/RANSOM_NOTE.txt
+      aws s3 cp /tmp/RANSOM_NOTE.txt s3://${TEST_BUCKET}/HOW_TO_DECRYPT.txt
+      aws s3 cp /tmp/RANSOM_NOTE.txt s3://${TEST_BUCKET}/README_IMPORTANT.txt
+      
+      echo "✅ Ransom notes placed"
+      
+      echo ""
+      echo "=========================================================================="
+      echo "  Attack Simulation Complete"
+      echo "=========================================================================="
+      echo ""
+      echo "Test Bucket: ${TEST_BUCKET}"
+      echo ""
+      echo "Expected Detections:"
+      echo "  - s3-versioning-suspended"
+      echo "  - s3-encryption-tampering"
+      echo "  - s3-public-access-block-disabled"
+      echo "  - s3-data-exfiltration-detected"
+      echo "  - s3-mass-encryption-detected"
+      echo "  - s3-mass-deletion-detected"
+      echo ""
+      echo "Check:"
+      echo "  - CloudWatch Logs for policy executions"
+      echo "  - Security Hub for findings"
+      echo "  - SQS queue for notifications"
+      echo "  - CloudTrail for attack events"
+      echo ""
+      echo "Cleanup command:"
+      echo "  aws s3 rb s3://${TEST_BUCKET} --force"
+      echo "  rm -rf /tmp/stolen /tmp/data-*.txt /tmp/encrypted-*.txt"
+      echo ""
+      echo "=========================================================================="
+
+# ============================================================================
+# Notes on Testing
+# ============================================================================
+
+testing_notes: |
+  1. **Pre-requisites:**
+     - Deploy Cloud Custodian policies first
+     - Enable S3 Storage Metrics and Request Metrics
+     - Configure CloudWatch Alarms
+     - Ensure Lambda has proper permissions
+     - Enable CloudTrail logging
+  
+  2. **Execution:**
+     - Run scenarios in isolated test environment
+     - Use dedicated test AWS account if possible
+     - Monitor CloudWatch Logs during execution
+     - Check Security Hub findings after each scenario
+  
+  3. **Validation:**
+     - Verify policy execution in CloudWatch Logs
+     - Check Security Hub findings are created
+     - Confirm SQS notifications sent
+     - Verify auto-remediation actions
+     - Check CloudTrail events captured
+  
+  4. **Cleanup:**
+     - Always run cleanup commands after testing
+     - Delete test buckets and objects
+     - Remove temporary files
+     - Clear Security Hub findings if needed
+  
+  5. **Metrics Requirements:**
+     - Enable S3 Storage Metrics (daily)
+     - Enable S3 Request Metrics with FilterId "EntireBucket"
+     - Wait 24 hours for metrics to be available for some tests
+  
+  6. **Safety:**
+     - Never run on production buckets
+     - Use buckets with "test-ransomware-" prefix
+     - Set bucket lifecycle policies to auto-delete after 7 days
+     - Tag test resources: Environment=Test, Purpose=RansomwareSimulation
+
+references:
+  - https://github.com/agnideesh/python-ransomware-simulator
+  - https://github.com/raphabot/s3-ransomware-simulator
+  - https://aws.amazon.com/blogs/security/anatomy-of-a-ransomware-event-targeting-data-in-amazon-s3/
+  - https://rhinosecuritylabs.com/aws/s3-ransomware-part-1-attack-vector/
+  - https://rhinosecuritylabs.com/aws/s3-ransomware-part-2-prevention-and-defense/
+  - https://github.com/aws-samples/aws-customer-playbook-framework/blob/main/docs/Ransom_Response_S3.md
+  - https://www.cybr.com/cloud-security/amazon-s3-ransomware-defenses-cheat-sheet/
+  - https://catalog.us-east-1.prod.workshops.aws/workshops/fc7b7cf3-f494-48e2-8954-258ffdd76ed6/en-US

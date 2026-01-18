@@ -1,0 +1,235 @@
+policies:
+  # ============================================================================
+  # S3 Ransomware Detection - CloudWatch Metrics Based
+  # ============================================================================
+  # These policies detect ransomware attacks using CloudWatch S3 metrics.
+  # NOTE: Requires S3 Storage Metrics and Request Metrics to be enabled.
+  # Triggered via custom Lambda based on CloudWatch Alarm state changes.
+  # ============================================================================
+
+  # Policy 1: Mass Deletion Detection via Request Metrics
+  - name: s3-mass-deletion-detected
+    resource: aws.s3
+    description: |
+      Detect mass deletion attacks by monitoring high DELETE request rates.
+      Triggered when DELETE requests exceed threshold in short time period.
+      Requires S3 Request Metrics configured with FilterId 'EntireBucket'.
+    
+    filters:
+      # High number of DELETE requests indicates mass deletion attack
+      - type: metrics
+        name: DeleteRequests
+        dimensions:
+          BucketName: "{bucket_name}"
+          FilterId: "EntireBucket"
+        statistics: Sum
+        days: 1
+        period: 300  # 5 minutes
+        op: greater-than
+        value: 50  # More than 50 DELETE requests in 5 minutes
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: Mass Deletion Attack Detected - {{ region }}"
+        violation_desc: |
+          **⚠️ CRITICAL: S3 Mass Deletion Attack Detected**
+          
+          **Bucket:** {{ resource.Name }}
+          **Metric:** DeleteRequests exceeded threshold (>50 in 5 minutes)
+          **Region:** {{ region }}
+          
+          **Attack Pattern:**
+          High rate of DELETE requests detected, consistent with ransomware
+          attempting to destroy data before demanding ransom.
+          
+          **CloudWatch Metrics Query:**
+          ```bash
+          aws cloudwatch get-metric-statistics \
+            --namespace AWS/S3 \
+            --metric-name DeleteRequests \
+            --dimensions Name=BucketName,Value={{ resource.Name }} \
+                        Name=FilterId,Value=EntireBucket \
+            --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
+            --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+            --period 300 \
+            --statistics Sum
+          ```
+          
+          **Immediate Actions:**
+          1. Check CloudTrail for DeleteObject API calls
+          2. Identify the IAM principal making deletions
+          3. Disable compromised credentials immediately
+          4. Verify versioning is enabled for recovery
+          5. Review recent access patterns
+        to:
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+      
+      - type: post-finding
+        severity: 95
+        severity_label: CRITICAL
+        types:
+          - "Software and Configuration Checks/AWS Security Best Practices/S3 Ransomware"
+        compliance_status: FAILED
+        title: "S3 Mass Deletion Attack - Ransomware Detected"
+        description: |
+          Mass deletion attack detected on bucket {{ resource.Name }}.
+          DELETE request rate exceeded safe threshold. Immediate investigation required.
+
+  # Policy 2: Mass Encryption Detection via PUT Request Spike
+  - name: s3-mass-encryption-detected
+    resource: aws.s3
+    description: |
+      Detect mass encryption attacks by monitoring high PUT request rates.
+      Ransomware encrypts files by reading, encrypting, and re-uploading (PUT).
+      Requires S3 Request Metrics configured with FilterId 'EntireBucket'.
+    
+    filters:
+      # High number of PUT requests in short period indicates encryption attack
+      - type: metrics
+        name: PutRequests
+        dimensions:
+          BucketName: "{bucket_name}"
+          FilterId: "EntireBucket"
+        statistics: Sum
+        days: 1
+        period: 300  # 5 minutes
+        op: greater-than
+        value: 100  # More than 100 PUT requests in 5 minutes
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: Mass Encryption Attack Detected - {{ region }}"
+        violation_desc: |
+          **⚠️ CRITICAL: S3 Mass Encryption Attack Detected**
+          
+          **Bucket:** {{ resource.Name }}
+          **Metric:** PutRequests exceeded threshold (>100 in 5 minutes)
+          **Region:** {{ region }}
+          
+          **Attack Pattern:**
+          High rate of PUT requests detected. Ransomware typically:
+          1. Downloads objects (GET)
+          2. Encrypts locally
+          3. Re-uploads encrypted versions (PUT)
+          4. May delete originals (DELETE)
+          
+          **CloudWatch Metrics Query:**
+          ```bash
+          aws cloudwatch get-metric-statistics \
+            --namespace AWS/S3 \
+            --metric-name PutRequests \
+            --dimensions Name=BucketName,Value={{ resource.Name }} \
+                        Name=FilterId,Value=EntireBucket \
+            --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
+            --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+            --period 300 \
+            --statistics Sum
+          ```
+          
+          **Immediate Actions:**
+          1. Check CloudTrail for PutObject API calls
+          2. Identify the IAM principal making PUT requests
+          3. Disable compromised credentials immediately
+          4. Enable versioning if not already enabled
+          5. Check for suspicious user agents or IP addresses
+          6. Use S3 Object Lock to prevent overwrites
+        to:
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+      
+      - type: post-finding
+        severity: 95
+        severity_label: CRITICAL
+        types:
+          - "Software and Configuration Checks/AWS Security Best Practices/S3 Ransomware"
+        compliance_status: FAILED
+        title: "S3 Mass Encryption Attack - Ransomware Detected"
+        description: |
+          Mass encryption attack detected on bucket {{ resource.Name }}.
+          PUT request rate exceeded safe threshold. Immediate investigation required.
+
+  # Policy 3: Data Exfiltration Detection via High Download Rate
+  - name: s3-data-exfiltration-detected
+    resource: aws.s3
+    description: |
+      Detect data exfiltration by monitoring high GET request rates.
+      Double-extortion ransomware exfiltrates data before encryption.
+      Requires S3 Request Metrics configured with FilterId 'EntireBucket'.
+    
+    filters:
+      # High number of GET requests indicates potential data exfiltration
+      - type: metrics
+        name: GetRequests
+        dimensions:
+          BucketName: "{bucket_name}"
+          FilterId: "EntireBucket"
+        statistics: Sum
+        days: 1
+        period: 600  # 10 minutes
+        op: greater-than
+        value: 500  # More than 500 GET requests in 10 minutes
+    
+    actions:
+      - type: notify
+        template: default.html
+        priority_header: "1"
+        subject: "🚨 CRITICAL: S3 Data Exfiltration Detected - {{ region }}"
+        violation_desc: |
+          **⚠️ CRITICAL: Potential Data Exfiltration Detected**
+          
+          **Bucket:** {{ resource.Name }}
+          **Metric:** GetRequests exceeded threshold (>500 in 10 minutes)
+          **Region:** {{ region }}
+          
+          **Attack Pattern:**
+          High rate of GET requests detected. Double-extortion ransomware:
+          1. Exfiltrates data via GET requests
+          2. Threatens to publish stolen data
+          3. Encrypts or deletes data
+          4. Demands ransom for decryption AND non-publication
+          
+          **CloudWatch Metrics Query:**
+          ```bash
+          aws cloudwatch get-metric-statistics \
+            --namespace AWS/S3 \
+            --metric-name GetRequests \
+            --dimensions Name=BucketName,Value={{ resource.Name }} \
+                        Name=FilterId,Value=EntireBucket \
+            --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S) \
+            --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+            --period 600 \
+            --statistics Sum
+          ```
+          
+          **Immediate Actions:**
+          1. Check CloudTrail for GetObject API calls
+          2. Review source IP addresses and user agents
+          3. Check BytesDownloaded metric for volume
+          4. Identify the IAM principal
+          5. Disable compromised credentials
+          6. Review VPC Flow Logs for unusual traffic
+        to:
+          - ysrinu95@gmail.com
+        transport:
+          type: sqs
+          queue: https://sqs.us-east-1.amazonaws.com/172327596604/aikyam-cloud-custodian-realtime-notifications
+      
+      - type: post-finding
+        severity: 90
+        severity_label: CRITICAL
+        types:
+          - "Software and Configuration Checks/AWS Security Best Practices/S3 Ransomware"
+        title: "S3 Data Exfiltration Attack Detected"
+        description: |
+          Potential data exfiltration detected on bucket {{ resource.Name }}.
+          GET request rate exceeded safe threshold.
+    

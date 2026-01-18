@@ -159,6 +159,8 @@ resource "aws_cloudwatch_event_rule" "forward_security_events_to_central" {
             "DeleteBucketPublicAccessBlock",
             "PutBucketEncryption",
             "DeleteBucketEncryption",
+            "PutBucketVersioning",
+            "DeleteBucketReplication",
             # CloudFront events
             "CreateDistribution",
             "UpdateDistribution",

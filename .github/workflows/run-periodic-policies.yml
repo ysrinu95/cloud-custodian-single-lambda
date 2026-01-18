@@ -2,8 +2,10 @@ name: Run Cloud Custodian Periodic Policies
 
 on:
   schedule:
-    # Run daily at 6 AM UTC
+    # Run daily at 6 AM UTC (all policies)
     - cron: '0 6 * * *'
+    # Run every 6 hours for critical policies (S3, IAM, Security Hub)
+    - cron: '0 */6 * * *'
   workflow_dispatch:
     inputs:
       account_id:
@@ -12,14 +14,20 @@ on:
         type: string
         default: '813185901390'
       policy_file:
-        description: 'Specific policy file to run (optional, runs all if empty)'
+        description: 'Specific policy file to run (e.g., s3.yml, iam.yml, all)'
         required: false
         type: string
+        default: 'all'
       dry_run:
         description: 'Dry run mode (skip actions)'
         required: false
         type: boolean
         default: false
+      regions:
+        description: 'AWS regions to scan (comma-separated, or "all")'
+        required: false
+        type: string
+        default: 'us-east-1'
 
 env:
   AWS_REGION: us-east-1
@@ -83,21 +91,45 @@ jobs:
           ACCOUNT_ID="${{ steps.account.outputs.account_id }}"
           POLICY_FILE="${{ github.event.inputs.policy_file }}"
           DRY_RUN="${{ github.event.inputs.dry_run }}"
+          REGIONS="${{ github.event.inputs.regions || 'us-east-1' }}"
           
           cd c7n
           mkdir -p output/periodic
           
-          echo "📋 Running Cloud Custodian periodic policies..."
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  Cloud Custodian Periodic Policies Execution"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "Account: $ACCOUNT_ID"
-          echo "Region: ${{ env.AWS_REGION }}"
+          echo "Regions: $REGIONS"
+          echo "Dry Run: $DRY_RUN"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
           
-          # Determine which policies to run
-          if [ -n "$POLICY_FILE" ]; then
-            POLICY_FILES="policies/periodic/$POLICY_FILE"
-            echo "Running specific policy: $POLICY_FILE"
+          # Determine which policies to run based on schedule or input
+          if [ "${{ github.event_name }}" == "schedule" ] && [ "${{ github.event.schedule }}" == "0 */6 * * *" ]; then
+            # Every 6 hours: run critical policies only
+            POLICY_FILES="policies/periodic/s3.yml policies/periodic/iam.yml policies/periodic/securityhub.yml"
+            echo "⏰ Scheduled run (6-hourly): Critical policies only"
+          elif [ -n "$POLICY_FILE" ] && [ "$POLICY_FILE" != "all" ]; then
+            # Specific policy requested
+            if [[ "$POLICY_FILE" == *.yml ]]; then
+              POLICY_FILES="policies/periodic/$POLICY_FILE"
+            else
+              POLICY_FILES="policies/periodic/${POLICY_FILE}.yml"
+            fi
+            echo "📄 Running specific policy: $POLICY_FILE"
           else
-            POLICY_FILES="policies/periodic/*.yml"
-            echo "Running all periodic policies"
+            # Run all periodic policies
+            POLICY_FILES=$(find policies/periodic -name "*.yml" -type f)
+            echo "📋 Running all periodic policies"
+          fi
+          
+          # Parse regions
+          if [ "$REGIONS" == "all" ]; then
+            REGION_LIST="us-east-1 us-west-2 eu-west-1 eu-central-1 ap-southeast-1"
+            echo "🌍 Running in all major regions"
+          else
+            REGION_LIST=$(echo "$REGIONS" | tr ',' ' ')
           fi
           
           # Build custodian command
@@ -108,42 +140,72 @@ jobs:
             echo "🔍 DRY RUN MODE - No actions will be taken"
           fi
           
-          # Run policies
-          for policy in $POLICY_FILES; do
-            if [ -f "$policy" ]; then
-              POLICY_NAME=$(basename "$policy" .yml)
-              echo ""
-              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-              echo "📄 Running policy: $POLICY_NAME"
-              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-              
-              $CUSTODIAN_CMD \
-                -s "output/periodic/$POLICY_NAME" \
-                -v \
-                --region ${{ env.AWS_REGION }} \
-                "$policy" || {
-                  echo "⚠️  Failed to run $POLICY_NAME"
-                  continue
-                }
-              
-              echo "✅ Completed: $POLICY_NAME"
-            fi
+          # Track statistics
+          TOTAL_POLICIES=0
+          SUCCESS_COUNT=0
+          FAILED_COUNT=0
+          TOTAL_RESOURCES=0
+          
+          # Run policies across regions
+          for region in $REGION_LIST; do
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "🌎 Region: $region"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            
+            for policy in $POLICY_FILES; do
+              if [ -f "$policy" ]; then
+                POLICY_NAME=$(basename "$policy" .yml)
+                TOTAL_POLICIES=$((TOTAL_POLICIES + 1))
+                
+                echo ""
+                echo "📄 Policy: $POLICY_NAME (Region: $region)"
+                echo "   File: $policy"
+                
+                OUTPUT_DIR="output/periodic/${region}/${POLICY_NAME}"
+                mkdir -p "$OUTPUT_DIR"
+                
+                # Run custodian
+                if $CUSTODIAN_CMD \
+                  -s "$OUTPUT_DIR" \
+                  --region "$region" \
+                  --output-dir "$OUTPUT_DIR" \
+                  --cache-period 0 \
+                  "$policy" 2>&1 | tee "$OUTPUT_DIR/execution.log"; then
+                  
+                  # Count resources found
+                  if [ -f "$OUTPUT_DIR/resources.json" ]; then
+                    RESOURCE_COUNT=$(jq '. | length' "$OUTPUT_DIR/resources.json" 2>/dev/null || echo "0")
+                    TOTAL_RESOURCES=$((TOTAL_RESOURCES + RESOURCE_COUNT))
+                    echo "   ✅ Success: $RESOURCE_COUNT resources found"
+                    SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+                  else
+                    echo "   ✅ Success: 0 resources found"
+                    SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+                  fi
+                else
+                  echo "   ❌ Failed to execute $POLICY_NAME"
+                  FAILED_COUNT=$((FAILED_COUNT + 1))
+                fi
+              fi
+            done
           done
           
           echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "📊 Policy Execution Summary"
+          echo "📊 Execution Summary"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Total Policies Executed: $TOTAL_POLICIES"
+          echo "Successful: $SUCCESS_COUNT"
+          echo "Failed: $FAILED_COUNT"
+          echo "Total Resources Found: $TOTAL_RESOURCES"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           
-          # Count resources found
-          for policy_output in output/periodic/*/resources.json; do
-            if [ -f "$policy_output" ]; then
-              POLICY_DIR=$(dirname "$policy_output")
-              POLICY_NAME=$(basename "$POLICY_DIR")
-              RESOURCE_COUNT=$(jq '. | length' "$policy_output" 2>/dev/null || echo "0")
-              echo "$POLICY_NAME: $RESOURCE_COUNT resources found"
-            fi
-          done
+          # Export for summary step
+          echo "TOTAL_POLICIES=$TOTAL_POLICIES" >> $GITHUB_ENV
+          echo "SUCCESS_COUNT=$SUCCESS_COUNT" >> $GITHUB_ENV
+          echo "FAILED_COUNT=$FAILED_COUNT" >> $GITHUB_ENV
+          echo "TOTAL_RESOURCES=$TOTAL_RESOURCES" >> $GITHUB_ENV
 
       - name: Upload policy results
         if: always()
@@ -156,27 +218,88 @@ jobs:
       - name: Generate summary
         if: always()
         run: |
-          echo "## Cloud Custodian Periodic Policies Execution" >> $GITHUB_STEP_SUMMARY
+          echo "# 📊 Cloud Custodian Periodic Policies Execution" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Account:** ${{ steps.account.outputs.account_id }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Region:** ${{ env.AWS_REGION }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Dry Run:** ${{ github.event.inputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
+          echo "## Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- **Account:** ${{ steps.account.outputs.account_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Regions:** ${{ github.event.inputs.regions || 'us-east-1' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dry Run:** ${{ github.event.inputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Policy File:** ${{ github.event.inputs.policy_file || 'all' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total Policies:** ${TOTAL_POLICIES:-0}" >> $GITHUB_STEP_SUMMARY
+          echo "- **✅ Successful:** ${SUCCESS_COUNT:-0}" >> $GITHUB_STEP_SUMMARY
+          echo "- **❌ Failed:** ${FAILED_COUNT:-0}" >> $GITHUB_STEP_SUMMARY
+          echo "- **📦 Total Resources Found:** ${TOTAL_RESOURCES:-0}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ -d "c7n/output/periodic" ]; then
-            echo "### Results by Policy" >> $GITHUB_STEP_SUMMARY
+            echo "## Results by Region and Policy" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "| Policy | Resources Found |" >> $GITHUB_STEP_SUMMARY
-            echo "|--------|----------------|" >> $GITHUB_STEP_SUMMARY
             
-            for policy_output in c7n/output/periodic/*/resources.json; do
-              if [ -f "$policy_output" ]; then
-                POLICY_DIR=$(dirname "$policy_output")
-                POLICY_NAME=$(basename "$POLICY_DIR")
-                RESOURCE_COUNT=$(jq '. | length' "$policy_output" 2>/dev/null || echo "0")
-                echo "| $POLICY_NAME | $RESOURCE_COUNT |" >> $GITHUB_STEP_SUMMARY
+            for region_dir in c7n/output/periodic/*/; do
+              if [ -d "$region_dir" ]; then
+                REGION=$(basename "$region_dir")
+                echo "### 🌎 Region: $REGION" >> $GITHUB_STEP_SUMMARY
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo "| Policy | Resources Found | Status |" >> $GITHUB_STEP_SUMMARY
+                echo "|--------|----------------|--------|" >> $GITHUB_STEP_SUMMARY
+                
+                for policy_output in "$region_dir"/*/resources.json; do
+                  if [ -f "$policy_output" ]; then
+                    POLICY_DIR=$(dirname "$policy_output")
+                    POLICY_NAME=$(basename "$POLICY_DIR")
+                    RESOURCE_COUNT=$(jq '. | length' "$policy_output" 2>/dev/null || echo "0")
+                    
+                    # Determine status icon
+                    if [ -f "$(dirname "$policy_output")/execution.log" ]; then
+                      if grep -q "ERROR" "$(dirname "$policy_output")/execution.log"; then
+                        STATUS="❌ Error"
+                      else
+                        STATUS="✅ Success"
+                      fi
+                    else
+                      STATUS="⚠️ Unknown"
+                    fi
+                    
+                    echo "| $POLICY_NAME | $RESOURCE_COUNT | $STATUS |" >> $GITHUB_STEP_SUMMARY
+                  fi
+                done
+                echo "" >> $GITHUB_STEP_SUMMARY
               fi
             done
+            
+            # Add quick links
+            echo "## 📎 Quick Links" >> $GITHUB_STEP_SUMMARY
+            echo "- [Download Results Artifact](#)" >> $GITHUB_STEP_SUMMARY
+            echo "- [View CloudWatch Logs](https://console.aws.amazon.com/cloudwatch/home?region=us-east-1#logsV2:log-groups)" >> $GITHUB_STEP_SUMMARY
+            echo "- [Security Hub Findings](https://console.aws.amazon.com/securityhub/home?region=us-east-1#/findings)" >> $GITHUB_STEP_SUMMARY
           else
-            echo "No results generated" >> $GITHUB_STEP_SUMMARY
+            echo "❌ No results generated" >> $GITHUB_STEP_SUMMARY
           fi
+          
+          # Add available policy files
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📋 Available Periodic Policies" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cd c7n/policies/periodic
+          echo "| Policy File | Description |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------------|-------------|" >> $GITHUB_STEP_SUMMARY
+          for policy in *.yml; do
+            DESC=$(grep -m 1 "description:" "$policy" | sed 's/.*description: //' | tr -d '"' || echo "N/A")
+            echo "| \`$policy\` | ${DESC:0:60}... |" >> $GITHUB_STEP_SUMMARY
+          done
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "⚠️ Periodic policy execution failed!"
+          echo "Check the workflow logs for details."
+          echo "Account: ${{ steps.account.outputs.account_id }}"
+          echo "Failed policies: ${FAILED_COUNT:-unknown}"
+          
+          # You can add Slack/Teams/Email notification here
+          # Example for Slack webhook:
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data '{"text":"❌ Cloud Custodian periodic policies failed for account ${{ steps.account.outputs.account_id }}"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}

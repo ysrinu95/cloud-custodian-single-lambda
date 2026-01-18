@@ -118,6 +118,58 @@
             "source_file": "aws-s3-security.yml",
             "enforcement_level": "notify",
             "description": "Detect when S3 bucket encryption is removed"
+          },
+          {
+            "policy_name": "s3-encryption-tampering",
+            "resource": "aws.s3",
+            "source_file": "aws-s3-ransomware-protection.yml",
+            "enforcement_level": "remediate",
+            "description": "Detect and remediate encryption tampering (ransomware indicator)"
+          }
+        ],
+        "PutBucketEncryption": [
+          {
+            "policy_name": "s3-encryption-tampering",
+            "resource": "aws.s3",
+            "source_file": "aws-s3-ransomware-protection.yml",
+            "enforcement_level": "notify",
+            "description": "Monitor encryption changes that may indicate tampering"
+          }
+        ],
+        "PutBucketVersioning": [
+          {
+            "policy_name": "s3-versioning-suspended",
+            "resource": "aws.s3",
+            "source_file": "aws-s3-ransomware-protection.yml",
+            "enforcement_level": "remediate",
+            "description": "Auto-remediate versioning suspension (ransomware prevention)"
+          }
+        ],
+        "DeleteBucketReplication": [
+          {
+            "policy_name": "s3-replication-tampering",
+            "resource": "aws.s3",
+            "source_file": "aws-s3-ransomware-protection.yml",
+            "enforcement_level": "notify",
+            "description": "Detect deletion of replication configuration"
+          }
+        ],
+        "PutBucketPolicy": [
+          {
+            "policy_name": "s3-malicious-bucket-policy",
+            "resource": "aws.s3",
+            "source_file": "aws-s3-ransomware-protection.yml",
+            "enforcement_level": "remediate",
+            "description": "Detect and remove malicious bucket policies"
+          }
+        ],
+        "DeletePublicAccessBlock": [
+          {
+            "policy_name": "s3-public-access-block-disabled",
+            "resource": "aws.s3",
+            "source_file": "aws-s3-ransomware-protection.yml",
+            "enforcement_level": "remediate",
+            "description": "Auto-remediate when public access block is disabled"
           }
         ],
         "PutBucketAcl": [
