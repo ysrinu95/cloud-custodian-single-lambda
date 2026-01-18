@@ -52,7 +52,7 @@ jobs:
 
       - name: Assume role in Member Account
         run: |
-          echo "🔐 Assuming CloudCustodianExecutionRole in member account..."
+          echo "🔐 Assuming role in member account..."
           echo "Target account: ${{ github.event.inputs.account_id }}"
           
           # First, verify we're starting from central account
@@ -64,16 +64,30 @@ jobs:
             exit 1
           fi
           
-          # Assume role in member account
+          # Try OrganizationAccountAccessRole first (standard AWS Organizations role)
+          echo "Attempting to assume OrganizationAccountAccessRole..."
           CREDENTIALS=$(aws sts assume-role \
-            --role-arn "arn:aws:iam::${{ github.event.inputs.account_id }}:role/CloudCustodianExecutionRole" \
+            --role-arn "arn:aws:iam::${{ github.event.inputs.account_id }}:role/OrganizationAccountAccessRole" \
             --role-session-name "github-actions-create-test-resources" \
             --duration-seconds 3600 \
             --output json 2>&1)
           
           if [ $? -ne 0 ]; then
-            echo "::error::Failed to assume role: $CREDENTIALS"
-            exit 1
+            echo "⚠️  OrganizationAccountAccessRole not available, trying CloudCustodianExecutionRole..."
+            
+            # Try CloudCustodianExecutionRole as fallback (requires member account root trust)
+            CREDENTIALS=$(aws sts assume-role \
+              --role-arn "arn:aws:iam::${{ github.event.inputs.account_id }}:role/CloudCustodianExecutionRole" \
+              --role-session-name "github-actions-create-test-resources" \
+              --duration-seconds 3600 \
+              --output json 2>&1)
+            
+            if [ $? -ne 0 ]; then
+              echo "::error::Failed to assume role in member account. Error: $CREDENTIALS"
+              echo "::error::Neither OrganizationAccountAccessRole nor CloudCustodianExecutionRole could be assumed."
+              echo "::error::Please ensure one of these roles exists and trusts the central account (172327596604)"
+              exit 1
+            fi
           fi
           
           # Export credentials to environment
