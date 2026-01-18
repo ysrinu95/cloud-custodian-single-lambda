@@ -36,7 +36,7 @@ policies:
           \`\`\`bash
           # Step 1: Get current distribution config and ETag
           aws cloudfront get-distribution-config \
-            --id {{ event.detail.responseElements.distribution.id or resource.Id }} \
+            --id {{ resource.Id }} \
             --query '[DistributionConfig, ETag]' \
             --output json > dist-config.json
           
@@ -50,7 +50,7 @@ policies:
           
           # Step 4: Apply updated configuration
           aws cloudfront update-distribution \
-            --id {{ event.detail.responseElements.distribution.id or resource.Id }} \
+            --id {{ resource.Id }} \
             --distribution-config file://config-updated.json \
             --if-match "$ETAG"
           \`\`\`
@@ -124,7 +124,7 @@ policies:
           \`\`\`bash
           # Step 1: Get current distribution config and ETag
           aws cloudfront get-distribution-config \
-            --id {{ event.detail.responseElements.distribution.id or resource.Id }} \
+            --id {{ resource.Id }} \
             --query '[DistributionConfig, ETag]' \
             --output json > dist-config.json
           
@@ -147,7 +147,7 @@ policies:
           
           # Step 4: Apply updated configuration
           aws cloudfront update-distribution \
-            --id {{ event.detail.responseElements.distribution.id or resource.Id }} \
+            --id {{ resource.Id }} \
             --distribution-config file://config-updated.json \
             --if-match "$ETAG"
           \`\`\`
@@ -212,7 +212,7 @@ policies:
           \`\`\`bash
           # Step 1: Get current distribution config and ETag
           aws cloudfront get-distribution-config \
-            --id {{ event.detail.responseElements.distribution.id or resource.Id }} \
+            --id {{ resource.Id }} \
             --query '[DistributionConfig, ETag]' \
             --output json > dist-config.json
           
@@ -226,7 +226,7 @@ policies:
           
           # Step 4: Apply updated configuration
           aws cloudfront update-distribution \
-            --id {{ event.detail.responseElements.distribution.id or resource.Id }} \
+            --id {{ resource.Id }} \
             --distribution-config file://config-updated.json \
             --if-match "$ETAG"
           \`\`\`
