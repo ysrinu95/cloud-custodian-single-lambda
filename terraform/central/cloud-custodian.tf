@@ -2120,8 +2120,10 @@ resource "aws_lambda_layer_version" "mailer_layer_external" {
 resource "null_resource" "mailer_function_build" {
   count = var.create_mailer_lambda ? 1 : 0
 
-  # No triggers needed - handler is generated inline, config is from environment variables
-  # Function will rebuild only when provisioner command changes or resource is tainted
+  # Trigger rebuild when any of these values change
+  triggers = {
+    always_run = timestamp()  # Always rebuild to ensure zip exists
+  }
 
   provisioner "local-exec" {
     working_dir = path.module
